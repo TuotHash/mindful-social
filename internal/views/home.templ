@@ -1,0 +1,39 @@
+package views
+
+import "github.com/mindful-social/mindful-social/internal/db"
+
+templ Home(viewer *Viewer, recent []db.Node) {
+	@Layout("Home", viewer) {
+		<section class="hero">
+			<h1>Mindful Social</h1>
+			<p class="lede">A graph of views, reasoning, and the people who hold them.</p>
+			if viewer == nil {
+				<p>
+					<a class="btn primary" href="/signup">Create an account</a>
+					<a class="btn" href="/login">Log in</a>
+				</p>
+			} else {
+				<p>
+					<a class="btn primary" href="/nodes/new">Add a node</a>
+				</p>
+			}
+		</section>
+		<section>
+			<h2>Recent nodes</h2>
+			if len(recent) == 0 {
+				<p class="muted">The graph is empty. Be the first to add a node.</p>
+			} else {
+				<ul class="node-list">
+					for _, n := range recent {
+						<li>
+							<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
+								<span class={ "badge", "badge-" + string(n.Type) }>{ string(n.Type) }</span>
+								<span class="title">{ n.Title }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			}
+		</section>
+	}
+}

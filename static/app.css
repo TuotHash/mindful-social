@@ -1,0 +1,141 @@
+/* Minimal styling — placeholder until we do real design. */
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  margin: 0;
+  background: #fafafa;
+  color: #1d1d1f;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 760px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid #e5e5ea;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topbar .brand {
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+}
+
+.topbar nav {
+  margin-left: auto;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.topbar nav a, .topbar nav .user, .topbar nav .link {
+  color: #444;
+  text-decoration: none;
+}
+
+.topbar nav .user { color: #888; }
+
+.inline { display: inline; }
+
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn.primary {
+  background: #0071e3;
+  color: #fff;
+  border-color: #0071e3;
+}
+
+button.link {
+  background: none;
+  border: 0;
+  color: #444;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.muted { color: #888; }
+.lede { font-size: 1.15rem; color: #555; }
+
+.flash {
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  border-radius: 6px;
+}
+
+.form { display: flex; flex-direction: column; gap: 1rem; max-width: 420px; }
+.form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.95rem; }
+.form input, .form textarea, .form select {
+  padding: 0.5rem;
+  border: 1px solid #d1d1d6;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
+}
+.form small { color: #888; font-size: 0.85rem; }
+
+.oauth-buttons { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.node-list { list-style: none; padding: 0; }
+.node-list li { margin: 0.5rem 0; }
+.node-list a { display: flex; gap: 0.75rem; align-items: center; text-decoration: none; color: inherit; }
+.node-list .title { font-weight: 500; }
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #e5e5ea;
+  color: #444;
+}
+
+.badge-topic     { background: #d1e7ff; color: #003c8f; }
+.badge-view      { background: #ffe1cc; color: #6e2a00; }
+.badge-reasoning { background: #d4edda; color: #155724; }
+.badge-fact      { background: #f3d4ff; color: #4b006e; }
+
+.node header { display: flex; gap: 0.75rem; align-items: center; }
+.node h1 { margin: 0.25rem 0; }
+.node .body { margin: 1rem 0; }
+.node .source a { word-break: break-all; }
+
+.legend { margin-top: 2rem; }
+.legend h2 { font-size: 1.1rem; }
+.legend h3 { font-size: 1rem; color: #555; margin: 1rem 0 0.5rem; }
+
+.edge-group { margin-bottom: 0.75rem; }
+.edge-group h4 { margin: 0.25rem 0; font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+.edge-group ul { list-style: none; padding-left: 0.5rem; border-left: 3px solid #e5e5ea; margin: 0.25rem 0; }
+.edge-group li { margin: 0.25rem 0; }
+.edge-group a { display: flex; gap: 0.5rem; align-items: center; text-decoration: none; color: inherit; }
+
+.edge-supports   ul { border-left-color: #4caf50; }
+.edge-opposes    ul { border-left-color: #f44336; }
+.edge-refines    ul { border-left-color: #2196f3; }
+.edge-cites      ul { border-left-color: #9c27b0; }
+.edge-relates_to ul { border-left-color: #999; }

@@ -3,14 +3,42 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Users authenticate with email + password. Username is a public handle.
+-- Users have a username (public handle) and email. Authentication credentials
+-- live in `auth_identities` so the same user can have multiple ways to sign in
+-- (password + Google + GitHub + custom OIDC, etc.).
 CREATE TABLE users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username      TEXT NOT NULL UNIQUE,
-  email         TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username   TEXT NOT NULL UNIQUE,
+  email      TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- One row per (user, provider) authentication link.
+--   provider:  'password' for local accounts, otherwise the provider key
+--              ('google', 'github', or 'oidc:<configured-name>').
+--   subject:   email for password identities; the IdP's stable user id
+--              (OIDC `sub` claim, GitHub user id) for OAuth.
+--   secret:    bcrypt hash for password identities, NULL for OAuth.
+CREATE TABLE auth_identities (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider   TEXT NOT NULL,
+  subject    TEXT NOT NULL,
+  secret     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, subject)
+);
+
+CREATE INDEX idx_auth_identities_user ON auth_identities(user_id);
+
+-- Session storage for alexedwards/scs (postgresstore).
+CREATE TABLE sessions (
+  token  CHAR(43) PRIMARY KEY,
+  data   BYTEA NOT NULL,
+  expiry TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX sessions_expiry_idx ON sessions(expiry);
 
 -- A node is anything in the graph: a topic, a stance, a piece of reasoning,
 -- or an external fact/source. Type drives navigation; tags add free-form
@@ -91,6 +119,8 @@ DROP TABLE IF EXISTS edges;
 DROP TYPE  IF EXISTS edge_kind;
 DROP TABLE IF EXISTS nodes;
 DROP TYPE  IF EXISTS node_type;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS auth_identities;
 DROP TABLE IF EXISTS users;
 
 -- +goose StatementEnd

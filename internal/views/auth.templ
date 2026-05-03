@@ -1,0 +1,69 @@
+package views
+
+// OAuthButton is a small stable record so handlers can hand templates the
+// list of available providers without leaking the auth.Provider interface.
+type OAuthButton struct {
+	Key   string
+	Label string
+}
+
+templ oauthButtons(buttons []OAuthButton) {
+	if len(buttons) > 0 {
+		<div class="oauth-buttons">
+			<p class="muted">Or sign in with:</p>
+			for _, b := range buttons {
+				<a class="btn" href={ templ.SafeURL("/auth/oauth/" + b.Key) }>{ b.Label }</a>
+			}
+		</div>
+	}
+}
+
+templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) {
+	@Layout("Sign up", nil) {
+		<section class="auth">
+			<h1>Create an account</h1>
+			@Flash(flash)
+			<form method="post" action="/signup" class="form">
+				<label>
+					Username
+					<input type="text" name="username" required minlength="3" maxlength="32" value={ formUsername }/>
+					<small>3–32 chars: letters, digits, dot, dash, underscore.</small>
+				</label>
+				<label>
+					Email
+					<input type="email" name="email" required value={ formEmail }/>
+				</label>
+				<label>
+					Password
+					<input type="password" name="password" required minlength="12"/>
+					<small>At least 12 characters.</small>
+				</label>
+				<button type="submit" class="btn primary">Sign up</button>
+			</form>
+			@oauthButtons(oauth)
+			<p class="muted"><a href="/login">Already have an account? Log in.</a></p>
+		</section>
+	}
+}
+
+templ Login(flash string, oauth []OAuthButton, formEmail string) {
+	@Layout("Log in", nil) {
+		<section class="auth">
+			<h1>Log in</h1>
+			@Flash(flash)
+			<form method="post" action="/login" class="form">
+				<label>
+					Email
+					<input type="email" name="email" required value={ formEmail }/>
+				</label>
+				<label>
+					Password
+					<input type="password" name="password" required/>
+				</label>
+				<button type="submit" class="btn primary">Log in</button>
+			</form>
+			@oauthButtons(oauth)
+			<p class="muted"><a href="/signup">Don&rsquo;t have an account? Sign up.</a></p>
+		</section>
+	}
+}

@@ -1,0 +1,49 @@
+package views
+
+// Layout is the shared chrome around every page. Title is set per-page.
+// CurrentUser is rendered in the header when set; nil means logged-out.
+templ Layout(title string, currentUser *Viewer) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } — Mindful Social</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+		</head>
+		<body>
+			<header class="topbar">
+				<a class="brand" href="/">Mindful Social</a>
+				<nav>
+					if currentUser != nil {
+						<a href="/nodes/new">New node</a>
+						<span class="user">{ currentUser.Username }</span>
+						<form method="post" action="/logout" class="inline">
+							<button type="submit" class="link">Log out</button>
+						</form>
+					} else {
+						<a href="/login">Log in</a>
+						<a href="/signup">Sign up</a>
+					}
+				</nav>
+			</header>
+			<main>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+// Viewer is the small slice of user info templates need. We avoid passing
+// the full db.User so views don't depend on database types.
+type Viewer struct {
+	ID       string
+	Username string
+}
+
+// Flash is a one-shot banner message rendered above forms.
+templ Flash(msg string) {
+	if msg != "" {
+		<div class="flash" role="alert">{ msg }</div>
+	}
+}

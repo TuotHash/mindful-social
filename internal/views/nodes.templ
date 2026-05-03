@@ -1,0 +1,124 @@
+package views
+
+import (
+	"github.com/google/uuid"
+	"github.com/mindful-social/mindful-social/internal/db"
+)
+
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL string) {
+	@Layout("New node", viewer) {
+		<section class="auth">
+			<h1>Add a node</h1>
+			<p class="muted">Pick a type. Topics group views; views are stances; reasonings are arguments; facts are external sources you cite.</p>
+			@Flash(flash)
+			<form method="post" action="/nodes" class="form">
+				<label>
+					Type
+					<select name="type" required>
+						<option value="topic" selected?={ formType == "topic" || formType == "" }>Topic</option>
+						<option value="view" selected?={ formType == "view" }>View</option>
+						<option value="reasoning" selected?={ formType == "reasoning" }>Reasoning</option>
+						<option value="fact" selected?={ formType == "fact" }>Fact / Source</option>
+					</select>
+				</label>
+				<label>
+					Title
+					<input type="text" name="title" required maxlength="200" value={ formTitle }/>
+				</label>
+				<label>
+					Body
+					<textarea name="body" rows="6">{ formBody }</textarea>
+					<small>Optional. Describe the node in your own words.</small>
+				</label>
+				<label>
+					Source URL <small>(facts only)</small>
+					<input type="url" name="source_url" value={ formSourceURL }/>
+				</label>
+				<button type="submit" class="btn primary">Create node</button>
+			</form>
+		</section>
+	}
+}
+
+// EdgeRow is the projection ListEdgesFromNode / ListEdgesToNode return —
+// templates render it directly so handlers don't have to repackage.
+type EdgeRow struct {
+	Kind  db.EdgeKind
+	ID    uuid.UUID
+	Type  db.NodeType
+	Title string
+}
+
+// EdgeGroup is one section of the legend on a node detail page: a heading
+// (e.g. "Supports") and the rows that fall under it.
+type EdgeGroup struct {
+	Label string
+	Kind  db.EdgeKind
+	Rows  []EdgeRow
+}
+
+templ NodeDetail(viewer *Viewer, node db.Node, outgoing, incoming []EdgeGroup) {
+	@Layout(node.Title, viewer) {
+		<article class="node">
+			<header>
+				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
+				<h1>{ node.Title }</h1>
+			</header>
+			if node.Body != "" {
+				<section class="body">
+					<p>{ node.Body }</p>
+				</section>
+			}
+			if node.SourceUrl != nil && *node.SourceUrl != "" {
+				<section class="source">
+					<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">{ *node.SourceUrl }</a>
+				</section>
+			}
+		</article>
+
+		<aside class="legend">
+			<h2>Legend</h2>
+			<section>
+				<h3>This node points at…</h3>
+				@edgeGroups(outgoing, "outgoing")
+			</section>
+			<section>
+				<h3>…what points at this node</h3>
+				@edgeGroups(incoming, "incoming")
+			</section>
+		</aside>
+	}
+}
+
+templ edgeGroups(groups []EdgeGroup, dir string) {
+	if hasAnyEdges(groups) {
+		for _, g := range groups {
+			if len(g.Rows) > 0 {
+				<div class={ "edge-group", "edge-" + string(g.Kind) }>
+					<h4>{ g.Label }</h4>
+					<ul>
+						for _, r := range g.Rows {
+							<li>
+								<a href={ templ.SafeURL("/nodes/" + r.ID.String()) }>
+									<span class={ "badge", "badge-" + string(r.Type) }>{ string(r.Type) }</span>
+									<span class="title">{ r.Title }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				</div>
+			}
+		}
+	} else {
+		<p class="muted">Nothing yet.</p>
+	}
+}
+
+func hasAnyEdges(groups []EdgeGroup) bool {
+	for _, g := range groups {
+		if len(g.Rows) > 0 {
+			return true
+		}
+	}
+	return false
+}
