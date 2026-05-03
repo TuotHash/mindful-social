@@ -1,0 +1,34 @@
+# Build artifacts
+/result
+/result-*
+/dist
+/bin
+*.exe
+
+# Go
+*.test
+*.prof
+go.work
+go.work.sum
+
+# Environment
+.env
+.env.local
+
+# Local Postgres state
+/.pgdata
+/.pgrun
+/.pglogs
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# direnv
+.direnv/
+
+# Claude Code session files
+.claude/
