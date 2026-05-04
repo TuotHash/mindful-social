@@ -141,6 +141,28 @@ button.link {
 .commitment-banner a { color: inherit; }
 .commitment-banner button { color: #666; font-size: 0.85rem; }
 
+.profile-head { margin-bottom: 1.5rem; }
+.profile-head h1 { margin: 0 0 0.25rem; }
+.profile section { margin-top: 2rem; }
+.profile h2 { font-size: 1.1rem; }
+
+.identity-list { list-style: none; padding: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.identity-list li {
+  background: #eef0f2;
+  border: 1px solid #d6dadf;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.commitment-list { list-style: none; padding: 0; }
+.commitment-list li { margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #e5e5ea; border-radius: 6px; }
+.commitment-list .commitment-view { display: flex; gap: 0.5rem; align-items: center; text-decoration: none; color: inherit; }
+.commitment-list .commitment-view .title { font-weight: 500; }
+.commitment-reasoning { margin-top: 0.25rem; font-size: 0.9rem; color: #666; }
+.commitment-reasoning a { color: inherit; }
+
 .featured { margin-top: 2rem; }
 .featured > h2 { font-size: 1.1rem; }
 .featured-card {

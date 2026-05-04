@@ -78,6 +78,49 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 	return i, err
 }
 
+const listNodesAuthoredBy = `-- name: ListNodesAuthoredBy :many
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+WHERE created_by = $1
+ORDER BY created_at DESC
+LIMIT $2
+`
+
+type ListNodesAuthoredByParams struct {
+	CreatedBy uuid.UUID `json:"created_by"`
+	Limit     int32     `json:"limit"`
+}
+
+// Nodes a user has authored, most recent first — for the "Authored" section
+// on a profile page.
+func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthoredByParams) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listNodesAuthoredBy, arg.CreatedBy, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Node
+	for rows.Next() {
+		var i Node
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Title,
+			&i.Body,
+			&i.SourceUrl,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNodesByType = `-- name: ListNodesByType :many
 SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
 WHERE type = $1

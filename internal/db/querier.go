@@ -52,6 +52,9 @@ type Querier interface {
 	// source node's page. Ordered by position ascending.
 	ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListFeaturedEdgesFromNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
+	// Nodes a user has authored, most recent first — for the "Authored" section
+	// on a profile page.
+	ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthoredByParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
 	// All nodes except the given one, alphabetically — used to populate the
 	// target-node picker on the edge creation form.

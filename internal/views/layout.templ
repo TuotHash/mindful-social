@@ -17,7 +17,7 @@ templ Layout(title string, currentUser *Viewer) {
 				<nav>
 					if currentUser != nil {
 						<a href="/nodes/new">New node</a>
-						<span class="user">{ currentUser.Username }</span>
+						<a href={ templ.SafeURL("/users/" + currentUser.Username) } class="user">{ currentUser.Username }</a>
 						<form method="post" action="/logout" class="inline">
 							<button type="submit" class="link">Log out</button>
 						</form>

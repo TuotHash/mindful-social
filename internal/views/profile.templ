@@ -1,0 +1,96 @@
+package views
+
+import (
+	"github.com/google/uuid"
+	"github.com/mindful-social/mindful-social/internal/db"
+)
+
+// CommitmentRow is one entry in the "Committed views" section of a profile:
+// the view (linked by id + title) and an optional attached reasoning.
+type CommitmentRow struct {
+	ViewID         uuid.UUID
+	ViewTitle      string
+	ReasoningID    *uuid.UUID
+	ReasoningTitle string
+}
+
+templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, commitments []CommitmentRow, identities []string) {
+	@Layout(profile.Username+" — profile", viewer) {
+		<section class="profile">
+			<header class="profile-head">
+				<h1>{ profile.Username }</h1>
+				<p class="muted">
+					Joined { profile.CreatedAt.Time.Format("January 2006") }
+					if isSelf {
+						· <span>this is you</span>
+					}
+				</p>
+			</header>
+
+			if isSelf && len(identities) > 0 {
+				<section class="profile-identities">
+					<h2>Sign-in methods</h2>
+					<ul class="identity-list">
+						for _, label := range identities {
+							<li>{ label }</li>
+						}
+					</ul>
+				</section>
+			}
+
+			<section class="profile-commitments">
+				<h2>Committed views</h2>
+				if len(commitments) == 0 {
+					<p class="muted">
+						if isSelf {
+							You haven't committed to any views yet.
+						} else {
+							No public commitments.
+						}
+					</p>
+				} else {
+					<ul class="commitment-list">
+						for _, c := range commitments {
+							<li>
+								<a href={ templ.SafeURL("/nodes/" + c.ViewID.String()) } class="commitment-view">
+									<span class="badge badge-view">view</span>
+									<span class="title">{ c.ViewTitle }</span>
+								</a>
+								if c.ReasoningID != nil {
+									<div class="commitment-reasoning">
+										via
+										<a href={ templ.SafeURL("/nodes/" + c.ReasoningID.String()) }>{ c.ReasoningTitle }</a>
+									</div>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</section>
+
+			<section class="profile-authored">
+				<h2>Authored nodes</h2>
+				if len(authored) == 0 {
+					<p class="muted">
+						if isSelf {
+							You haven't authored any nodes yet. <a href="/nodes/new">Create one</a>.
+						} else {
+							No authored nodes yet.
+						}
+					</p>
+				} else {
+					<ul class="node-list">
+						for _, n := range authored {
+							<li>
+								<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
+									<span class={ "badge", "badge-" + string(n.Type) }>{ string(n.Type) }</span>
+									<span class="title">{ n.Title }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+		</section>
+	}
+}

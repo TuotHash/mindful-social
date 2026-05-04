@@ -36,3 +36,11 @@ SELECT * FROM nodes
 WHERE id != $1
 ORDER BY title ASC
 LIMIT 500;
+
+-- name: ListNodesAuthoredBy :many
+-- Nodes a user has authored, most recent first — for the "Authored" section
+-- on a profile page.
+SELECT * FROM nodes
+WHERE created_by = $1
+ORDER BY created_at DESC
+LIMIT $2;
