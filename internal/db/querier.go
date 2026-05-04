@@ -13,14 +13,23 @@ import (
 type Querier interface {
 	CountNodes(ctx context.Context) (int64, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
+	// Creates a user's stance on a view, optionally with a personal reasoning
+	// node attached. UNIQUE(user_id, view_id) ensures at most one commitment per
+	// user per view, so callers should treat 23505 as "already committed".
+	CreateCommitment(ctx context.Context, arg CreateCommitmentParams) (Commitment, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteCommitment(ctx context.Context, arg DeleteCommitmentParams) error
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
 	// Promote an edge to the featured section by assigning it the next position
 	// after the current max for its source node. from_node is required so callers
 	// can't accidentally feature an edge against the wrong source.
 	FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error
+	// Whether and how a specific user has committed to a specific view. Returns
+	// the optional reasoning's title alongside, so the view page can render
+	// "you've committed via <reasoning title>" in one round-trip.
+	GetCommitmentForUserAndView(ctx context.Context, arg GetCommitmentForUserAndViewParams) (GetCommitmentForUserAndViewRow, error)
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	// Lookup used by the password-login flow: find the user by email AND the
@@ -29,6 +38,9 @@ type Querier interface {
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	// A user's commitments with the joined view title and optional reasoning
+	// title — for the "committed views" section on a profile page.
+	ListCommitmentsByUser(ctx context.Context, userID uuid.UUID) ([]ListCommitmentsByUserRow, error)
 	// Outgoing edges with the destination node's title and type joined in,
 	// ready to render the "this node points at..." section of the legend.
 	// position is NULL for legend-only edges and an integer rank for featured ones.
@@ -44,6 +56,9 @@ type Querier interface {
 	// All nodes except the given one, alphabetically — used to populate the
 	// target-node picker on the edge creation form.
 	ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error)
+	// Reasoning-type nodes the user has authored, alphabetical — used as the
+	// picker on the commit-to-view form.
+	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
 	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)

@@ -117,12 +117,36 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := currentUser(r)
+	var commitment *views.CommitmentInfo
+	if user != nil && node.Type == db.NodeTypeView {
+		row, err := s.queries.GetCommitmentForUserAndView(r.Context(), db.GetCommitmentForUserAndViewParams{
+			UserID: user.ID,
+			ViewID: id,
+		})
+		switch {
+		case err == nil:
+			info := views.CommitmentInfo{ReasoningID: row.ReasoningID}
+			if row.ReasoningTitle != nil {
+				info.ReasoningTitle = *row.ReasoningTitle
+			}
+			commitment = &info
+		case errors.Is(err, pgx.ErrNoRows):
+			// not committed — leave nil
+		default:
+			s.logger.Error("node detail: commitment lookup", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	render(w, r, views.NodeDetail(
-		viewerFor(currentUser(r)),
+		viewerFor(user),
 		node,
 		featuredRows(feat),
 		groupOutgoing(out),
 		groupIncoming(in),
+		commitment,
 	))
 }
 

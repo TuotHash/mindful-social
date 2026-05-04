@@ -125,7 +125,21 @@ button.link {
 .node h1 { margin: 0.25rem 0; }
 .node .body { margin: 1rem 0; }
 .node .source a { word-break: break-all; }
-.node-actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
+.node-actions { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.commitment-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: #eaf6ee;
+  border: 1px solid #b9dec5;
+  border-radius: 6px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.commitment-banner a { color: inherit; }
+.commitment-banner button { color: #666; font-size: 0.85rem; }
 
 .featured { margin-top: 2rem; }
 .featured > h2 { font-size: 1.1rem; }

@@ -71,7 +71,22 @@ type FeaturedRow struct {
 	Body   string
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing, incoming []EdgeGroup) {
+// CommitmentInfo is non-nil when the current viewer has committed to the
+// view being rendered. ReasoningTitle is empty when the commitment has no
+// attached reasoning node.
+type CommitmentInfo struct {
+	ReasoningID    *uuid.UUID
+	ReasoningTitle string
+}
+
+// ReasoningOption is one row in the reasoning-picker dropdown on the
+// commit-to-view form: a node id and its title.
+type ReasoningOption struct {
+	ID    uuid.UUID
+	Title string
+}
+
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing, incoming []EdgeGroup, commitment *CommitmentInfo) {
 	@Layout(node.Title, viewer) {
 		<article class="node">
 			<header>
@@ -92,6 +107,21 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing,
 				<div class="node-actions">
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn">Edit</a>
+					if node.Type == db.NodeTypeView && commitment == nil {
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/commit") } class="btn primary">Commit to this view</a>
+					}
+				</div>
+			}
+			if viewer != nil && node.Type == db.NodeTypeView && commitment != nil {
+				<div class="commitment-banner">
+					<strong>You have committed to this view.</strong>
+					if commitment.ReasoningID != nil {
+						via
+						<a href={ templ.SafeURL("/nodes/" + commitment.ReasoningID.String()) }>{ commitment.ReasoningTitle }</a>
+					}
+					<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/uncommit") } class="inline">
+						<button type="submit" class="link">Uncommit</button>
+					</form>
 				</div>
 			}
 		</article>
@@ -164,6 +194,42 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 				<div class="form-row">
 					<button type="submit" class="btn primary">Save changes</button>
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
+				</div>
+			</form>
+		</section>
+	}
+}
+
+templ CommitForm(viewer *Viewer, view db.Node, flash string, reasonings []ReasoningOption) {
+	@Layout("Commit to "+view.Title, viewer) {
+		<section>
+			<h1>
+				Commit to
+				<span class={ "badge", "badge-" + string(view.Type) }>{ string(view.Type) }</span>
+				{ view.Title }
+			</h1>
+			<p class="muted">
+				Committing pins this view to your profile as a stance you hold. You can
+				attach one of your own reasoning nodes to explain why, or commit
+				without one and add it later.
+			</p>
+			@Flash(flash)
+			<form method="post" action={ templ.SafeURL("/nodes/" + view.ID.String() + "/commit") } class="form">
+				<label>
+					Reasoning <small>(optional)</small>
+					<select name="reasoning_id">
+						<option value="">— No specific reasoning —</option>
+						for _, r := range reasonings {
+							<option value={ r.ID.String() }>{ r.Title }</option>
+						}
+					</select>
+					if len(reasonings) == 0 {
+						<small>You haven't authored any reasoning nodes yet. You can still commit without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
+					}
+				</label>
+				<div class="form-row">
+					<button type="submit" class="btn primary">Commit</button>
+					<a href={ templ.SafeURL("/nodes/" + view.ID.String()) } class="btn">Cancel</a>
 				</div>
 			</form>
 		</section>

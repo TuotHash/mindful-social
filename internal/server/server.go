@@ -118,6 +118,9 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}/edges", s.handleEdgeCreate)
 		r.Post("/nodes/{id}/edges/{edgeID}/feature", s.handleEdgeFeature)
 		r.Post("/nodes/{id}/edges/{edgeID}/unfeature", s.handleEdgeUnfeature)
+		r.Get("/nodes/{id}/commit", s.handleCommitForm)
+		r.Post("/nodes/{id}/commit", s.handleCommitCreate)
+		r.Post("/nodes/{id}/uncommit", s.handleUncommit)
 	})
 
 	s.router = r
