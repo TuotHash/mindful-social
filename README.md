@@ -73,6 +73,67 @@ flake.nix           reproducible dev shell
 See [`migrations/00001_initial_schema.sql`](migrations/00001_initial_schema.sql)
 for the full schema.
 
+## Configuration
+
+The server is configured entirely through environment variables. Inside
+`nix develop`, `DATABASE_URL` is set automatically via the shell hook.
+
+### Core
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | **yes** | — | Postgres connection string, e.g. `postgres:///mindful_social?host=/path/to/socket` |
+| `LISTEN_ADDR` | no | `127.0.0.1:8080` | TCP address the HTTP server binds to |
+| `PUBLIC_BASE_URL` | no* | `http://127.0.0.1:8080` | Absolute origin the browser sees. Required when any OAuth provider is configured, because callback URLs are derived from it. Set to your public domain, e.g. `https://mindful.example.org` |
+
+### OAuth / SSO (all optional)
+
+The app starts with no OAuth configured — only password auth is available. Set
+any of the blocks below to enable the corresponding provider. Multiple
+providers can be active at the same time.
+
+**Google**
+
+```
+GOOGLE_CLIENT_ID=<client_id>
+GOOGLE_CLIENT_SECRET=<client_secret>
+```
+
+Redirect URI to register in the Google Cloud Console:
+`<PUBLIC_BASE_URL>/auth/callback/google`
+
+**GitHub**
+
+```
+GITHUB_CLIENT_ID=<client_id>
+GITHUB_CLIENT_SECRET=<client_secret>
+```
+
+Redirect URI: `<PUBLIC_BASE_URL>/auth/callback/github`
+
+**Custom OIDC (Authelia, Authentik, Keycloak, Zitadel, …)**
+
+Register one or more keys in `OIDC_PROVIDERS`, then supply per-key variables:
+
+```
+OIDC_PROVIDERS=work,community
+
+OIDC_WORK_ISSUER=https://auth.example.org
+OIDC_WORK_CLIENT_ID=<client_id>
+OIDC_WORK_CLIENT_SECRET=<client_secret>
+OIDC_WORK_LABEL=Work SSO          # optional — button label, defaults to key title-cased
+
+OIDC_COMMUNITY_ISSUER=https://id.community.example
+OIDC_COMMUNITY_CLIENT_ID=<client_id>
+OIDC_COMMUNITY_CLIENT_SECRET=<client_secret>
+```
+
+Keys are case-insensitive (`work` and `WORK` are the same). The redirect URI
+for a key named `work` is `<PUBLIC_BASE_URL>/auth/callback/oidc:work`.
+
+Any provider that is missing its required variables is skipped at startup with
+a warning; it does not prevent the other providers or the app from starting.
+
 ## License
 
 TBD — likely AGPL-3.0 or similar copyleft FOSS license.
