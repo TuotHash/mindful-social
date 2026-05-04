@@ -77,6 +77,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, outgoing, incoming []EdgeGroup) {
 			if viewer != nil {
 				<div class="node-actions">
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn">Edit</a>
 				</div>
 			}
 		</article>
@@ -92,6 +93,43 @@ templ NodeDetail(viewer *Viewer, node db.Node, outgoing, incoming []EdgeGroup) {
 				@edgeGroups(incoming, "incoming")
 			</section>
 		</aside>
+	}
+}
+
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL string) {
+	@Layout("Edit "+node.Title, viewer) {
+		<section>
+			<h1>
+				Edit
+				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
+			</h1>
+			<p class="muted">The node type cannot be changed after creation.</p>
+			@Flash(flash)
+			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String()) } class="form">
+				<label>
+					Title
+					<input type="text" name="title" required maxlength="200" value={ formTitle }/>
+				</label>
+				<label>
+					Body
+					<textarea name="body" rows="6">{ formBody }</textarea>
+					<small>Optional. Describe the node in your own words.</small>
+				</label>
+				<label>
+					Source URL
+					if node.Type == db.NodeTypeFact {
+						<small>(required for facts)</small>
+					} else {
+						<small>(optional)</small>
+					}
+					<input type="url" name="source_url" value={ formSourceURL }/>
+				</label>
+				<div class="form-row">
+					<button type="submit" class="btn primary">Save changes</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
+				</div>
+			</form>
+		</section>
 	}
 }
 

@@ -112,6 +112,8 @@ func (s *Server) routes() {
 		r.Use(s.requireUser)
 		r.Get("/nodes/new", s.handleNodeNew)
 		r.Post("/nodes", s.handleNodeCreate)
+		r.Get("/nodes/{id}/edit", s.handleNodeEdit)
+		r.Post("/nodes/{id}", s.handleNodeUpdate)
 		r.Get("/nodes/{id}/edges/new", s.handleEdgeNew)
 		r.Post("/nodes/{id}/edges", s.handleEdgeCreate)
 	})

@@ -119,6 +119,92 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	))
 }
 
+func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	node, err := s.queries.GetNode(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("node edit: get", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	src := ""
+	if node.SourceUrl != nil {
+		src = *node.SourceUrl
+	}
+	render(w, r, views.NodeEdit(viewerFor(currentUser(r)), node, "", node.Title, node.Body, src))
+}
+
+func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	node, err := s.queries.GetNode(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("node update: get", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+
+	title := strings.TrimSpace(r.PostFormValue("title"))
+	body := strings.TrimSpace(r.PostFormValue("body"))
+	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
+
+	flash := ""
+	switch {
+	case title == "":
+		flash = "Title is required."
+	case len(title) > 200:
+		flash = "Title is too long (max 200 characters)."
+	case node.Type == db.NodeTypeFact && sourceURL == "":
+		flash = "Facts need a source URL."
+	}
+	if flash != "" {
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL))
+		return
+	}
+
+	var srcPtr *string
+	if sourceURL != "" {
+		srcPtr = &sourceURL
+	}
+
+	_, err = s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
+		ID:        id,
+		Title:     title,
+		Body:      body,
+		SourceUrl: srcPtr,
+	})
+	if err != nil {
+		s.logger.Error("update node", "err", err)
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL))
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+id.String(), http.StatusSeeOther)
+}
+
 func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chiURLParam(r, "id"))
 	if err != nil {
