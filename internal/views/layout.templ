@@ -15,6 +15,7 @@ templ Layout(title string, currentUser *Viewer) {
 			<header class="topbar">
 				<a class="brand" href="/">Mindful Social</a>
 				<nav>
+					<a href="/tags">Tags</a>
 					if currentUser != nil {
 						<a href="/nodes/new">New node</a>
 						<a href={ templ.SafeURL("/users/" + currentUser.Username) } class="user">{ currentUser.Username }</a>

@@ -24,7 +24,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
-	render(w, r, views.NodeNew(viewerFor(currentUser(r)), "", "", "", "", "", ""))
+	render(w, r, views.NodeNew(viewerFor(currentUser(r)), "", "", "", "", "", "", ""))
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +43,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	body := strings.TrimSpace(r.PostFormValue("body"))
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawPin := strings.TrimSpace(r.PostFormValue("pin")) // "" | "supports" | "opposes" | "featured"
+	rawTags := r.PostFormValue("tags")
 
 	flash := ""
 	nt := db.NodeType(rawType)
@@ -65,7 +66,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if flash != "" {
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin, rawTags))
 		return
 	}
 
@@ -83,7 +84,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin))
+		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags))
 		return
 	}
 	if rawPin != "" {
@@ -95,6 +96,11 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			// Node created successfully; the pin failed. Log and continue —
 			// user can pin from the detail page.
 			s.logger.Error("create node: pin", "err", err)
+		}
+	}
+	if names := parseTagsInput(rawTags); len(names) > 0 {
+		if err := s.setTagsForNode(r, node.ID, names); err != nil {
+			s.logger.Error("create node: set tags", "err", err)
 		}
 	}
 	http.Redirect(w, r, "/nodes/"+node.ID.String(), http.StatusSeeOther)
@@ -136,6 +142,12 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	tags, err := s.queries.ListTagsForNode(r.Context(), id)
+	if err != nil {
+		s.logger.Error("node detail: list tags", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	user := currentUser(r)
 	var pin *views.PinInfo
@@ -159,6 +171,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		featuredRows(feat),
 		displayGroups(out, in),
 		pin,
+		tags,
 	))
 }
 
@@ -226,7 +239,23 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	if node.SourceUrl != nil {
 		src = *node.SourceUrl
 	}
-	render(w, r, views.NodeEdit(viewerFor(currentUser(r)), node, "", node.Title, node.Body, src))
+	tags, err := s.queries.ListTagsForNode(r.Context(), id)
+	if err != nil {
+		s.logger.Error("node edit: list tags", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.NodeEdit(viewerFor(currentUser(r)), node, "", node.Title, node.Body, src, joinTagNames(tags)))
+}
+
+// joinTagNames flattens a tag list into the comma-separated string the form
+// field expects.
+func joinTagNames(tags []db.Tag) string {
+	names := make([]string, 0, len(tags))
+	for _, t := range tags {
+		names = append(names, t.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
@@ -258,6 +287,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	body := strings.TrimSpace(r.PostFormValue("body"))
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
+	rawTags := r.PostFormValue("tags")
 
 	flash := ""
 	switch {
@@ -269,7 +299,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		flash = "Facts need a source URL."
 	}
 	if flash != "" {
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags))
 		return
 	}
 
@@ -286,8 +316,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags))
 		return
+	}
+	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
+		s.logger.Error("update node: set tags", "err", err)
 	}
 	http.Redirect(w, r, "/nodes/"+id.String(), http.StatusSeeOther)
 }

@@ -1,0 +1,54 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/mindful-social/mindful-social/internal/db"
+)
+
+templ TagsIndex(viewer *Viewer, tags []db.ListAllTagsRow) {
+	@Layout("Tags", viewer) {
+		<section>
+			<h1>Tags</h1>
+			<p class="muted">Free-form labels that group nodes across types. Click a tag to see everything carrying it.</p>
+			if len(tags) == 0 {
+				<p class="muted">No tags yet. Add some when you create or edit a node.</p>
+			} else {
+				<ul class="tag-cloud">
+					for _, t := range tags {
+						<li>
+							<a href={ templ.SafeURL("/tags/" + t.Name) } class="tag-chip">{ t.Name }</a>
+							<span class="tag-count">{ strconv.FormatInt(t.NodeCount, 10) }</span>
+						</li>
+					}
+				</ul>
+			}
+		</section>
+	}
+}
+
+templ TagDetail(viewer *Viewer, name string, nodes []db.Node) {
+	@Layout("#"+name, viewer) {
+		<section>
+			<h1>
+				<span class="tag-chip tag-chip-large">{ name }</span>
+			</h1>
+			<p class="muted">Nodes carrying this tag, most recent first.</p>
+			if len(nodes) == 0 {
+				<p class="muted">No nodes with this tag yet.</p>
+			} else {
+				<ul class="node-list">
+					for _, n := range nodes {
+						<li>
+							<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
+								<span class={ "badge", "badge-" + string(n.Type) }>{ string(n.Type) }</span>
+								<span class="title">{ n.Title }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			}
+			<p class="muted"><a href="/tags">← All tags</a></p>
+		</section>
+	}
+}

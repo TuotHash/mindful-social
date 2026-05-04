@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AttachTag(ctx context.Context, arg AttachTagParams) error
 	CountNodes(ctx context.Context) (int64, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
@@ -18,6 +19,9 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
+	// Used by the "replace all tags" path on node update — the handler deletes
+	// the existing rows and re-inserts the new set.
+	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error
 	// Promote an edge to the featured section by assigning it the next position
 	// after the current max for its source node. from_node is required so callers
 	// can't accidentally feature an edge against the wrong source.
@@ -31,9 +35,13 @@ type Querier interface {
 	// reasoning's title alongside, so the node detail page can render
 	// "you support this via <reasoning title>" in one round-trip.
 	GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error)
+	GetTagByName(ctx context.Context, name string) (Tag, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	// Tag list with how many nodes carry each tag — for the /tags index page.
+	// Tags with zero nodes (orphans from previous edits) come last.
+	ListAllTags(ctx context.Context) ([]ListAllTagsRow, error)
 	// Outgoing edges with the destination node's title and type joined in,
 	// ready to render the "this node points at..." section of the legend.
 	// position is NULL for legend-only edges and an integer rank for featured ones.
@@ -52,6 +60,8 @@ type Querier interface {
 	// All nodes except the given one, alphabetically — used to populate the
 	// target-node picker on the edge creation form.
 	ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error)
+	// Nodes that carry a given tag, most recent first — for /tags/{name}.
+	ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node, error)
 	// A user's pins with the joined node and optional reasoning titles — for
 	// the "On my profile" section on a profile page.
 	ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error)
@@ -59,12 +69,17 @@ type Querier interface {
 	// picker on the pin form when kind is supports/opposes.
 	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
+	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first.
 	SetPin(ctx context.Context, arg SetPinParams) error
 	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
+	// Idempotent: returns the tag id whether it already existed or just got
+	// inserted. The DO UPDATE SET name=EXCLUDED.name is a no-op that exists
+	// only so RETURNING fires on the conflict path.
+	UpsertTag(ctx context.Context, name string) (uuid.UUID, error)
 }
 
 var _ Querier = (*Queries)(nil)

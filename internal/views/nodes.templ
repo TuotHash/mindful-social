@@ -5,7 +5,7 @@ import (
 	"github.com/mindful-social/mindful-social/internal/db"
 )
 
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin string) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags string) {
 	@Layout("New node", viewer) {
 		<section class="auth">
 			<h1>Add a node</h1>
@@ -33,6 +33,10 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 				<label>
 					Source URL <small>(facts only)</small>
 					<input type="url" name="source_url" value={ formSourceURL }/>
+				</label>
+				<label>
+					Tags <small>(comma-separated, optional)</small>
+					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				<fieldset class="form-fieldset">
 					<legend>Pin to my profile <small>(optional)</small></legend>
@@ -127,7 +131,7 @@ func pinBannerClass(k db.PinKind) string {
 	return "pin-banner pin-" + string(k)
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo) {
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag) {
 	@Layout(node.Title, viewer) {
 		<article class="node">
 			<header>
@@ -142,6 +146,13 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 			if node.SourceUrl != nil && *node.SourceUrl != "" {
 				<section class="source">
 					<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">{ *node.SourceUrl }</a>
+				</section>
+			}
+			if len(tags) > 0 {
+				<section class="node-tags">
+					for _, t := range tags {
+						<a href={ templ.SafeURL("/tags/" + t.Name) } class="tag-chip">{ t.Name }</a>
+					}
 				</section>
 			}
 			if viewer != nil {
@@ -227,7 +238,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL string) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags string) {
 	@Layout("Edit "+node.Title, viewer) {
 		<section>
 			<h1>
@@ -254,6 +265,10 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 						<small>(optional)</small>
 					}
 					<input type="url" name="source_url" value={ formSourceURL }/>
+				</label>
+				<label>
+					Tags <small>(comma-separated, optional)</small>
+					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				<div class="form-row">
 					<button type="submit" class="btn primary">Save changes</button>

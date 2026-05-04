@@ -162,6 +162,25 @@ button.link {
 .profile section { margin-top: 2rem; }
 .profile h2 { font-size: 1.1rem; }
 
+.tag-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  margin-right: 0.25rem;
+  background: #eef0f2;
+  border: 1px solid #d6dadf;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: #444;
+  text-decoration: none;
+}
+.tag-chip:hover { background: #e1e5ea; }
+.tag-chip-large { font-size: 1rem; padding: 0.25rem 0.85rem; }
+.node-tags { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
+.tag-cloud { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.tag-cloud li { display: inline-flex; align-items: center; gap: 0.25rem; }
+.tag-count { font-size: 0.8rem; color: #888; }
+
 .identity-list { list-style: none; padding: 0; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .identity-list li {
   background: #eef0f2;
