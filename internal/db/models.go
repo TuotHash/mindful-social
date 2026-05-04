@@ -148,6 +148,7 @@ type Edge struct {
 	Kind      EdgeKind           `json:"kind"`
 	CreatedBy uuid.UUID          `json:"created_by"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Position  *int16             `json:"position"`
 }
 
 type Node struct {

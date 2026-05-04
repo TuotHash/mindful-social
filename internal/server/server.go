@@ -116,6 +116,8 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}", s.handleNodeUpdate)
 		r.Get("/nodes/{id}/edges/new", s.handleEdgeNew)
 		r.Post("/nodes/{id}/edges", s.handleEdgeCreate)
+		r.Post("/nodes/{id}/edges/{edgeID}/feature", s.handleEdgeFeature)
+		r.Post("/nodes/{id}/edges/{edgeID}/unfeature", s.handleEdgeUnfeature)
 	})
 
 	s.router = r

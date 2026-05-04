@@ -15,7 +15,7 @@ import (
 const createEdge = `-- name: CreateEdge :one
 INSERT INTO edges (from_node, to_node, kind, created_by)
 VALUES ($1, $2, $3, $4)
-RETURNING id, from_node, to_node, kind, created_by, created_at
+RETURNING id, from_node, to_node, kind, created_by, created_at, position
 `
 
 type CreateEdgeParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, e
 		&i.Kind,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Position,
 	)
 	return i, err
 }
@@ -53,10 +54,33 @@ func (q *Queries) DeleteEdge(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const featureEdge = `-- name: FeatureEdge :exec
+UPDATE edges AS e
+SET position = COALESCE(
+    (SELECT MAX(sib.position) + 1 FROM edges AS sib WHERE sib.from_node = $2),
+    1
+)
+WHERE e.id = $1 AND e.from_node = $2
+`
+
+type FeatureEdgeParams struct {
+	ID       uuid.UUID `json:"id"`
+	FromNode uuid.UUID `json:"from_node"`
+}
+
+// Promote an edge to the featured section by assigning it the next position
+// after the current max for its source node. from_node is required so callers
+// can't accidentally feature an edge against the wrong source.
+func (q *Queries) FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error {
+	_, err := q.db.Exec(ctx, featureEdge, arg.ID, arg.FromNode)
+	return err
+}
+
 const listEdgesFromNode = `-- name: ListEdgesFromNode :many
 SELECT
     e.id,
     e.kind,
+    e.position,
     e.created_at,
     n.id    AS to_id,
     n.type  AS to_type,
@@ -70,6 +94,7 @@ ORDER BY e.created_at DESC
 type ListEdgesFromNodeRow struct {
 	ID        uuid.UUID          `json:"id"`
 	Kind      EdgeKind           `json:"kind"`
+	Position  *int16             `json:"position"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	ToID      uuid.UUID          `json:"to_id"`
 	ToType    NodeType           `json:"to_type"`
@@ -78,6 +103,7 @@ type ListEdgesFromNodeRow struct {
 
 // Outgoing edges with the destination node's title and type joined in,
 // ready to render the "this node points at..." section of the legend.
+// position is NULL for legend-only edges and an integer rank for featured ones.
 func (q *Queries) ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListEdgesFromNodeRow, error) {
 	rows, err := q.db.Query(ctx, listEdgesFromNode, fromNode)
 	if err != nil {
@@ -90,6 +116,7 @@ func (q *Queries) ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
+			&i.Position,
 			&i.CreatedAt,
 			&i.ToID,
 			&i.ToType,
@@ -154,4 +181,74 @@ func (q *Queries) ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]List
 		return nil, err
 	}
 	return items, nil
+}
+
+const listFeaturedEdgesFromNode = `-- name: ListFeaturedEdgesFromNode :many
+SELECT
+    e.id,
+    e.kind,
+    e.position,
+    n.id    AS to_id,
+    n.type  AS to_type,
+    n.title AS to_title,
+    n.body  AS to_body
+FROM edges e
+JOIN nodes n ON n.id = e.to_node
+WHERE e.from_node = $1 AND e.position IS NOT NULL
+ORDER BY e.position ASC
+`
+
+type ListFeaturedEdgesFromNodeRow struct {
+	ID       uuid.UUID `json:"id"`
+	Kind     EdgeKind  `json:"kind"`
+	Position *int16    `json:"position"`
+	ToID     uuid.UUID `json:"to_id"`
+	ToType   NodeType  `json:"to_type"`
+	ToTitle  string    `json:"to_title"`
+	ToBody   string    `json:"to_body"`
+}
+
+// Outgoing edges marked as featured (position IS NOT NULL), with the
+// destination node's full body included so it can be rendered inline on the
+// source node's page. Ordered by position ascending.
+func (q *Queries) ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListFeaturedEdgesFromNodeRow, error) {
+	rows, err := q.db.Query(ctx, listFeaturedEdgesFromNode, fromNode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFeaturedEdgesFromNodeRow
+	for rows.Next() {
+		var i ListFeaturedEdgesFromNodeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Position,
+			&i.ToID,
+			&i.ToType,
+			&i.ToTitle,
+			&i.ToBody,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unfeatureEdge = `-- name: UnfeatureEdge :exec
+UPDATE edges AS e SET position = NULL WHERE e.id = $1 AND e.from_node = $2
+`
+
+type UnfeatureEdgeParams struct {
+	ID       uuid.UUID `json:"id"`
+	FromNode uuid.UUID `json:"from_node"`
+}
+
+func (q *Queries) UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error {
+	_, err := q.db.Exec(ctx, unfeatureEdge, arg.ID, arg.FromNode)
+	return err
 }

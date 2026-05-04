@@ -110,13 +110,64 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	feat, err := s.queries.ListFeaturedEdgesFromNode(r.Context(), id)
+	if err != nil {
+		s.logger.Error("node detail: featured edges", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	render(w, r, views.NodeDetail(
 		viewerFor(currentUser(r)),
 		node,
+		featuredRows(feat),
 		groupOutgoing(out),
 		groupIncoming(in),
 	))
+}
+
+func (s *Server) handleEdgeFeature(w http.ResponseWriter, r *http.Request) {
+	fromID, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.queries.FeatureEdge(r.Context(), db.FeatureEdgeParams{
+		ID:       edgeID,
+		FromNode: fromID,
+	}); err != nil {
+		s.logger.Error("feature edge", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
+}
+
+func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
+	fromID, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.queries.UnfeatureEdge(r.Context(), db.UnfeatureEdgeParams{
+		ID:       edgeID,
+		FromNode: fromID,
+	}); err != nil {
+		s.logger.Error("unfeature edge", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
@@ -324,10 +375,12 @@ func groupOutgoing(rows []db.ListEdgesFromNodeRow) []views.EdgeGroup {
 		for _, row := range rows {
 			if row.Kind == ek.kind {
 				g.Rows = append(g.Rows, views.EdgeRow{
-					Kind:  row.Kind,
-					ID:    row.ToID,
-					Type:  row.ToType,
-					Title: row.ToTitle,
+					EdgeID:   row.ID,
+					Kind:     row.Kind,
+					Featured: row.Position != nil,
+					ID:       row.ToID,
+					Type:     row.ToType,
+					Title:    row.ToTitle,
 				})
 			}
 		}
@@ -343,14 +396,38 @@ func groupIncoming(rows []db.ListEdgesToNodeRow) []views.EdgeGroup {
 		for _, row := range rows {
 			if row.Kind == ek.kind {
 				g.Rows = append(g.Rows, views.EdgeRow{
-					Kind:  row.Kind,
-					ID:    row.FromID,
-					Type:  row.FromType,
-					Title: row.FromTitle,
+					EdgeID: row.ID,
+					Kind:   row.Kind,
+					ID:     row.FromID,
+					Type:   row.FromType,
+					Title:  row.FromTitle,
 				})
 			}
 		}
 		groups = append(groups, g)
 	}
 	return groups
+}
+
+// featuredRows turns the DB projection into the view-layer FeaturedRow,
+// looking up the human label from edgeOrder so templates don't need to
+// hardcode "supports → Supports" mappings.
+func featuredRows(rows []db.ListFeaturedEdgesFromNodeRow) []views.FeaturedRow {
+	labels := make(map[db.EdgeKind]string, len(edgeOrder))
+	for _, ek := range edgeOrder {
+		labels[ek.kind] = ek.label
+	}
+	out := make([]views.FeaturedRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, views.FeaturedRow{
+			EdgeID: row.ID,
+			Kind:   row.Kind,
+			Label:  labels[row.Kind],
+			ID:     row.ToID,
+			Type:   row.ToType,
+			Title:  row.ToTitle,
+			Body:   row.ToBody,
+		})
+	}
+	return out
 }

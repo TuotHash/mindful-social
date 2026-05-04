@@ -17,6 +17,10 @@ type Querier interface {
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
+	// Promote an edge to the featured section by assigning it the next position
+	// after the current max for its source node. from_node is required so callers
+	// can't accidentally feature an edge against the wrong source.
+	FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	// Lookup used by the password-login flow: find the user by email AND the
@@ -27,15 +31,21 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	// Outgoing edges with the destination node's title and type joined in,
 	// ready to render the "this node points at..." section of the legend.
+	// position is NULL for legend-only edges and an integer rank for featured ones.
 	ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListEdgesFromNodeRow, error)
 	// Incoming edges, similar shape — for "what points at this node".
 	ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]ListEdgesToNodeRow, error)
+	// Outgoing edges marked as featured (position IS NOT NULL), with the
+	// destination node's full body included so it can be rendered inline on the
+	// source node's page. Ordered by position ascending.
+	ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListFeaturedEdgesFromNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
 	// All nodes except the given one, alphabetically — used to populate the
 	// target-node picker on the edge creation form.
 	ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
+	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 }
 
