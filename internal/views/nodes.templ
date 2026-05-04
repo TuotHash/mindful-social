@@ -5,7 +5,7 @@ import (
 	"github.com/mindful-social/mindful-social/internal/db"
 )
 
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL string) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin string) {
 	@Layout("New node", viewer) {
 		<section class="auth">
 			<h1>Add a node</h1>
@@ -34,6 +34,25 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 					Source URL <small>(facts only)</small>
 					<input type="url" name="source_url" value={ formSourceURL }/>
 				</label>
+				<fieldset class="form-fieldset">
+					<legend>Pin to my profile <small>(optional)</small></legend>
+					<label class="radio">
+						<input type="radio" name="pin" value="" checked?={ formPin == "" }/>
+						Don't pin
+					</label>
+					<label class="radio">
+						<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
+						Feature on my profile
+					</label>
+					<label class="radio">
+						<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
+						Support <small>(views only)</small>
+					</label>
+					<label class="radio">
+						<input type="radio" name="pin" value="opposes" checked?={ formPin == "opposes" }/>
+						Oppose <small>(views only)</small>
+					</label>
+				</fieldset>
 				<button type="submit" class="btn primary">Create node</button>
 			</form>
 		</section>
@@ -71,22 +90,42 @@ type FeaturedRow struct {
 	Body   string
 }
 
-// CommitmentInfo is non-nil when the current viewer has committed to the
-// view being rendered. ReasoningTitle is empty when the commitment has no
-// attached reasoning node.
-type CommitmentInfo struct {
+// PinInfo is non-nil when the current viewer has pinned the node being
+// rendered. ReasoningTitle is empty when the pin has no attached reasoning.
+type PinInfo struct {
+	Kind           db.PinKind
 	ReasoningID    *uuid.UUID
 	ReasoningTitle string
 }
 
 // ReasoningOption is one row in the reasoning-picker dropdown on the
-// commit-to-view form: a node id and its title.
+// pin-to-profile form: a node id and its title.
 type ReasoningOption struct {
 	ID    uuid.UUID
 	Title string
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing, incoming []EdgeGroup, commitment *CommitmentInfo) {
+// pinKindLabel turns a PinKind value into the verb shown in the UI banner
+// ("You support this", "You oppose this", "On your profile").
+func pinKindLabel(k db.PinKind) string {
+	switch k {
+	case db.PinKindSupports:
+		return "You support this"
+	case db.PinKindOpposes:
+		return "You oppose this"
+	case db.PinKindFeatured:
+		return "On your profile"
+	}
+	return string(k)
+}
+
+// pinBannerClass adds a kind-specific modifier so CSS can color the banner
+// (green for supports, red for opposes, neutral for featured).
+func pinBannerClass(k db.PinKind) string {
+	return "pin-banner pin-" + string(k)
+}
+
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing, incoming []EdgeGroup, pin *PinInfo) {
 	@Layout(node.Title, viewer) {
 		<article class="node">
 			<header>
@@ -107,20 +146,27 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing,
 				<div class="node-actions">
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
 					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn">Edit</a>
-					if node.Type == db.NodeTypeView && commitment == nil {
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/commit") } class="btn primary">Commit to this view</a>
+					if pin == nil {
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="btn primary">
+							if node.Type == db.NodeTypeView {
+								Pin to my profile
+							} else {
+								Feature on my profile
+							}
+						</a>
 					}
 				</div>
 			}
-			if viewer != nil && node.Type == db.NodeTypeView && commitment != nil {
-				<div class="commitment-banner">
-					<strong>You have committed to this view.</strong>
-					if commitment.ReasoningID != nil {
+			if viewer != nil && pin != nil {
+				<div class={ pinBannerClass(pin.Kind) }>
+					<strong>{ pinKindLabel(pin.Kind) }.</strong>
+					if pin.ReasoningID != nil {
 						via
-						<a href={ templ.SafeURL("/nodes/" + commitment.ReasoningID.String()) }>{ commitment.ReasoningTitle }</a>
+						<a href={ templ.SafeURL("/nodes/" + pin.ReasoningID.String()) }>{ pin.ReasoningTitle }</a>
 					}
-					<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/uncommit") } class="inline">
-						<button type="submit" class="link">Uncommit</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="link">Change</a>
+					<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/unpin") } class="inline">
+						<button type="submit" class="link">Remove</button>
 					</form>
 				</div>
 			}
@@ -200,36 +246,53 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 	}
 }
 
-templ CommitForm(viewer *Viewer, view db.Node, flash string, reasonings []ReasoningOption) {
-	@Layout("Commit to "+view.Title, viewer) {
+templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID string, reasonings []ReasoningOption) {
+	@Layout("Pin "+node.Title, viewer) {
 		<section>
 			<h1>
-				Commit to
-				<span class={ "badge", "badge-" + string(view.Type) }>{ string(view.Type) }</span>
-				{ view.Title }
+				Pin
+				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
+				{ node.Title }
 			</h1>
 			<p class="muted">
-				Committing pins this view to your profile as a stance you hold. You can
-				attach one of your own reasoning nodes to explain why, or commit
-				without one and add it later.
+				Pin this node to your profile. For views you can take a stance —
+				support or oppose — and optionally attach one of your reasoning nodes
+				to explain why. For other node types you can just feature it.
 			</p>
 			@Flash(flash)
-			<form method="post" action={ templ.SafeURL("/nodes/" + view.ID.String() + "/commit") } class="form">
+			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="form">
+				<fieldset class="form-fieldset">
+					<legend>Stance</legend>
+					if node.Type == db.NodeTypeView {
+						<label class="radio">
+							<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" }/>
+							Support
+						</label>
+						<label class="radio">
+							<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
+							Oppose
+						</label>
+					}
+					<label class="radio">
+						<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (formKind == "" && node.Type != db.NodeTypeView) }/>
+						Just feature
+					</label>
+				</fieldset>
 				<label>
 					Reasoning <small>(optional)</small>
 					<select name="reasoning_id">
 						<option value="">— No specific reasoning —</option>
 						for _, r := range reasonings {
-							<option value={ r.ID.String() }>{ r.Title }</option>
+							<option value={ r.ID.String() } selected?={ r.ID.String() == formReasoningID }>{ r.Title }</option>
 						}
 					</select>
 					if len(reasonings) == 0 {
-						<small>You haven't authored any reasoning nodes yet. You can still commit without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
+						<small>You haven't authored any reasoning nodes yet. You can still pin without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
 					}
 				</label>
 				<div class="form-row">
-					<button type="submit" class="btn primary">Commit</button>
-					<a href={ templ.SafeURL("/nodes/" + view.ID.String()) } class="btn">Cancel</a>
+					<button type="submit" class="btn primary">Save pin</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
 				</div>
 			</form>
 		</section>

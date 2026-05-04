@@ -5,16 +5,32 @@ import (
 	"github.com/mindful-social/mindful-social/internal/db"
 )
 
-// CommitmentRow is one entry in the "Committed views" section of a profile:
-// the view (linked by id + title) and an optional attached reasoning.
-type CommitmentRow struct {
-	ViewID         uuid.UUID
-	ViewTitle      string
+// PinRow is one entry in the "On profile" section: the pinned node and the
+// kind of pin (supports / opposes / featured), with an optional reasoning.
+type PinRow struct {
+	NodeID         uuid.UUID
+	NodeType       db.NodeType
+	NodeTitle      string
+	Kind           db.PinKind
 	ReasoningID    *uuid.UUID
 	ReasoningTitle string
 }
 
-templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, commitments []CommitmentRow, identities []string) {
+// pinKindShort is the inline label rendered next to each pin row on a
+// profile, e.g. "Supports", "Opposes", "Featured".
+func pinKindShort(k db.PinKind) string {
+	switch k {
+	case db.PinKindSupports:
+		return "Supports"
+	case db.PinKindOpposes:
+		return "Opposes"
+	case db.PinKindFeatured:
+		return "Featured"
+	}
+	return string(k)
+}
+
+templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, identities []string) {
 	@Layout(profile.Username+" — profile", viewer) {
 		<section class="profile">
 			<header class="profile-head">
@@ -38,28 +54,29 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 				</section>
 			}
 
-			<section class="profile-commitments">
-				<h2>Committed views</h2>
-				if len(commitments) == 0 {
+			<section class="profile-pins">
+				<h2>On profile</h2>
+				if len(pins) == 0 {
 					<p class="muted">
 						if isSelf {
-							You haven't committed to any views yet.
+							You haven't pinned any nodes yet.
 						} else {
-							No public commitments.
+							No public pins.
 						}
 					</p>
 				} else {
-					<ul class="commitment-list">
-						for _, c := range commitments {
-							<li>
-								<a href={ templ.SafeURL("/nodes/" + c.ViewID.String()) } class="commitment-view">
-									<span class="badge badge-view">view</span>
-									<span class="title">{ c.ViewTitle }</span>
+					<ul class="pin-list">
+						for _, p := range pins {
+							<li class={ "pin-row", "pin-" + string(p.Kind) }>
+								<span class="pin-kind">{ pinKindShort(p.Kind) }</span>
+								<a href={ templ.SafeURL("/nodes/" + p.NodeID.String()) } class="pin-node">
+									<span class={ "badge", "badge-" + string(p.NodeType) }>{ string(p.NodeType) }</span>
+									<span class="title">{ p.NodeTitle }</span>
 								</a>
-								if c.ReasoningID != nil {
-									<div class="commitment-reasoning">
+								if p.ReasoningID != nil {
+									<div class="pin-reasoning">
 										via
-										<a href={ templ.SafeURL("/nodes/" + c.ReasoningID.String()) }>{ c.ReasoningTitle }</a>
+										<a href={ templ.SafeURL("/nodes/" + p.ReasoningID.String()) }>{ p.ReasoningTitle }</a>
 									</div>
 								}
 							</li>

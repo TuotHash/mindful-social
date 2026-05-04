@@ -124,6 +124,59 @@ func (e NodeType) Valid() bool {
 	return false
 }
 
+type PinKind string
+
+const (
+	PinKindSupports PinKind = "supports"
+	PinKindOpposes  PinKind = "opposes"
+	PinKindFeatured PinKind = "featured"
+)
+
+func (e *PinKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PinKind(s)
+	case string:
+		*e = PinKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PinKind: %T", src)
+	}
+	return nil
+}
+
+type NullPinKind struct {
+	PinKind PinKind `json:"pin_kind"`
+	Valid   bool    `json:"valid"` // Valid is true if PinKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPinKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.PinKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PinKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPinKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PinKind), nil
+}
+
+func (e PinKind) Valid() bool {
+	switch e {
+	case PinKindSupports,
+		PinKindOpposes,
+		PinKindFeatured:
+		return true
+	}
+	return false
+}
+
 type AuthIdentity struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`
@@ -131,14 +184,6 @@ type AuthIdentity struct {
 	Subject   string             `json:"subject"`
 	Secret    *string            `json:"secret"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type Commitment struct {
-	ID          uuid.UUID          `json:"id"`
-	UserID      uuid.UUID          `json:"user_id"`
-	ViewID      uuid.UUID          `json:"view_id"`
-	ReasoningID *uuid.UUID         `json:"reasoning_id"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
 type Edge struct {
@@ -183,4 +228,13 @@ type User struct {
 	Username  string             `json:"username"`
 	Email     string             `json:"email"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type UserNodePin struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	NodeID      uuid.UUID          `json:"node_id"`
+	Kind        PinKind            `json:"kind"`
+	ReasoningID *uuid.UUID         `json:"reasoning_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }

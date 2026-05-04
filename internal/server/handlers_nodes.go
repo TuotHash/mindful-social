@@ -24,7 +24,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
-	render(w, r, views.NodeNew(viewerFor(currentUser(r)), "", "", "", "", ""))
+	render(w, r, views.NodeNew(viewerFor(currentUser(r)), "", "", "", "", "", ""))
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
@@ -42,9 +42,11 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	body := strings.TrimSpace(r.PostFormValue("body"))
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
+	rawPin := strings.TrimSpace(r.PostFormValue("pin")) // "" | "supports" | "opposes" | "featured"
 
 	flash := ""
 	nt := db.NodeType(rawType)
+	var pinKind db.PinKind
 	switch {
 	case !nt.Valid():
 		flash = "Pick a valid node type."
@@ -55,8 +57,15 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	case nt == db.NodeTypeFact && sourceURL == "":
 		flash = "Facts need a source URL."
 	}
+	if flash == "" && rawPin != "" {
+		var pinErr string
+		pinKind, pinErr = parsePinKind(rawPin, nt)
+		if pinErr != "" {
+			flash = pinErr
+		}
+	}
 	if flash != "" {
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin))
 		return
 	}
 
@@ -74,8 +83,19 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL))
+		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin))
 		return
+	}
+	if rawPin != "" {
+		if err := s.queries.SetPin(r.Context(), db.SetPinParams{
+			UserID: user.ID,
+			NodeID: node.ID,
+			Kind:   pinKind,
+		}); err != nil {
+			// Node created successfully; the pin failed. Log and continue —
+			// user can pin from the detail page.
+			s.logger.Error("create node: pin", "err", err)
+		}
 	}
 	http.Redirect(w, r, "/nodes/"+node.ID.String(), http.StatusSeeOther)
 }
@@ -118,25 +138,18 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := currentUser(r)
-	var commitment *views.CommitmentInfo
-	if user != nil && node.Type == db.NodeTypeView {
-		row, err := s.queries.GetCommitmentForUserAndView(r.Context(), db.GetCommitmentForUserAndViewParams{
-			UserID: user.ID,
-			ViewID: id,
-		})
-		switch {
-		case err == nil:
-			info := views.CommitmentInfo{ReasoningID: row.ReasoningID}
+	var pin *views.PinInfo
+	if user != nil {
+		row, ok := s.lookupPin(w, r, user.ID, id)
+		if !ok {
+			return // error already written
+		}
+		if row != nil {
+			info := views.PinInfo{Kind: row.Kind, ReasoningID: row.ReasoningID}
 			if row.ReasoningTitle != nil {
 				info.ReasoningTitle = *row.ReasoningTitle
 			}
-			commitment = &info
-		case errors.Is(err, pgx.ErrNoRows):
-			// not committed — leave nil
-		default:
-			s.logger.Error("node detail: commitment lookup", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
+			pin = &info
 		}
 	}
 
@@ -146,7 +159,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		featuredRows(feat),
 		groupOutgoing(out),
 		groupIncoming(in),
-		commitment,
+		pin,
 	))
 }
 

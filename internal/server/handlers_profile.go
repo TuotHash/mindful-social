@@ -41,9 +41,9 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	commitments, err := s.queries.ListCommitmentsByUser(r.Context(), user.ID)
+	pins, err := s.queries.ListPinsByUser(r.Context(), user.ID)
 	if err != nil {
-		s.logger.Error("profile: list commitments", "err", err)
+		s.logger.Error("profile: list pins", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -65,15 +65,21 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		user,
 		isSelf,
 		authored,
-		commitmentRows(commitments),
+		pinRows(pins),
 		identityLabels(identities),
 	))
 }
 
-func commitmentRows(rows []db.ListCommitmentsByUserRow) []views.CommitmentRow {
-	out := make([]views.CommitmentRow, 0, len(rows))
+func pinRows(rows []db.ListPinsByUserRow) []views.PinRow {
+	out := make([]views.PinRow, 0, len(rows))
 	for _, r := range rows {
-		row := views.CommitmentRow{ViewID: r.ViewID, ViewTitle: r.ViewTitle, ReasoningID: r.ReasoningID}
+		row := views.PinRow{
+			NodeID:    r.NodeID,
+			NodeType:  r.NodeType,
+			NodeTitle: r.NodeTitle,
+			Kind:      r.Kind,
+			ReasoningID: r.ReasoningID,
+		}
 		if r.ReasoningTitle != nil {
 			row.ReasoningTitle = *r.ReasoningTitle
 		}

@@ -127,19 +127,35 @@ button.link {
 .node .source a { word-break: break-all; }
 .node-actions { margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-.commitment-banner {
+.pin-banner {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: #eaf6ee;
-  border: 1px solid #b9dec5;
+  border: 1px solid;
   border-radius: 6px;
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
   flex-wrap: wrap;
 }
-.commitment-banner a { color: inherit; }
-.commitment-banner button { color: #666; font-size: 0.85rem; }
+.pin-banner a { color: inherit; }
+.pin-banner button { color: #666; font-size: 0.85rem; }
+.pin-banner .link { font-size: 0.85rem; }
+.pin-supports { background: #eaf6ee; border-color: #b9dec5; }
+.pin-opposes  { background: #fdecec; border-color: #efbcbc; }
+.pin-featured { background: #f1f1f4; border-color: #d6dadf; }
+
+.form-fieldset {
+  border: 1px solid #d1d1d6;
+  border-radius: 6px;
+  padding: 0.5rem 1rem 0.75rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.form-fieldset legend { padding: 0 0.4rem; font-size: 0.95rem; }
+.form-fieldset .radio { flex-direction: row; align-items: center; gap: 0.5rem; }
+.form-fieldset .radio input { margin: 0; }
 
 .profile-head { margin-bottom: 1.5rem; }
 .profile-head h1 { margin: 0 0 0.25rem; }
@@ -156,12 +172,29 @@ button.link {
   color: #444;
 }
 
-.commitment-list { list-style: none; padding: 0; }
-.commitment-list li { margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #e5e5ea; border-radius: 6px; }
-.commitment-list .commitment-view { display: flex; gap: 0.5rem; align-items: center; text-decoration: none; color: inherit; }
-.commitment-list .commitment-view .title { font-weight: 500; }
-.commitment-reasoning { margin-top: 0.25rem; font-size: 0.9rem; color: #666; }
-.commitment-reasoning a { color: inherit; }
+.pin-list { list-style: none; padding: 0; }
+.pin-list li {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-left-width: 4px;
+  border-radius: 6px;
+}
+.pin-row.pin-supports { border-left-color: #4caf50; }
+.pin-row.pin-opposes  { border-left-color: #f44336; }
+.pin-row.pin-featured { border-left-color: #999; }
+.pin-list .pin-kind {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+  margin-right: 0.5rem;
+}
+.pin-list .pin-node { display: inline-flex; gap: 0.5rem; align-items: center; text-decoration: none; color: inherit; }
+.pin-list .pin-node .title { font-weight: 500; }
+.pin-reasoning { margin-top: 0.25rem; font-size: 0.9rem; color: #666; }
+.pin-reasoning a { color: inherit; }
 
 .featured { margin-top: 2rem; }
 .featured > h2 { font-size: 1.1rem; }
