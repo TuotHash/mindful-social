@@ -157,8 +157,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		viewerFor(user),
 		node,
 		featuredRows(feat),
-		groupOutgoing(out),
-		groupIncoming(in),
+		displayGroups(out, in),
 		pin,
 	))
 }
@@ -391,68 +390,97 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
 }
 
-// groupOutgoing/groupIncoming bucket the flat edge list into the legend
-// sections the template expects. Order is fixed (supports first, then
-// opposes, refines, cites, relates_to) for visual consistency across pages.
+// edgeOrder fixes the canonical kind sequence for the legend and pins active
+// vs. passive labels for each kind. relates_to is symmetric so its passive
+// form matches its active one and the two directions render in a single bucket.
 var edgeOrder = []struct {
-	kind  db.EdgeKind
-	label string
+	kind         db.EdgeKind
+	activeLabel  string
+	passiveLabel string
 }{
-	{db.EdgeKindSupports, "Supports"},
-	{db.EdgeKindOpposes, "Opposes"},
-	{db.EdgeKindRefines, "Refines"},
-	{db.EdgeKindCites, "Cites"},
-	{db.EdgeKindRelatesTo, "Relates to"},
+	{db.EdgeKindSupports, "Supports", "Supported by"},
+	{db.EdgeKindOpposes, "Opposes", "Opposed by"},
+	{db.EdgeKindRefines, "Refines", "Refined by"},
+	{db.EdgeKindCites, "Cites", "Cited by"},
+	{db.EdgeKindRelatesTo, "Relates to", "Relates to"},
 }
 
-func groupOutgoing(rows []db.ListEdgesFromNodeRow) []views.EdgeGroup {
-	groups := make([]views.EdgeGroup, 0, len(edgeOrder))
+// displayGroups combines outgoing and incoming edges into one ordered list
+// of legend sections. For asymmetric kinds the two directions become two
+// separate sections with active and passive labels ("Supports" /
+// "Supported by"). For relates_to (symmetric) both directions merge into a
+// single "Relates to" section. Featured outgoing edges are excluded — they
+// render inline in the "Key reasoning" section above the legend.
+func displayGroups(out []db.ListEdgesFromNodeRow, in []db.ListEdgesToNodeRow) []views.EdgeGroup {
+	var groups []views.EdgeGroup
 	for _, ek := range edgeOrder {
-		g := views.EdgeGroup{Label: ek.label, Kind: ek.kind}
-		for _, row := range rows {
-			if row.Kind == ek.kind {
-				g.Rows = append(g.Rows, views.EdgeRow{
-					EdgeID:   row.ID,
-					Kind:     row.Kind,
-					Featured: row.Position != nil,
-					ID:       row.ToID,
-					Type:     row.ToType,
-					Title:    row.ToTitle,
+		outRows := outgoingRowsOfKind(out, ek.kind)
+		inRows := incomingRowsOfKind(in, ek.kind)
+
+		if ek.kind == db.EdgeKindRelatesTo {
+			merged := append(append([]views.EdgeRow{}, outRows...), inRows...)
+			if len(merged) > 0 {
+				groups = append(groups, views.EdgeGroup{
+					Kind:  ek.kind,
+					Label: ek.activeLabel,
+					Rows:  merged,
 				})
 			}
+			continue
 		}
-		groups = append(groups, g)
+		if len(outRows) > 0 {
+			groups = append(groups, views.EdgeGroup{Kind: ek.kind, Label: ek.activeLabel, Rows: outRows})
+		}
+		if len(inRows) > 0 {
+			groups = append(groups, views.EdgeGroup{Kind: ek.kind, Label: ek.passiveLabel, Rows: inRows})
+		}
 	}
 	return groups
 }
 
-func groupIncoming(rows []db.ListEdgesToNodeRow) []views.EdgeGroup {
-	groups := make([]views.EdgeGroup, 0, len(edgeOrder))
-	for _, ek := range edgeOrder {
-		g := views.EdgeGroup{Label: ek.label, Kind: ek.kind}
-		for _, row := range rows {
-			if row.Kind == ek.kind {
-				g.Rows = append(g.Rows, views.EdgeRow{
-					EdgeID: row.ID,
-					Kind:   row.Kind,
-					ID:     row.FromID,
-					Type:   row.FromType,
-					Title:  row.FromTitle,
-				})
-			}
+func outgoingRowsOfKind(rows []db.ListEdgesFromNodeRow, kind db.EdgeKind) []views.EdgeRow {
+	var out []views.EdgeRow
+	for _, row := range rows {
+		if row.Kind != kind || row.Position != nil {
+			continue
 		}
-		groups = append(groups, g)
+		out = append(out, views.EdgeRow{
+			EdgeID:   row.ID,
+			Kind:     row.Kind,
+			Outgoing: true,
+			ID:       row.ToID,
+			Type:     row.ToType,
+			Title:    row.ToTitle,
+		})
 	}
-	return groups
+	return out
+}
+
+func incomingRowsOfKind(rows []db.ListEdgesToNodeRow, kind db.EdgeKind) []views.EdgeRow {
+	var out []views.EdgeRow
+	for _, row := range rows {
+		if row.Kind != kind {
+			continue
+		}
+		out = append(out, views.EdgeRow{
+			EdgeID:   row.ID,
+			Kind:     row.Kind,
+			Outgoing: false,
+			ID:       row.FromID,
+			Type:     row.FromType,
+			Title:    row.FromTitle,
+		})
+	}
+	return out
 }
 
 // featuredRows turns the DB projection into the view-layer FeaturedRow,
-// looking up the human label from edgeOrder so templates don't need to
+// looking up the active label from edgeOrder so templates don't need to
 // hardcode "supports → Supports" mappings.
 func featuredRows(rows []db.ListFeaturedEdgesFromNodeRow) []views.FeaturedRow {
 	labels := make(map[db.EdgeKind]string, len(edgeOrder))
 	for _, ek := range edgeOrder {
-		labels[ek.kind] = ek.label
+		labels[ek.kind] = ek.activeLabel
 	}
 	out := make([]views.FeaturedRow, 0, len(rows))
 	for _, row := range rows {

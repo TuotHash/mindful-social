@@ -59,19 +59,21 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 	}
 }
 
-// EdgeRow is the projection ListEdgesFromNode / ListEdgesToNode return —
-// templates render it directly so handlers don't have to repackage.
+// EdgeRow is one entry in a legend section. Outgoing is true when this row
+// represents an edge that *originates* at the current node (eligible for the
+// "Feature" button); false for incoming edges where the current node is the
+// destination.
 type EdgeRow struct {
 	EdgeID   uuid.UUID
 	Kind     db.EdgeKind
-	Featured bool
+	Outgoing bool
 	ID       uuid.UUID
 	Type     db.NodeType
 	Title    string
 }
 
-// EdgeGroup is one section of the legend on a node detail page: a heading
-// (e.g. "Supports") and the rows that fall under it.
+// EdgeGroup is one section of the legend: a heading ("Supports", "Supported
+// by", "Relates to", …) and the rows that fall under it.
 type EdgeGroup struct {
 	Label string
 	Kind  db.EdgeKind
@@ -125,7 +127,7 @@ func pinBannerClass(k db.PinKind) string {
 	return "pin-banner pin-" + string(k)
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing, incoming []EdgeGroup, pin *PinInfo) {
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo) {
 	@Layout(node.Title, viewer) {
 		<article class="node">
 			<header>
@@ -196,15 +198,31 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, outgoing,
 		}
 
 		<aside class="legend">
-			<h2>Legend</h2>
-			<section>
-				<h3>This node points at…</h3>
-				@edgeGroups(outgoing, "outgoing", node.ID, viewer)
-			</section>
-			<section>
-				<h3>…what points at this node</h3>
-				@edgeGroups(incoming, "incoming", node.ID, viewer)
-			</section>
+			<h2>Connections</h2>
+			if len(groups) == 0 {
+				<p class="muted">No connections yet.</p>
+			} else {
+				for _, g := range groups {
+					<div class={ "edge-group", "edge-" + string(g.Kind) }>
+						<h4>{ g.Label }</h4>
+						<ul>
+							for _, r := range g.Rows {
+								<li>
+									<a href={ templ.SafeURL("/nodes/" + r.ID.String()) }>
+										<span class={ "badge", "badge-" + string(r.Type) }>{ string(r.Type) }</span>
+										<span class="title">{ r.Title }</span>
+									</a>
+									if r.Outgoing && viewer != nil {
+										<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
+											<button type="submit" class="link">Feature</button>
+										</form>
+									}
+								</li>
+							}
+						</ul>
+					</div>
+				}
+			}
 		</aside>
 	}
 }
@@ -341,55 +359,3 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash string, formKind string, c
 	}
 }
 
-templ edgeGroups(groups []EdgeGroup, dir string, sourceID uuid.UUID, viewer *Viewer) {
-	if hasAnyVisibleEdges(groups, dir) {
-		for _, g := range groups {
-			if hasVisibleRows(g, dir) {
-				<div class={ "edge-group", "edge-" + string(g.Kind) }>
-					<h4>{ g.Label }</h4>
-					<ul>
-						for _, r := range g.Rows {
-							if !(dir == "outgoing" && r.Featured) {
-								<li>
-									<a href={ templ.SafeURL("/nodes/" + r.ID.String()) }>
-										<span class={ "badge", "badge-" + string(r.Type) }>{ string(r.Type) }</span>
-										<span class="title">{ r.Title }</span>
-									</a>
-									if dir == "outgoing" && viewer != nil {
-										<form method="post" action={ templ.SafeURL("/nodes/" + sourceID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
-											<button type="submit" class="link">Feature</button>
-										</form>
-									}
-								</li>
-							}
-						}
-					</ul>
-				</div>
-			}
-		}
-	} else {
-		<p class="muted">Nothing yet.</p>
-	}
-}
-
-// In the outgoing direction, featured rows are rendered in the "Key reasoning"
-// section above and skipped here, so a group is "visible" only if it has at
-// least one non-featured row.
-func hasVisibleRows(g EdgeGroup, dir string) bool {
-	for _, r := range g.Rows {
-		if dir == "outgoing" && r.Featured {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
-func hasAnyVisibleEdges(groups []EdgeGroup, dir string) bool {
-	for _, g := range groups {
-		if hasVisibleRows(g, dir) {
-			return true
-		}
-	}
-	return false
-}
