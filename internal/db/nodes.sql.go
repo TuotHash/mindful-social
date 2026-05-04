@@ -167,17 +167,14 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 	return items, nil
 }
 
-const listNodesExcept = `-- name: ListNodesExcept :many
+const listRecentNodes = `-- name: ListRecentNodes :many
 SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
-WHERE id != $1
-ORDER BY title ASC
-LIMIT 500
+ORDER BY created_at DESC
+LIMIT $1
 `
 
-// All nodes except the given one, alphabetically — used to populate the
-// target-node picker on the edge creation form.
-func (q *Queries) ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error) {
-	rows, err := q.db.Query(ctx, listNodesExcept, id)
+func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listRecentNodes, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -206,32 +203,40 @@ func (q *Queries) ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, er
 	return items, nil
 }
 
-const listRecentNodes = `-- name: ListRecentNodes :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
-ORDER BY created_at DESC
-LIMIT $1
+const pickerSearchNodes = `-- name: PickerSearchNodes :many
+SELECT n.id, n.type, n.title
+FROM nodes n, websearch_to_tsquery('english', $1) q
+WHERE n.search_tsv @@ q
+  AND n.id != $2
+ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC
+LIMIT 50
 `
 
-func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, error) {
-	rows, err := q.db.Query(ctx, listRecentNodes, limit)
+type PickerSearchNodesParams struct {
+	WebsearchToTsquery string    `json:"websearch_to_tsquery"`
+	ID                 uuid.UUID `json:"id"`
+}
+
+type PickerSearchNodesRow struct {
+	ID    uuid.UUID `json:"id"`
+	Type  NodeType  `json:"type"`
+	Title string    `json:"title"`
+}
+
+// Title/body full-text search for the edge-creation picker. Excludes the
+// source node (sqlc parameter $2) and returns just enough columns to render
+// a radio list. Empty queries return nothing — the form's empty state tells
+// the user to type to search.
+func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error) {
+	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.WebsearchToTsquery, arg.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Node
+	var items []PickerSearchNodesRow
 	for rows.Next() {
-		var i Node
-		if err := rows.Scan(
-			&i.ID,
-			&i.Type,
-			&i.Title,
-			&i.Body,
-			&i.SourceUrl,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.SearchTsv,
-		); err != nil {
+		var i PickerSearchNodesRow
+		if err := rows.Scan(&i.ID, &i.Type, &i.Title); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

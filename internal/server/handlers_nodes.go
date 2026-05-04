@@ -341,13 +341,34 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	candidates, err := s.queries.ListNodesExcept(r.Context(), id)
+	find := strings.TrimSpace(r.URL.Query().Get("find"))
+	candidates, err := s.searchEdgeCandidates(r, id, find)
 	if err != nil {
-		s.logger.Error("edge new: list candidates", "err", err)
+		s.logger.Error("edge new: search candidates", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", candidates))
+	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", find, candidates))
+}
+
+// searchEdgeCandidates returns the matches the picker shows. An empty query
+// returns no rows — the form's empty state tells the user to type to search.
+func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query string) ([]views.EdgeCandidate, error) {
+	if query == "" {
+		return nil, nil
+	}
+	rows, err := s.queries.PickerSearchNodes(r.Context(), db.PickerSearchNodesParams{
+		WebsearchToTsquery: query,
+		ID:                 sourceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]views.EdgeCandidate, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, views.EdgeCandidate{ID: row.ID, Type: row.Type, Title: row.Title})
+	}
+	return out, nil
 }
 
 func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
@@ -379,14 +400,15 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	rawKind := strings.TrimSpace(r.PostFormValue("kind"))
 	rawToID := strings.TrimSpace(r.PostFormValue("to_id"))
 
+	find := strings.TrimSpace(r.PostFormValue("find"))
 	rerender := func(flash string) {
-		candidates, lerr := s.queries.ListNodesExcept(r.Context(), fromID)
+		candidates, lerr := s.searchEdgeCandidates(r, fromID, find)
 		if lerr != nil {
-			s.logger.Error("edge create: list candidates", "err", lerr)
+			s.logger.Error("edge create: search candidates", "err", lerr)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, candidates))
+		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, find, candidates))
 	}
 
 	ek := db.EdgeKind(rawKind)

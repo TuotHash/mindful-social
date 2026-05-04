@@ -332,7 +332,15 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 	}
 }
 
-templ EdgeNew(viewer *Viewer, fromNode db.Node, flash string, formKind string, candidates []db.Node) {
+// EdgeCandidate is the slim row the edge-creation picker renders for each
+// search hit: just enough to show a labelled radio button.
+type EdgeCandidate struct {
+	ID    uuid.UUID
+	Type  db.NodeType
+	Title string
+}
+
+templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, candidates []EdgeCandidate) {
 	@Layout("Add connection", viewer) {
 		<section>
 			<h1>
@@ -357,20 +365,38 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash string, formKind string, c
 					</select>
 				</label>
 				<label>
-					Target node
-					<select name="to_id" required size="12" class="node-picker">
-						for _, n := range candidates {
-							<option value={ n.ID.String() }>{ string(n.Type) } — { n.Title }</option>
-						}
-					</select>
-					<small>Click to select. Type in a browser find (Ctrl+F) to search.</small>
+					Find target node
+					<input type="search" name="find" value={ find } placeholder="search by title or body…"/>
+					<small>Type a query and submit to filter the list below.</small>
 				</label>
+				@candidatePicker(find, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn primary">Add connection</button>
 					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn">Cancel</a>
 				</div>
 			</form>
 		</section>
+	}
+}
+
+templ candidatePicker(find string, candidates []EdgeCandidate) {
+	if find == "" {
+		<p class="muted">Type a search query above and submit to see matching nodes.</p>
+	}
+	if find != "" && len(candidates) == 0 {
+		<p class="muted">No nodes match that query.</p>
+	}
+	if find != "" && len(candidates) > 0 {
+		<fieldset class="form-fieldset candidate-list">
+			<legend>Pick a target</legend>
+			for _, c := range candidates {
+				<label class="radio">
+					<input type="radio" name="to_id" value={ c.ID.String() } required/>
+					<span class={ "badge", "badge-" + string(c.Type) }>{ string(c.Type) }</span>
+					{ c.Title }
+				</label>
+			}
+		</fieldset>
 	}
 }
 

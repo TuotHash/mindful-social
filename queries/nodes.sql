@@ -29,14 +29,6 @@ RETURNING *;
 -- name: CountNodes :one
 SELECT count(*) FROM nodes;
 
--- name: ListNodesExcept :many
--- All nodes except the given one, alphabetically — used to populate the
--- target-node picker on the edge creation form.
-SELECT * FROM nodes
-WHERE id != $1
-ORDER BY title ASC
-LIMIT 500;
-
 -- name: ListNodesAuthoredBy :many
 -- Nodes a user has authored, most recent first — for the "Authored" section
 -- on a profile page.
@@ -44,6 +36,18 @@ SELECT * FROM nodes
 WHERE created_by = $1
 ORDER BY created_at DESC
 LIMIT $2;
+
+-- name: PickerSearchNodes :many
+-- Title/body full-text search for the edge-creation picker. Excludes the
+-- source node (sqlc parameter $2) and returns just enough columns to render
+-- a radio list. Empty queries return nothing — the form's empty state tells
+-- the user to type to search.
+SELECT n.id, n.type, n.title
+FROM nodes n, websearch_to_tsquery('english', $1) q
+WHERE n.search_tsv @@ q
+  AND n.id != $2
+ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC
+LIMIT 50;
 
 -- name: SearchNodes :many
 -- Full-text search over title + body using a precomputed tsvector. The query

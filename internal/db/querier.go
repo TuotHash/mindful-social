@@ -57,9 +57,6 @@ type Querier interface {
 	// on a profile page.
 	ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthoredByParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
-	// All nodes except the given one, alphabetically — used to populate the
-	// target-node picker on the edge creation form.
-	ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error)
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
 	ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node, error)
 	// A user's pins with the joined node and optional reasoning titles — for
@@ -70,6 +67,11 @@ type Querier interface {
 	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
+	// Title/body full-text search for the edge-creation picker. Excludes the
+	// source node (sqlc parameter $2) and returns just enough columns to render
+	// a radio list. Empty queries return nothing — the form's empty state tells
+	// the user to type to search.
+	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
 	// Full-text search over title + body using a precomputed tsvector. The query
 	// uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
 	// bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
