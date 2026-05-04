@@ -119,6 +119,44 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 	return items, nil
 }
 
+const listNodesExcept = `-- name: ListNodesExcept :many
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+WHERE id != $1
+ORDER BY title ASC
+LIMIT 500
+`
+
+// All nodes except the given one, alphabetically — used to populate the
+// target-node picker on the edge creation form.
+func (q *Queries) ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listNodesExcept, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Node
+	for rows.Next() {
+		var i Node
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Title,
+			&i.Body,
+			&i.SourceUrl,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecentNodes = `-- name: ListRecentNodes :many
 SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
 ORDER BY created_at DESC

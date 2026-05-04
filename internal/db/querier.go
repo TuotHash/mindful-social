@@ -32,6 +32,9 @@ type Querier interface {
 	ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]ListEdgesToNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
+	// All nodes except the given one, alphabetically — used to populate the
+	// target-node picker on the edge creation form.
+	ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 }

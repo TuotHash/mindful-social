@@ -28,3 +28,11 @@ RETURNING *;
 
 -- name: CountNodes :one
 SELECT count(*) FROM nodes;
+
+-- name: ListNodesExcept :many
+-- All nodes except the given one, alphabetically — used to populate the
+-- target-node picker on the edge creation form.
+SELECT * FROM nodes
+WHERE id != $1
+ORDER BY title ASC
+LIMIT 500;

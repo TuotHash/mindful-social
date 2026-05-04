@@ -74,6 +74,11 @@ templ NodeDetail(viewer *Viewer, node db.Node, outgoing, incoming []EdgeGroup) {
 					<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">{ *node.SourceUrl }</a>
 				</section>
 			}
+			if viewer != nil {
+				<div class="node-actions">
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
+				</div>
+			}
 		</article>
 
 		<aside class="legend">
@@ -87,6 +92,48 @@ templ NodeDetail(viewer *Viewer, node db.Node, outgoing, incoming []EdgeGroup) {
 				@edgeGroups(incoming, "incoming")
 			</section>
 		</aside>
+	}
+}
+
+templ EdgeNew(viewer *Viewer, fromNode db.Node, flash string, formKind string, candidates []db.Node) {
+	@Layout("Add connection", viewer) {
+		<section>
+			<h1>
+				Connect from
+				<span class={ "badge", "badge-" + string(fromNode.Type) }>{ string(fromNode.Type) }</span>
+				{ fromNode.Title }
+			</h1>
+			<p class="muted">
+				You are creating a directed connection <strong>from</strong> this node <strong>to</strong> another.
+				The kind describes how the source relates to the target.
+			</p>
+			@Flash(flash)
+			<form method="post" action={ templ.SafeURL("/nodes/" + fromNode.ID.String() + "/edges") } class="form">
+				<label>
+					Relationship kind
+					<select name="kind" required>
+						<option value="supports" selected?={ formKind == "supports" || formKind == "" }>Supports — the source backs the target</option>
+						<option value="opposes" selected?={ formKind == "opposes" }>Opposes — the source argues against the target</option>
+						<option value="refines" selected?={ formKind == "refines" }>Refines — the source clarifies or narrows the target</option>
+						<option value="cites" selected?={ formKind == "cites" }>Cites — the source references the target as evidence</option>
+						<option value="relates_to" selected?={ formKind == "relates_to" }>Relates to — loosely connected</option>
+					</select>
+				</label>
+				<label>
+					Target node
+					<select name="to_id" required size="12" class="node-picker">
+						for _, n := range candidates {
+							<option value={ n.ID.String() }>{ string(n.Type) } — { n.Title }</option>
+						}
+					</select>
+					<small>Click to select. Type in a browser find (Ctrl+F) to search.</small>
+				</label>
+				<div class="form-row">
+					<button type="submit" class="btn primary">Add connection</button>
+					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn">Cancel</a>
+				</div>
+			</form>
+		</section>
 	}
 }
 

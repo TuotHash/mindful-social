@@ -95,6 +95,8 @@ button.link {
   background: #fff;
 }
 .form small { color: #888; font-size: 0.85rem; }
+.form-row { display: flex; gap: 0.5rem; align-items: center; }
+.node-picker { font-family: inherit; }
 
 .oauth-buttons { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
@@ -123,6 +125,7 @@ button.link {
 .node h1 { margin: 0.25rem 0; }
 .node .body { margin: 1rem 0; }
 .node .source a { word-break: break-all; }
+.node-actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
 
 .legend { margin-top: 2rem; }
 .legend h2 { font-size: 1.1rem; }

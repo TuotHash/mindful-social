@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/mindful-social/mindful-social/internal/db"
 	"github.com/mindful-social/mindful-social/internal/views"
@@ -116,6 +117,104 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		groupOutgoing(out),
 		groupIncoming(in),
 	))
+}
+
+func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	node, err := s.queries.GetNode(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("edge new: get node", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	candidates, err := s.queries.ListNodesExcept(r.Context(), id)
+	if err != nil {
+		s.logger.Error("edge new: list candidates", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", candidates))
+}
+
+func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	fromID, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fromNode, err := s.queries.GetNode(r.Context(), fromID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("edge create: get from node", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+
+	rawKind := strings.TrimSpace(r.PostFormValue("kind"))
+	rawToID := strings.TrimSpace(r.PostFormValue("to_id"))
+
+	rerender := func(flash string) {
+		candidates, lerr := s.queries.ListNodesExcept(r.Context(), fromID)
+		if lerr != nil {
+			s.logger.Error("edge create: list candidates", "err", lerr)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, candidates))
+	}
+
+	ek := db.EdgeKind(rawKind)
+	if !ek.Valid() {
+		rerender("Pick a valid relationship kind.")
+		return
+	}
+	toID, err := uuid.Parse(rawToID)
+	if err != nil {
+		rerender("Select a target node.")
+		return
+	}
+	if toID == fromID {
+		rerender("A node cannot connect to itself.")
+		return
+	}
+
+	_, err = s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
+		FromNode:  fromID,
+		ToNode:    toID,
+		Kind:      ek,
+		CreatedBy: user.ID,
+	})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			rerender("That connection already exists.")
+			return
+		}
+		s.logger.Error("edge create", "err", err)
+		rerender("Could not create connection. Please try again.")
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
 }
 
 // groupOutgoing/groupIncoming bucket the flat edge list into the legend
