@@ -35,9 +35,7 @@ SELECT * FROM tags WHERE name = $1;
 
 -- name: ListNodesWithTag :many
 -- Nodes that carry a given tag, most recent first — for /tags/{name}.
-SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by,
-       n.created_at, n.updated_at
-FROM nodes n
+SELECT n.* FROM nodes n
 JOIN node_tags nt ON nt.node_id = n.id
 WHERE nt.tag_id = $1
 ORDER BY n.created_at DESC

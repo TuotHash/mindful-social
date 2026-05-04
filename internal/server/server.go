@@ -109,6 +109,7 @@ func (s *Server) routes() {
 	r.Get("/users/{username}", s.handleProfile)
 	r.Get("/tags", s.handleTagsIndex)
 	r.Get("/tags/{name}", s.handleTagDetail)
+	r.Get("/search", s.handleSearch)
 
 	// Routes that require an authenticated user.
 	r.Group(func(r chi.Router) {

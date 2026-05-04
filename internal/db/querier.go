@@ -70,6 +70,12 @@ type Querier interface {
 	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
+	// Full-text search over title + body using a precomputed tsvector. The query
+	// uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
+	// bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
+	// with creation date as a tiebreaker. ts_headline produces a short marked-up
+	// excerpt the template can render directly.
+	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first.

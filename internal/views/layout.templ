@@ -14,6 +14,9 @@ templ Layout(title string, currentUser *Viewer) {
 		<body>
 			<header class="topbar">
 				<a class="brand" href="/">Mindful Social</a>
+				<form method="get" action="/search" class="topbar-search">
+					<input type="search" name="q" placeholder="search…" aria-label="Search"/>
+				</form>
 				<nav>
 					<a href="/tags">Tags</a>
 					if currentUser != nil {

@@ -43,6 +43,26 @@ main {
   text-decoration: none;
 }
 
+.topbar-search { margin: 0; flex: 0 1 320px; }
+.topbar-search input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #d1d1d6;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: #fafafa;
+}
+.topbar-search input:focus { outline: 2px solid #0071e3; outline-offset: -1px; }
+
+.search-form { display: flex; gap: 0.5rem; margin: 1rem 0; }
+.search-form input { flex: 1; padding: 0.5rem; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 1rem; }
+.search-results { list-style: none; padding: 0; }
+.search-results li { padding: 0.75rem 0; border-bottom: 1px solid #eee; }
+.search-results .search-hit { display: flex; gap: 0.5rem; align-items: center; text-decoration: none; color: inherit; }
+.search-results .search-hit .title { font-weight: 500; }
+.search-excerpt { margin: 0.25rem 0 0; color: #555; font-size: 0.95rem; }
+.search-excerpt mark { background: #fff3a3; padding: 0 2px; border-radius: 2px; }
+
 .topbar nav .user { color: #888; }
 
 .inline { display: inline; }

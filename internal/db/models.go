@@ -205,6 +205,7 @@ type Node struct {
 	CreatedBy uuid.UUID          `json:"created_by"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	SearchTsv interface{}        `json:"search_tsv"`
 }
 
 type NodeTag struct {

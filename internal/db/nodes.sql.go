@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countNodes = `-- name: CountNodes :one
@@ -25,7 +26,7 @@ func (q *Queries) CountNodes(ctx context.Context) (int64, error) {
 const createNode = `-- name: CreateNode :one
 INSERT INTO nodes (type, title, body, source_url, created_by)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv
 `
 
 type CreateNodeParams struct {
@@ -54,12 +55,13 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SearchTsv,
 	)
 	return i, err
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -74,12 +76,13 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SearchTsv,
 	)
 	return i, err
 }
 
 const listNodesAuthoredBy = `-- name: ListNodesAuthoredBy :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
 WHERE created_by = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -110,6 +113,7 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchTsv,
 		); err != nil {
 			return nil, err
 		}
@@ -122,7 +126,7 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
 WHERE type = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -151,6 +155,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchTsv,
 		); err != nil {
 			return nil, err
 		}
@@ -163,7 +168,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listNodesExcept = `-- name: ListNodesExcept :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
 WHERE id != $1
 ORDER BY title ASC
 LIMIT 500
@@ -189,6 +194,7 @@ func (q *Queries) ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, er
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchTsv,
 		); err != nil {
 			return nil, err
 		}
@@ -201,7 +207,7 @@ func (q *Queries) ListNodesExcept(ctx context.Context, id uuid.UUID) ([]Node, er
 }
 
 const listRecentNodes = `-- name: ListRecentNodes :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
 ORDER BY created_at DESC
 LIMIT $1
 `
@@ -224,6 +230,74 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchTsv,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchNodes = `-- name: SearchNodes :many
+SELECT
+    n.id, n.type, n.title, n.body, n.source_url, n.created_by,
+    n.created_at, n.updated_at,
+    ts_rank(n.search_tsv, q) AS rank,
+    ts_headline('english', n.body, q,
+                'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8') AS excerpt
+FROM nodes n, websearch_to_tsquery('english', $1) q
+WHERE n.search_tsv @@ q
+ORDER BY rank DESC, n.created_at DESC
+LIMIT $2
+`
+
+type SearchNodesParams struct {
+	WebsearchToTsquery string `json:"websearch_to_tsquery"`
+	Limit              int32  `json:"limit"`
+}
+
+type SearchNodesRow struct {
+	ID        uuid.UUID          `json:"id"`
+	Type      NodeType           `json:"type"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	SourceUrl *string            `json:"source_url"`
+	CreatedBy uuid.UUID          `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Rank      float32            `json:"rank"`
+	Excerpt   []byte             `json:"excerpt"`
+}
+
+// Full-text search over title + body using a precomputed tsvector. The query
+// uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
+// bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
+// with creation date as a tiebreaker. ts_headline produces a short marked-up
+// excerpt the template can render directly.
+func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error) {
+	rows, err := q.db.Query(ctx, searchNodes, arg.WebsearchToTsquery, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchNodesRow
+	for rows.Next() {
+		var i SearchNodesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Title,
+			&i.Body,
+			&i.SourceUrl,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Rank,
+			&i.Excerpt,
 		); err != nil {
 			return nil, err
 		}
@@ -242,7 +316,7 @@ SET title = $2,
     source_url = $4,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv
 `
 
 type UpdateNodeParams struct {
@@ -269,6 +343,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SearchTsv,
 	)
 	return i, err
 }

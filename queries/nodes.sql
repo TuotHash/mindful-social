@@ -44,3 +44,20 @@ SELECT * FROM nodes
 WHERE created_by = $1
 ORDER BY created_at DESC
 LIMIT $2;
+
+-- name: SearchNodes :many
+-- Full-text search over title + body using a precomputed tsvector. The query
+-- uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
+-- bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
+-- with creation date as a tiebreaker. ts_headline produces a short marked-up
+-- excerpt the template can render directly.
+SELECT
+    n.id, n.type, n.title, n.body, n.source_url, n.created_by,
+    n.created_at, n.updated_at,
+    ts_rank(n.search_tsv, q) AS rank,
+    ts_headline('english', n.body, q,
+                'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8') AS excerpt
+FROM nodes n, websearch_to_tsquery('english', $1) q
+WHERE n.search_tsv @@ q
+ORDER BY rank DESC, n.created_at DESC
+LIMIT $2;

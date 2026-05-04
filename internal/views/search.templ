@@ -1,0 +1,89 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/mindful-social/mindful-social/internal/db"
+)
+
+// SearchHit is one result on the /search page. Excerpt is split into plain
+// and matched parts so templ can escape each one and surround matches with
+// <mark> safely (without exposing user-authored HTML).
+type SearchHit struct {
+	ID      uuid.UUID
+	Type    db.NodeType
+	Title   string
+	Excerpt []ExcerptPart
+}
+
+// ExcerptPart is one chunk of a search result's body excerpt. Match=true
+// segments are wrapped in <mark> at render time.
+type ExcerptPart struct {
+	Text  string
+	Match bool
+}
+
+templ SearchResults(viewer *Viewer, q string, hits []SearchHit) {
+	@Layout("Search", viewer) {
+		<section>
+			<h1>Search</h1>
+			<form method="get" action="/search" class="search-form">
+				<input type="search" name="q" value={ q } placeholder="search nodes…"/>
+				<button type="submit" class="btn">Search</button>
+			</form>
+			if q == "" {
+				<p class="muted">Type a query above to search node titles and bodies.</p>
+			}
+			if isQueryWithNoHits(q, hits) {
+				<p class="muted">No matches for <strong>{ q }</strong>.</p>
+			}
+			if isQueryWithHits(q, hits) {
+				<p class="muted">{ strconv.Itoa(len(hits)) } results for <strong>{ q }</strong>.</p>
+				<ul class="search-results">
+					for _, h := range hits {
+						@searchHitItem(h)
+					}
+				</ul>
+			}
+		</section>
+	}
+}
+
+templ searchHitItem(h SearchHit) {
+	<li>
+		<a href={ templ.SafeURL("/nodes/" + h.ID.String()) } class="search-hit">
+			<span class={ "badge", "badge-" + string(h.Type) }>{ string(h.Type) }</span>
+			<span class="title">{ h.Title }</span>
+		</a>
+		if len(h.Excerpt) > 0 {
+			<p class="search-excerpt">
+				@searchExcerpt(h.Excerpt)
+			</p>
+		}
+	</li>
+}
+
+templ searchExcerpt(parts []ExcerptPart) {
+	for _, p := range parts {
+		if p.Match {
+			<mark>{ p.Text }</mark>
+		}
+		if !p.Match {
+			<span>{ p.Text }</span>
+		}
+	}
+}
+
+func isQueryWithNoHits(q string, hits []SearchHit) bool { return q != "" && len(hits) == 0 }
+func isQueryWithHits(q string, hits []SearchHit) bool   { return q != "" && len(hits) > 0 }
+
+// resultCountPhrase returns "1 result" / "N results" — folded into a single
+// expression because templ's parser refuses a paragraph that mixes two outer
+// {…} interpolations with an inline element that itself contains {…}.
+func resultCountPhrase(n int) string {
+	if n == 1 {
+		return "1 result"
+	}
+	return strconv.Itoa(n) + " results"
+}
