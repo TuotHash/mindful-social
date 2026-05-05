@@ -293,8 +293,10 @@ SELECT
     n.id, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
     ts_rank(n.search_tsv, q) AS rank,
+    -- Cast to text so sqlc maps it to Go string instead of []byte.
+    -- Without the cast, sqlc can't infer the return type of ts_headline.
     ts_headline('english', n.body, q,
-                'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8') AS excerpt
+                'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
 FROM nodes n, websearch_to_tsquery('english', $1) q
 WHERE n.search_tsv @@ q
 ORDER BY rank DESC, n.created_at DESC
@@ -316,7 +318,7 @@ type SearchNodesRow struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	Rank      float32            `json:"rank"`
-	Excerpt   []byte             `json:"excerpt"`
+	Excerpt   string             `json:"excerpt"`
 }
 
 // Full-text search over title + body using a precomputed tsvector. The query

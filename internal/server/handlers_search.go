@@ -38,7 +38,7 @@ func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
 			ID:      row.ID,
 			Type:    row.Type,
 			Title:   row.Title,
-			Excerpt: parseHighlightedExcerpt(string(row.Excerpt)),
+			Excerpt: parseHighlightedExcerpt(row.Excerpt),
 		})
 	}
 	return out
