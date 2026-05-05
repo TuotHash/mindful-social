@@ -12,12 +12,23 @@ import (
 
 type Querier interface {
 	AttachTag(ctx context.Context, arg AttachTagParams) error
+	// Total edges (incoming + outgoing) that would cascade-delete if the node
+	// were removed. Used on the deletion confirmation page.
+	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
+	// Pins on this node by users other than the node's author. The author's own
+	// pin is excluded — they obviously consent to losing it. Other users' pins
+	// are surfaced on the confirmation page so the author knows what cascades.
+	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Any logged-in user can delete any edge (wiki-open curation, same as
+	// feature/unfeature). Both endpoints of an edge can trigger this — the page
+	// the user is on is just where they get redirected after the delete.
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
+	DeleteNode(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.

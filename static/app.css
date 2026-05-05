@@ -85,6 +85,12 @@ main {
   border-color: #0071e3;
 }
 
+.btn.danger {
+  background: #c1272d;
+  color: #fff;
+  border-color: #c1272d;
+}
+
 button.link {
   background: none;
   border: 0;

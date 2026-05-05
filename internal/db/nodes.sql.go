@@ -12,12 +12,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countEdgesForNode = `-- name: CountEdgesForNode :one
+SELECT count(*) FROM edges WHERE from_node = $1 OR to_node = $1
+`
+
+// Total edges (incoming + outgoing) that would cascade-delete if the node
+// were removed. Used on the deletion confirmation page.
+func (q *Queries) CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countEdgesForNode, fromNode)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countNodes = `-- name: CountNodes :one
 SELECT count(*) FROM nodes
 `
 
 func (q *Queries) CountNodes(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countNodes)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOtherUserPinsForNode = `-- name: CountOtherUserPinsForNode :one
+SELECT count(*) FROM user_node_pins WHERE node_id = $1 AND user_id <> $2
+`
+
+type CountOtherUserPinsForNodeParams struct {
+	NodeID uuid.UUID `json:"node_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// Pins on this node by users other than the node's author. The author's own
+// pin is excluded — they obviously consent to losing it. Other users' pins
+// are surfaced on the confirmation page so the author knows what cascades.
+func (q *Queries) CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOtherUserPinsForNode, arg.NodeID, arg.UserID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -58,6 +90,15 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.SearchTsv,
 	)
 	return i, err
+}
+
+const deleteNode = `-- name: DeleteNode :exec
+DELETE FROM nodes WHERE id = $1
+`
+
+func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteNode, id)
+	return err
 }
 
 const getNode = `-- name: GetNode :one

@@ -29,6 +29,20 @@ RETURNING *;
 -- name: CountNodes :one
 SELECT count(*) FROM nodes;
 
+-- name: DeleteNode :exec
+DELETE FROM nodes WHERE id = $1;
+
+-- name: CountEdgesForNode :one
+-- Total edges (incoming + outgoing) that would cascade-delete if the node
+-- were removed. Used on the deletion confirmation page.
+SELECT count(*) FROM edges WHERE from_node = $1 OR to_node = $1;
+
+-- name: CountOtherUserPinsForNode :one
+-- Pins on this node by users other than the node's author. The author's own
+-- pin is excluded — they obviously consent to losing it. Other users' pins
+-- are surfaced on the confirmation page so the author knows what cascades.
+SELECT count(*) FROM user_node_pins WHERE node_id = $1 AND user_id <> $2;
+
 -- name: ListNodesAuthoredBy :many
 -- Nodes a user has authored, most recent first — for the "Authored" section
 -- on a profile page.

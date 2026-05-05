@@ -1,6 +1,8 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/mindful-social/mindful-social/internal/db"
 )
@@ -131,6 +133,28 @@ func pinBannerClass(k db.PinKind) string {
 	return "pin-banner pin-" + string(k)
 }
 
+// cascadeEdgeLabel renders the edge-count line on the deletion confirmation
+// page. Pluralized so "1 connection" reads naturally next to the larger plural.
+func cascadeEdgeLabel(n int64) string {
+	if n == 1 {
+		return "1 connection"
+	}
+	return fmt.Sprintf("%d connections", n)
+}
+
+// cascadePinLabel renders the other-users'-pins line. None at all gets a
+// distinct phrasing — "0 pins from other users" reads worse than "No other
+// users have pinned this."
+func cascadePinLabel(n int64) string {
+	if n == 0 {
+		return "No other users have pinned this node."
+	}
+	if n == 1 {
+		return "1 other user's pin to this node will be removed."
+	}
+	return fmt.Sprintf("%d other users' pins to this node will be removed.", n)
+}
+
 templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag) {
 	@Layout(node.Title, viewer) {
 		<article class="node">
@@ -168,6 +192,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							}
 						</a>
 					}
+					if viewer.ID == node.CreatedBy.String() {
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="btn danger">Delete</a>
+					}
 				</div>
 			}
 			if viewer != nil && pin != nil {
@@ -202,6 +229,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/unfeature") } class="inline">
 								<button type="submit" class="link">Unfeature</button>
 							</form>
+							<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
+								<button type="submit" class="link">Disconnect</button>
+							</form>
 						}
 					</article>
 				}
@@ -226,6 +256,11 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 									if r.Outgoing && viewer != nil {
 										<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
 											<button type="submit" class="link">Feature</button>
+										</form>
+									}
+									if viewer != nil {
+										<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/delete") } class="inline edge-action">
+											<button type="submit" class="link">Disconnect</button>
 										</form>
 									}
 								</li>
@@ -373,6 +408,33 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 				<div class="form-row">
 					<button type="submit" class="btn primary">Add connection</button>
 					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn">Cancel</a>
+				</div>
+			</form>
+		</section>
+	}
+}
+
+templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
+	@Layout("Delete "+node.Title, viewer) {
+		<section>
+			<h1>
+				Delete
+				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
+				{ node.Title }
+			</h1>
+			<p class="muted">
+				This permanently removes the node. The action cannot be undone.
+			</p>
+			<ul class="muted">
+				<li>{ cascadeEdgeLabel(edgeCount) } will be removed.</li>
+				<li>{ cascadePinLabel(otherPinCount) }</li>
+				<li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li>
+				<li>Tags lose their link to this node, but the tags themselves remain.</li>
+			</ul>
+			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="form">
+				<div class="form-row">
+					<button type="submit" class="btn danger">Yes, delete this node</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
 				</div>
 			</form>
 		</section>

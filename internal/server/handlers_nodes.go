@@ -219,6 +219,104 @@ func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
 }
 
+func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	node, err := s.queries.GetNode(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("node delete confirm: get", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if node.CreatedBy != user.ID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	edgeCount, err := s.queries.CountEdgesForNode(r.Context(), id)
+	if err != nil {
+		s.logger.Error("node delete confirm: count edges", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	otherPinCount, err := s.queries.CountOtherUserPinsForNode(r.Context(), db.CountOtherUserPinsForNodeParams{
+		NodeID: id,
+		UserID: user.ID,
+	})
+	if err != nil {
+		s.logger.Error("node delete confirm: count pins", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.NodeDelete(viewerFor(user), node, edgeCount, otherPinCount))
+}
+
+func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	node, err := s.queries.GetNode(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.logger.Error("node delete: get", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if node.CreatedBy != user.ID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := s.queries.DeleteNode(r.Context(), id); err != nil {
+		s.logger.Error("node delete", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/users/"+user.Username, http.StatusSeeOther)
+}
+
+func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
+	// pageID is the node whose page hosted the form — used for the redirect
+	// only. Edges can be deleted from either endpoint, so we don't constrain
+	// the delete to from_node.
+	pageID, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.queries.DeleteEdge(r.Context(), edgeID); err != nil {
+		s.logger.Error("delete edge", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+pageID.String(), http.StatusSeeOther)
+}
+
 func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chiURLParam(r, "id"))
 	if err != nil {

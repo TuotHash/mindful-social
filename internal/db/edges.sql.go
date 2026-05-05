@@ -49,6 +49,9 @@ const deleteEdge = `-- name: DeleteEdge :exec
 DELETE FROM edges WHERE id = $1
 `
 
+// Any logged-in user can delete any edge (wiki-open curation, same as
+// feature/unfeature). Both endpoints of an edge can trigger this — the page
+// the user is on is just where they get redirected after the delete.
 func (q *Queries) DeleteEdge(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteEdge, id)
 	return err

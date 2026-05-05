@@ -66,4 +66,7 @@ WHERE e.id = $1 AND e.from_node = $2;
 UPDATE edges AS e SET position = NULL WHERE e.id = $1 AND e.from_node = $2;
 
 -- name: DeleteEdge :exec
+-- Any logged-in user can delete any edge (wiki-open curation, same as
+-- feature/unfeature). Both endpoints of an edge can trigger this — the page
+-- the user is on is just where they get redirected after the delete.
 DELETE FROM edges WHERE id = $1;
