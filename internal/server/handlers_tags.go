@@ -22,11 +22,12 @@ const (
 // disallowed punctuation are folded into hyphens, and adjacent hyphens
 // collapse so "Sugar Tax!!" → "sugar-tax". Allowed characters: a–z, 0–9,
 // underscore, hyphen. The list is capped at maxTagsPerNode and each tag at
-// maxTagLength runes.
+// maxTagLength runes. Returns nil (not an empty slice) when no valid tags
+// are produced, so callers can compare against nil naturally.
 func parseTagsInput(raw string) []string {
 	parts := strings.Split(raw, ",")
 	seen := make(map[string]bool, len(parts))
-	out := make([]string, 0, len(parts))
+	var out []string
 	for _, p := range parts {
 		t := normalizeTag(p)
 		if t == "" || seen[t] {

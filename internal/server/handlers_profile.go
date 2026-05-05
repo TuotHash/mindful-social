@@ -109,7 +109,7 @@ func identityLabel(provider string) string {
 	case "github":
 		return "GitHub"
 	}
-	if len(provider) > 5 && provider[:5] == "oidc:" {
+	if len(provider) >= 5 && provider[:5] == "oidc:" {
 		key := provider[5:]
 		if key == "" {
 			return "OIDC"
