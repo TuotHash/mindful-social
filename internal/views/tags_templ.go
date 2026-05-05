@@ -11,7 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"strconv"
 
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func TagsIndex(viewer *Viewer, tags []db.ListAllTagsRow) templ.Component {

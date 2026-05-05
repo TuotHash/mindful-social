@@ -6,8 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mindful-social/mindful-social/internal/db"
-	"github.com/mindful-social/mindful-social/internal/views"
+	"github.com/TuotHash/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/views"
 )
 
 const profileNodesLimit = 25

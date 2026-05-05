@@ -12,7 +12,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags string) templ.Component {

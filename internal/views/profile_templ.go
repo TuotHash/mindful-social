@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"github.com/google/uuid"
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 // PinRow is one entry in the "On profile" section: the pinned node and the

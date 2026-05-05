@@ -1,4 +1,4 @@
-module github.com/mindful-social/mindful-social
+module github.com/TuotHash/mindful-social
 
 go 1.25.0
 

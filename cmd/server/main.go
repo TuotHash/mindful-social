@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mindful-social/mindful-social/internal/config"
-	"github.com/mindful-social/mindful-social/internal/server"
+	"github.com/TuotHash/mindful-social/internal/config"
+	"github.com/TuotHash/mindful-social/internal/server"
 )
 
 func main() {

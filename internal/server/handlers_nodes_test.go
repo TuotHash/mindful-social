@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 // makeOut builds a synthetic ListEdgesFromNode row.

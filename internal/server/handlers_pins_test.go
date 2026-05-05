@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func TestParsePinKind(t *testing.T) {

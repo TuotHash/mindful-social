@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mindful-social/mindful-social/internal/views"
+	"github.com/TuotHash/mindful-social/internal/views"
 )
 
 func TestParseHighlightedExcerpt(t *testing.T) {

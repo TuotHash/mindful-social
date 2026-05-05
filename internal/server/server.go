@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/mindful-social/mindful-social/internal/auth"
-	"github.com/mindful-social/mindful-social/internal/config"
-	"github.com/mindful-social/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/auth"
+	"github.com/TuotHash/mindful-social/internal/config"
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 type Server struct {

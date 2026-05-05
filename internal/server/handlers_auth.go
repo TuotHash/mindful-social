@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/mindful-social/mindful-social/internal/auth"
-	"github.com/mindful-social/mindful-social/internal/views"
+	"github.com/TuotHash/mindful-social/internal/auth"
+	"github.com/TuotHash/mindful-social/internal/views"
 )
 
 const (

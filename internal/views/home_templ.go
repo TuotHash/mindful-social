@@ -8,7 +8,7 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/mindful-social/mindful-social/internal/db"
+import "github.com/TuotHash/mindful-social/internal/db"
 
 func Home(viewer *Viewer, recent []db.Node) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {

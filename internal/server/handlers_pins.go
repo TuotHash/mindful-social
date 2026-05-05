@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mindful-social/mindful-social/internal/db"
-	"github.com/mindful-social/mindful-social/internal/views"
+	"github.com/TuotHash/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/views"
 )
 
 // handlePinForm renders the "Pin to profile" page for a node: kind selector
