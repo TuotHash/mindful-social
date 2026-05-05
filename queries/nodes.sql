@@ -52,12 +52,15 @@ ORDER BY created_at DESC
 LIMIT $2;
 
 -- name: PickerSearchNodes :many
--- Title/body full-text search for the edge-creation picker. Excludes the
--- source node (sqlc parameter $2) and returns just enough columns to render
--- a radio list. Empty queries return nothing — the form's empty state tells
--- the user to type to search.
+-- Title/body full-text search for the edge-creation picker. Uses to_tsquery
+-- (not websearch_to_tsquery) so the Go side can append ":*" to each term and
+-- get prefix matching — typing "nuc" finds "nuclear". The handler is
+-- responsible for sanitizing user input into valid tsquery syntax; raw user
+-- text must never reach this query. Excludes the source node (sqlc parameter
+-- $2). Empty queries are short-circuited in Go before this fires (to_tsquery
+-- errors on an empty string).
 SELECT n.id, n.type, n.title
-FROM nodes n, websearch_to_tsquery('english', $1) q
+FROM nodes n, to_tsquery('english', $1) q
 WHERE n.search_tsv @@ q
   AND n.id != $2
 ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC

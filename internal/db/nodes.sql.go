@@ -246,7 +246,7 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 
 const pickerSearchNodes = `-- name: PickerSearchNodes :many
 SELECT n.id, n.type, n.title
-FROM nodes n, websearch_to_tsquery('english', $1) q
+FROM nodes n, to_tsquery('english', $1) q
 WHERE n.search_tsv @@ q
   AND n.id != $2
 ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC
@@ -254,8 +254,8 @@ LIMIT 50
 `
 
 type PickerSearchNodesParams struct {
-	WebsearchToTsquery string    `json:"websearch_to_tsquery"`
-	ID                 uuid.UUID `json:"id"`
+	ToTsquery string    `json:"to_tsquery"`
+	ID        uuid.UUID `json:"id"`
 }
 
 type PickerSearchNodesRow struct {
@@ -264,12 +264,15 @@ type PickerSearchNodesRow struct {
 	Title string    `json:"title"`
 }
 
-// Title/body full-text search for the edge-creation picker. Excludes the
-// source node (sqlc parameter $2) and returns just enough columns to render
-// a radio list. Empty queries return nothing — the form's empty state tells
-// the user to type to search.
+// Title/body full-text search for the edge-creation picker. Uses to_tsquery
+// (not websearch_to_tsquery) so the Go side can append ":*" to each term and
+// get prefix matching — typing "nuc" finds "nuclear". The handler is
+// responsible for sanitizing user input into valid tsquery syntax; raw user
+// text must never reach this query. Excludes the source node (sqlc parameter
+// $2). Empty queries are short-circuited in Go before this fires (to_tsquery
+// errors on an empty string).
 func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error) {
-	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.WebsearchToTsquery, arg.ID)
+	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.ToTsquery, arg.ID)
 	if err != nil {
 		return nil, err
 	}

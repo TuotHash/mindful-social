@@ -153,3 +153,35 @@ func TestDisplayGroups_kindOrderingIsCanonical(t *testing.T) {
 	}
 }
 
+func TestToPrefixTsquery(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"   ", ""},
+		{"!@#$%", ""},
+		{"nuc", "nuc:*"},
+		{"nuclear power", "nuclear:* & power:*"},
+		{"  Nuclear   POWER  ", "Nuclear:* & POWER:*"},
+		// Punctuation between words splits them; quoted phrases collapse to
+		// AND-joined prefix matches (no phrase semantics in the picker).
+		{`"open source"`, "open:* & source:*"},
+		{"foo, bar; baz!", "foo:* & bar:* & baz:*"},
+		// tsquery operators must not survive — splitting on non-letter/digit
+		// strips them, so injection is impossible.
+		{"a & b | !c", "a:* & b:* & c:*"},
+		{"(parens)", "parens:*"},
+		// Non-ASCII letters stay; numbers count as word characters.
+		{"Café 9000", "Café:* & 9000:*"},
+	}
+	for _, c := range cases {
+		t.Run(c.in, func(t *testing.T) {
+			got := toPrefixTsquery(c.in)
+			if got != c.want {
+				t.Fatalf("toPrefixTsquery(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -469,14 +470,17 @@ func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
 }
 
 // searchEdgeCandidates returns the matches the picker shows. An empty query
-// returns no rows — the form's empty state tells the user to type to search.
+// (or one that produces no usable terms after sanitizing — e.g. only
+// punctuation) returns no rows; the form's empty state tells the user to
+// type to search.
 func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query string) ([]views.EdgeCandidate, error) {
-	if query == "" {
+	tsq := toPrefixTsquery(query)
+	if tsq == "" {
 		return nil, nil
 	}
 	rows, err := s.queries.PickerSearchNodes(r.Context(), db.PickerSearchNodesParams{
-		WebsearchToTsquery: query,
-		ID:                 sourceID,
+		ToTsquery: tsq,
+		ID:        sourceID,
 	})
 	if err != nil {
 		return nil, err
@@ -486,6 +490,29 @@ func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query
 		out = append(out, views.EdgeCandidate{ID: row.ID, Type: row.Type, Title: row.Title})
 	}
 	return out, nil
+}
+
+// toPrefixTsquery converts arbitrary user text into a tsquery string that
+// prefix-matches every term. "Nuclear power" → "Nuclear:* & power:*". The
+// English stemmer still applies on both sides at match time, so "nuc"
+// matches the indexed lexeme "nuclear" because lexemes starting with "nuc"
+// satisfy the "nuc:*" prefix predicate.
+//
+// Splitting on non-letter/digit runes is also our sanitization: tsquery
+// operators (& | ! ( ) :) and stray punctuation cannot survive into the
+// query string, so passing user input directly to to_tsquery is safe.
+func toPrefixTsquery(s string) string {
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	if len(fields) == 0 {
+		return ""
+	}
+	parts := make([]string, len(fields))
+	for i, f := range fields {
+		parts[i] = f + ":*"
+	}
+	return strings.Join(parts, " & ")
 }
 
 func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {

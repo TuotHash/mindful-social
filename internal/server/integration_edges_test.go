@@ -87,6 +87,27 @@ func TestEdgeCreate_RejectsSelfEdge(t *testing.T) {
 	}
 }
 
+func TestEdgePicker_PrefixMatchesPartialWord(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	source := createNode(t, c, "topic", "Energy policy", "")
+	// The thing we're searching for. The body is intentionally short so a
+	// false positive from the body wouldn't accidentally pass the test.
+	createNode(t, c, "view", "Nuclear power is good", "")
+	// A noise node so the test asserts targeted matching, not "any node".
+	createNode(t, c, "view", "Solar panels everywhere", "")
+
+	resp := get(t, c, "/nodes/"+source.String()+"/edges/picker?find=nuc")
+	body := readBody(t, resp)
+	if !strings.Contains(body, "Nuclear power is good") {
+		t.Fatalf("picker fragment should match 'nuc' against 'Nuclear power'; body: %s", snippet(body))
+	}
+	if strings.Contains(body, "Solar panels everywhere") {
+		t.Fatalf("picker fragment should not match noise node 'Solar panels'; body: %s", snippet(body))
+	}
+}
+
 func singleEdge(t *testing.T, from, to uuid.UUID) uuid.UUID {
 	t.Helper()
 	rows, err := testServer.queries.ListEdgesFromNode(context.Background(), from)
