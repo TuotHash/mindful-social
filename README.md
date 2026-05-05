@@ -30,6 +30,25 @@ go run ./cmd/server              # listens on 127.0.0.1:8080
 The app speaks plain HTTP on `127.0.0.1:8080`. Put a reverse proxy
 (HAProxy, Caddy, nginx) in front for TLS — the app never sees a certificate.
 
+## Tests
+
+Pure-function unit tests run with no setup:
+
+```bash
+go test ./...
+```
+
+Integration tests hit a real Postgres. They auto-skip if
+`TEST_DATABASE_URL` is unset, so the line above stays green. To run them:
+
+```bash
+./scripts/db-test-setup.sh        # create + migrate the test DB (once)
+go test ./...                     # TEST_DATABASE_URL is set by the dev shell
+```
+
+Re-run `db-test-setup.sh` after adding a new migration. Tests truncate the
+data tables between cases, so you don't need to reset between runs.
+
 ## Project layout
 
 ```

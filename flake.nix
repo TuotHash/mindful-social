@@ -31,6 +31,7 @@
             export PGPORT=5433
             export PGDATABASE=mindful_social
             export DATABASE_URL="postgres:///$PGDATABASE?host=$PGHOST&port=$PGPORT"
+            export TEST_DATABASE_URL="postgres:///mindful_social_test?host=$PGHOST&port=$PGPORT"
 
             mkdir -p "$PGHOST"
 
@@ -46,6 +47,7 @@
               ./scripts/db-start.sh        start Postgres in foreground (Ctrl-C to stop)
               ./scripts/db-create.sh       create the mindful_social database (in another shell)
               ./scripts/migrate-up.sh      apply migrations
+              ./scripts/db-test-setup.sh   create + migrate the test database (optional; for go test)
 
             Run the app:
               go run ./cmd/server          listens on 127.0.0.1:8080

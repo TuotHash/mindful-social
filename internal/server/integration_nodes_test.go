@@ -1,0 +1,81 @@
+package server
+
+import (
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+)
+
+func TestNodeCreate_RendersOnDetail(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, c, "view", "Open source is good", "Pro-FOSS stance.")
+
+	body := readBody(t, get(t, c, "/nodes/"+id.String()))
+	if !strings.Contains(body, "Open source is good") {
+		t.Fatalf("detail page missing title; excerpt: %s", snippet(body))
+	}
+	if !strings.Contains(body, "Pro-FOSS stance.") {
+		t.Fatalf("detail page missing body; excerpt: %s", snippet(body))
+	}
+}
+
+func TestNodeDelete_AuthorOnly(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	signup(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, alice, "topic", "A topic", "")
+
+	bob := newClient(t)
+	signup(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	resp := formPost(t, bob, "/nodes/"+id.String()+"/delete", url.Values{})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("non-author delete: expected 403, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Node still exists.
+	resp = get(t, alice, "/nodes/"+id.String())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("node still expected to exist, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Author can delete.
+	resp = formPost(t, alice, "/nodes/"+id.String()+"/delete", url.Values{})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("author delete: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Detail page now 404s.
+	resp = get(t, alice, "/nodes/"+id.String())
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("after delete: expected 404, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestNodeDelete_FactRequiresSourceURL(t *testing.T) {
+	// Cross-check: node creation's own validation works through the HTTP
+	// boundary. Fact without source_url should re-render the form with a
+	// flash, not create the row.
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	resp := formPost(t, c, "/nodes", url.Values{
+		"type":  {"fact"},
+		"title": {"A fact without a source"},
+	})
+	body := readBody(t, resp)
+	if !strings.Contains(body, "source URL") {
+		t.Fatalf("expected validation flash mentioning source URL; got: %s", snippet(body))
+	}
+	// We didn't navigate to a /nodes/{uuid} page.
+	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
+		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
+	}
+}
