@@ -449,6 +449,25 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", find, candidates))
 }
 
+// handleEdgePicker returns just the candidate-picker fragment, used by HTMX
+// for live search-as-you-type. The full form lives at /edges/new; this
+// endpoint serves only the part that needs to update on each keystroke.
+func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	find := strings.TrimSpace(r.URL.Query().Get("find"))
+	candidates, err := s.searchEdgeCandidates(r, id, find)
+	if err != nil {
+		s.logger.Error("edge picker fragment: search candidates", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.CandidatePicker(find, candidates))
+}
+
 // searchEdgeCandidates returns the matches the picker shows. An empty query
 // returns no rows — the form's empty state tells the user to type to search.
 func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query string) ([]views.EdgeCandidate, error) {

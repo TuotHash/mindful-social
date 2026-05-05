@@ -121,6 +121,7 @@ func (s *Server) routes() {
 		r.Get("/nodes/{id}/delete", s.handleNodeDeleteConfirm)
 		r.Post("/nodes/{id}/delete", s.handleNodeDelete)
 		r.Get("/nodes/{id}/edges/new", s.handleEdgeNew)
+		r.Get("/nodes/{id}/edges/picker", s.handleEdgePicker)
 		r.Post("/nodes/{id}/edges", s.handleEdgeCreate)
 		r.Post("/nodes/{id}/edges/{edgeID}/feature", s.handleEdgeFeature)
 		r.Post("/nodes/{id}/edges/{edgeID}/unfeature", s.handleEdgeUnfeature)

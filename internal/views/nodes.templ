@@ -401,10 +401,19 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 				</label>
 				<label>
 					Find target node
-					<input type="search" name="find" value={ find } placeholder="search by title or body…"/>
-					<small>Type a query and submit to filter the list below.</small>
+					<input
+						type="search"
+						name="find"
+						value={ find }
+						placeholder="search by title or body…"
+						hx-get={ "/nodes/" + fromNode.ID.String() + "/edges/picker" }
+						hx-trigger="input changed delay:200ms, search"
+						hx-target="#picker-target"
+						hx-swap="outerHTML"
+					/>
+					<small>Results update as you type.</small>
 				</label>
-				@candidatePicker(find, candidates)
+				@CandidatePicker(find, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn primary">Add connection</button>
 					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn">Cancel</a>
@@ -441,24 +450,30 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 	}
 }
 
-templ candidatePicker(find string, candidates []EdgeCandidate) {
-	if find == "" {
-		<p class="muted">Type a search query above and submit to see matching nodes.</p>
-	}
-	if find != "" && len(candidates) == 0 {
-		<p class="muted">No nodes match that query.</p>
-	}
-	if find != "" && len(candidates) > 0 {
-		<fieldset class="form-fieldset candidate-list">
-			<legend>Pick a target</legend>
-			for _, c := range candidates {
-				<label class="radio">
-					<input type="radio" name="to_id" value={ c.ID.String() } required/>
-					<span class={ "badge", "badge-" + string(c.Type) }>{ string(c.Type) }</span>
-					{ c.Title }
-				</label>
-			}
-		</fieldset>
-	}
+// CandidatePicker is rendered both on the full /edges/new page and as a
+// fragment via HTMX live-search. The outer div has a stable id so HTMX can
+// target it with hx-swap="outerHTML" — each fragment response replaces the
+// previous one in place.
+templ CandidatePicker(find string, candidates []EdgeCandidate) {
+	<div id="picker-target">
+		if find == "" {
+			<p class="muted">Start typing in the search box above to see matching nodes.</p>
+		}
+		if find != "" && len(candidates) == 0 {
+			<p class="muted">No nodes match that query.</p>
+		}
+		if find != "" && len(candidates) > 0 {
+			<fieldset class="form-fieldset candidate-list">
+				<legend>Pick a target</legend>
+				for _, c := range candidates {
+					<label class="radio">
+						<input type="radio" name="to_id" value={ c.ID.String() } required/>
+						<span class={ "badge", "badge-" + string(c.Type) }>{ string(c.Type) }</span>
+						{ c.Title }
+					</label>
+				}
+			</fieldset>
+		}
+	</div>
 }
 

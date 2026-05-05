@@ -55,7 +55,7 @@ flake.nix           reproducible dev shell
 | Migrations     | `goose`                                            |
 | Templates      | `templ` (added when we have HTML pages)            |
 | Sessions / auth| `scs` + `bcrypt` (added when we add auth)          |
-| Interactivity  | HTMX (added when needed)                           |
+| Interactivity  | HTMX (vendored at `static/htmx.min.js`, v2.0.4)    |
 | Graph view     | Svelte component (deferred)                        |
 | Dev env        | Nix flake                                          |
 
