@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -469,18 +468,19 @@ func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.CandidatePicker(find, candidates))
 }
 
-// searchEdgeCandidates returns the matches the picker shows. An empty query
-// (or one that produces no usable terms after sanitizing — e.g. only
-// punctuation) returns no rows; the form's empty state tells the user to
-// type to search.
+// searchEdgeCandidates returns the matches the picker shows. An empty or
+// whitespace-only query returns no rows; the form's empty state tells the
+// user to type to search. Otherwise the trigram %> operator handles the
+// match — pg_trgm takes plain text, so user input goes through unchanged
+// (no escaping needed and no operators to inject).
 func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query string) ([]views.EdgeCandidate, error) {
-	tsq := toPrefixTsquery(query)
-	if tsq == "" {
+	q := strings.TrimSpace(query)
+	if q == "" {
 		return nil, nil
 	}
 	rows, err := s.queries.PickerSearchNodes(r.Context(), db.PickerSearchNodesParams{
-		ToTsquery: tsq,
-		ID:        sourceID,
+		Query:    q,
+		SourceID: sourceID,
 	})
 	if err != nil {
 		return nil, err
@@ -490,29 +490,6 @@ func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query
 		out = append(out, views.EdgeCandidate{ID: row.ID, Type: row.Type, Title: row.Title})
 	}
 	return out, nil
-}
-
-// toPrefixTsquery converts arbitrary user text into a tsquery string that
-// prefix-matches every term. "Nuclear power" → "Nuclear:* & power:*". The
-// English stemmer still applies on both sides at match time, so "nuc"
-// matches the indexed lexeme "nuclear" because lexemes starting with "nuc"
-// satisfy the "nuc:*" prefix predicate.
-//
-// Splitting on non-letter/digit runes is also our sanitization: tsquery
-// operators (& | ! ( ) :) and stray punctuation cannot survive into the
-// query string, so passing user input directly to to_tsquery is safe.
-func toPrefixTsquery(s string) string {
-	fields := strings.FieldsFunc(s, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-	if len(fields) == 0 {
-		return ""
-	}
-	parts := make([]string, len(fields))
-	for i, f := range fields {
-		parts[i] = f + ":*"
-	}
-	return strings.Join(parts, " & ")
 }
 
 func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {

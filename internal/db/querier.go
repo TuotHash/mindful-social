@@ -78,19 +78,26 @@ type Querier interface {
 	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
-	// Title/body full-text search for the edge-creation picker. Uses to_tsquery
-	// (not websearch_to_tsquery) so the Go side can append ":*" to each term and
-	// get prefix matching — typing "nuc" finds "nuclear". The handler is
-	// responsible for sanitizing user input into valid tsquery syntax; raw user
-	// text must never reach this query. Excludes the source node (sqlc parameter
-	// $2). Empty queries are short-circuited in Go before this fires (to_tsquery
-	// errors on an empty string).
+	// Trigram fuzzy match against the title for the edge-creation picker.
+	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
+	// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
+	// uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
+	// which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
+	// ($2). Raw user text is safe here — pg_trgm operators take plain text, no
+	// query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
-	// Full-text search over title + body using a precomputed tsvector. The query
-	// uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
-	// bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
-	// with creation date as a tiebreaker. ts_headline produces a short marked-up
-	// excerpt the template can render directly.
+	// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
+	// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
+	// title catches typos and partial words ("nucear" → "Nuclear"). A row
+	// matches if EITHER mechanism hits.
+	//
+	// Ranking gives semantic matches a +1.0 head-start so they always sit above
+	// pure-fuzzy matches at the same nominal score; within each group we order
+	// by relevance score and then creation date as a tiebreaker.
+	//
+	// ts_headline runs over the tsquery only — fuzzy-only matches get an empty
+	// excerpt because the body did not contain the searched lexemes; the title
+	// carries enough information in that case.
 	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on

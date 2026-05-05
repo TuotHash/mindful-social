@@ -10,6 +10,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
@@ -34,7 +35,20 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	// AfterConnect runs once per new physical connection. We lower the
+	// pg_trgm word-similarity threshold so the picker and /search match
+	// fuzzy/partial inputs ("nuc" → "nuclear", "nucear" → "nuclear"). The
+	// default 0.6 is far too strict for live-search UX. Any other queries
+	// that use the threshold operators (%>, <%) inherit this setting.
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET pg_trgm.word_similarity_threshold = 0.25")
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, err
 	}

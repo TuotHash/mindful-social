@@ -246,16 +246,15 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 
 const pickerSearchNodes = `-- name: PickerSearchNodes :many
 SELECT n.id, n.type, n.title
-FROM nodes n, to_tsquery('english', $1) q
-WHERE n.search_tsv @@ q
-  AND n.id != $2
-ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC
+FROM nodes n
+WHERE n.id != $1 AND n.title %> $2::text
+ORDER BY word_similarity($2::text, n.title) DESC, n.title ASC
 LIMIT 50
 `
 
 type PickerSearchNodesParams struct {
-	ToTsquery string    `json:"to_tsquery"`
-	ID        uuid.UUID `json:"id"`
+	SourceID uuid.UUID `json:"source_id"`
+	Query    string    `json:"query"`
 }
 
 type PickerSearchNodesRow struct {
@@ -264,15 +263,15 @@ type PickerSearchNodesRow struct {
 	Title string    `json:"title"`
 }
 
-// Title/body full-text search for the edge-creation picker. Uses to_tsquery
-// (not websearch_to_tsquery) so the Go side can append ":*" to each term and
-// get prefix matching — typing "nuc" finds "nuclear". The handler is
-// responsible for sanitizing user input into valid tsquery syntax; raw user
-// text must never reach this query. Excludes the source node (sqlc parameter
-// $2). Empty queries are short-circuited in Go before this fires (to_tsquery
-// errors on an empty string).
+// Trigram fuzzy match against the title for the edge-creation picker.
+// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
+// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
+// uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
+// which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
+// ($2). Raw user text is safe here — pg_trgm operators take plain text, no
+// query syntax to escape.
 func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error) {
-	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.ToTsquery, arg.ID)
+	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.SourceID, arg.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -295,20 +294,22 @@ const searchNodes = `-- name: SearchNodes :many
 SELECT
     n.id, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
-    ts_rank(n.search_tsv, q) AS rank,
-    -- Cast to text so sqlc maps it to Go string instead of []byte.
-    -- Without the cast, sqlc can't infer the return type of ts_headline.
-    ts_headline('english', n.body, q,
+    CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', $1::text)
+         THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', $1::text))
+         ELSE word_similarity($1::text, n.title)::real
+    END AS rank,
+    ts_headline('english', n.body, websearch_to_tsquery('english', $1::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
-FROM nodes n, websearch_to_tsquery('english', $1) q
-WHERE n.search_tsv @@ q
+FROM nodes n
+WHERE n.search_tsv @@ websearch_to_tsquery('english', $1::text)
+   OR n.title %> $1::text
 ORDER BY rank DESC, n.created_at DESC
 LIMIT $2
 `
 
 type SearchNodesParams struct {
-	WebsearchToTsquery string `json:"websearch_to_tsquery"`
-	Limit              int32  `json:"limit"`
+	Query       string `json:"query"`
+	ResultLimit int32  `json:"result_limit"`
 }
 
 type SearchNodesRow struct {
@@ -324,13 +325,20 @@ type SearchNodesRow struct {
 	Excerpt   string             `json:"excerpt"`
 }
 
-// Full-text search over title + body using a precomputed tsvector. The query
-// uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
-// bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
-// with creation date as a tiebreaker. ts_headline produces a short marked-up
-// excerpt the template can render directly.
+// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
+// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
+// title catches typos and partial words ("nucear" → "Nuclear"). A row
+// matches if EITHER mechanism hits.
+//
+// Ranking gives semantic matches a +1.0 head-start so they always sit above
+// pure-fuzzy matches at the same nominal score; within each group we order
+// by relevance score and then creation date as a tiebreaker.
+//
+// ts_headline runs over the tsquery only — fuzzy-only matches get an empty
+// excerpt because the body did not contain the searched lexemes; the title
+// carries enough information in that case.
 func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error) {
-	rows, err := q.db.Query(ctx, searchNodes, arg.WebsearchToTsquery, arg.Limit)
+	rows, err := q.db.Query(ctx, searchNodes, arg.Query, arg.ResultLimit)
 	if err != nil {
 		return nil, err
 	}

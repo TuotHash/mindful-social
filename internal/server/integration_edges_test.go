@@ -108,6 +108,42 @@ func TestEdgePicker_PrefixMatchesPartialWord(t *testing.T) {
 	}
 }
 
+func TestEdgePicker_FuzzyMatchTypo(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	source := createNode(t, c, "topic", "Energy policy", "")
+	createNode(t, c, "view", "Nuclear power is good", "")
+	createNode(t, c, "view", "Solar panels everywhere", "")
+
+	// Typo: "nucear" missing the 'l' from "nuclear". Trigram similarity
+	// against "Nuclear power" is high enough to match.
+	resp := get(t, c, "/nodes/"+source.String()+"/edges/picker?find=nucear")
+	body := readBody(t, resp)
+	if !strings.Contains(body, "Nuclear power is good") {
+		t.Fatalf("picker should fuzzy-match 'nucear' to 'Nuclear power'; body: %s", snippet(body))
+	}
+	if strings.Contains(body, "Solar panels everywhere") {
+		t.Fatalf("picker should not match unrelated 'Solar panels'; body: %s", snippet(body))
+	}
+}
+
+func TestEdgePicker_InfixMatch(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	source := createNode(t, c, "topic", "Energy policy", "")
+	createNode(t, c, "view", "Nuclear power is good", "")
+
+	// Mid-word substring: "uclear" inside "Nuclear" — only trigrams handle
+	// this; the previous tsquery prefix approach would have missed it.
+	resp := get(t, c, "/nodes/"+source.String()+"/edges/picker?find=uclear")
+	body := readBody(t, resp)
+	if !strings.Contains(body, "Nuclear power is good") {
+		t.Fatalf("picker should infix-match 'uclear' to 'Nuclear power'; body: %s", snippet(body))
+	}
+}
+
 func singleEdge(t *testing.T, from, to uuid.UUID) uuid.UUID {
 	t.Helper()
 	rows, err := testServer.queries.ListEdgesFromNode(context.Background(), from)

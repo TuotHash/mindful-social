@@ -52,35 +52,43 @@ ORDER BY created_at DESC
 LIMIT $2;
 
 -- name: PickerSearchNodes :many
--- Title/body full-text search for the edge-creation picker. Uses to_tsquery
--- (not websearch_to_tsquery) so the Go side can append ":*" to each term and
--- get prefix matching — typing "nuc" finds "nuclear". The handler is
--- responsible for sanitizing user input into valid tsquery syntax; raw user
--- text must never reach this query. Excludes the source node (sqlc parameter
--- $2). Empty queries are short-circuited in Go before this fires (to_tsquery
--- errors on an empty string).
+-- Trigram fuzzy match against the title for the edge-creation picker.
+-- Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
+-- typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
+-- uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
+-- which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
+-- ($2). Raw user text is safe here — pg_trgm operators take plain text, no
+-- query syntax to escape.
 SELECT n.id, n.type, n.title
-FROM nodes n, to_tsquery('english', $1) q
-WHERE n.search_tsv @@ q
-  AND n.id != $2
-ORDER BY ts_rank(n.search_tsv, q) DESC, n.title ASC
+FROM nodes n
+WHERE n.id != sqlc.arg(source_id) AND n.title %> sqlc.arg(query)::text
+ORDER BY word_similarity(sqlc.arg(query)::text, n.title) DESC, n.title ASC
 LIMIT 50;
 
 -- name: SearchNodes :many
--- Full-text search over title + body using a precomputed tsvector. The query
--- uses websearch_to_tsquery so arbitrary user input is safe (it tolerates
--- bad punctuation and supports "phrases" + OR). ts_rank orders by relevance,
--- with creation date as a tiebreaker. ts_headline produces a short marked-up
--- excerpt the template can render directly.
+-- Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
+-- phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
+-- title catches typos and partial words ("nucear" → "Nuclear"). A row
+-- matches if EITHER mechanism hits.
+--
+-- Ranking gives semantic matches a +1.0 head-start so they always sit above
+-- pure-fuzzy matches at the same nominal score; within each group we order
+-- by relevance score and then creation date as a tiebreaker.
+--
+-- ts_headline runs over the tsquery only — fuzzy-only matches get an empty
+-- excerpt because the body did not contain the searched lexemes; the title
+-- carries enough information in that case.
 SELECT
     n.id, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
-    ts_rank(n.search_tsv, q) AS rank,
-    -- Cast to text so sqlc maps it to Go string instead of []byte.
-    -- Without the cast, sqlc can't infer the return type of ts_headline.
-    ts_headline('english', n.body, q,
+    CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
+         THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', sqlc.arg(query)::text))
+         ELSE word_similarity(sqlc.arg(query)::text, n.title)::real
+    END AS rank,
+    ts_headline('english', n.body, websearch_to_tsquery('english', sqlc.arg(query)::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
-FROM nodes n, websearch_to_tsquery('english', $1) q
-WHERE n.search_tsv @@ q
+FROM nodes n
+WHERE n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
+   OR n.title %> sqlc.arg(query)::text
 ORDER BY rank DESC, n.created_at DESC
-LIMIT $2;
+LIMIT sqlc.arg(result_limit);

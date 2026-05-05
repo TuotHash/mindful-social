@@ -20,8 +20,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
-		WebsearchToTsquery: q,
-		Limit:              searchResultLimit,
+		Query:       q,
+		ResultLimit: searchResultLimit,
 	})
 	if err != nil {
 		s.logger.Error("search", "err", err, "q", q)
