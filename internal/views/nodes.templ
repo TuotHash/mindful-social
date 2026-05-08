@@ -43,24 +43,31 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 					Tags <small>(comma-separated, optional)</small>
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
-				<fieldset class="form-fieldset">
-					<legend>Pin to my profile <small>(optional)</small></legend>
-					<label class="radio">
-						<input type="radio" name="pin" value="" checked?={ formPin == "" }/>
-						Don't pin
-					</label>
-					<label class="radio">
-						<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
-						Feature on my profile
-					</label>
-					<label class="radio">
-						<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
-						Support <small>(views only)</small>
-					</label>
-					<label class="radio">
-						<input type="radio" name="pin" value="opposes" checked?={ formPin == "opposes" }/>
-						Oppose <small>(views only)</small>
-					</label>
+				<fieldset class="toggle-group">
+					<legend>Pin to my profile</legend>
+					<div class="toggle-btns">
+						<label class="toggle-btn" data-kind="none">
+							<input type="radio" name="pin" value="" checked?={ formPin == "" }/>
+							<span class="material-symbols-outlined">keep_off</span>
+							Don't pin
+						</label>
+						<label class="toggle-btn" data-kind="featured">
+							<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
+							<span class="material-symbols-outlined">keep</span>
+							Feature
+						</label>
+						<label class="toggle-btn" data-kind="supports">
+							<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
+							<span class="material-symbols-outlined">heart_plus</span>
+							Support
+						</label>
+						<label class="toggle-btn" data-kind="opposes">
+							<input type="radio" name="pin" value="opposes" checked?={ formPin == "opposes" }/>
+							<span class="material-symbols-outlined">heart_minus</span>
+							Oppose
+						</label>
+					</div>
+					<small class="muted" style="font-size: 12px;">Support and Oppose are only available for View nodes.</small>
 				</fieldset>
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">add</span>Create node</button>
@@ -352,22 +359,27 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="form">
-				<fieldset class="form-fieldset">
+				<fieldset class="toggle-group">
 					<legend>Stance</legend>
-					if node.Type == db.NodeTypeView {
-						<label class="radio">
-							<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" }/>
-							Support
+					<div class="toggle-btns">
+						if node.Type == db.NodeTypeView {
+							<label class="toggle-btn" data-kind="supports">
+								<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" }/>
+								<span class="material-symbols-outlined">heart_plus</span>
+								Support
+							</label>
+							<label class="toggle-btn" data-kind="opposes">
+								<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
+								<span class="material-symbols-outlined">heart_minus</span>
+								Oppose
+							</label>
+						}
+						<label class="toggle-btn" data-kind="featured">
+							<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (formKind == "" && node.Type != db.NodeTypeView) }/>
+							<span class="material-symbols-outlined">keep</span>
+							Just feature
 						</label>
-						<label class="radio">
-							<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
-							Oppose
-						</label>
-					}
-					<label class="radio">
-						<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (formKind == "" && node.Type != db.NodeTypeView) }/>
-						Just feature
-					</label>
+					</div>
 				</fieldset>
 				<label>
 					Reasoning <small>(optional)</small>
