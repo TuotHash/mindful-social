@@ -246,6 +246,13 @@ button.link {
 }
 button.link:hover { color: var(--ink); }
 
+.material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
 .inline { display: inline; }
 
 /* ===== Type ===== */
@@ -567,7 +574,7 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
   text-decoration: none; color: inherit;
 }
 .edge-group .title { font-weight: 500; }
-.edge-action { margin-left: auto; }
+.edge-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 
 /* ===== Profile ===== */
 .profile { display: flex; flex-direction: column; gap: 28px; }

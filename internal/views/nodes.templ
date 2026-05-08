@@ -63,8 +63,8 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 					</label>
 				</fieldset>
 				<div class="form-row">
-					<button type="submit" class="btn accent">Create node</button>
-					<a href="/" class="btn ghost">Cancel</a>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">add</span>Create node</button>
+					<a href="/" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
@@ -197,19 +197,19 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 				}
 				if viewer != nil {
 					<div class="node-actions" style="margin-top: 22px;">
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn ghost">Edit</a>
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn"><span class="material-symbols-outlined">conversion_path</span>Connect</a>
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						if pin == nil {
 							<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="btn accent">
 								if node.Type == db.NodeTypeView {
-									Pin to my profile
+									<span class="material-symbols-outlined">push_pin</span>Pin to my profile
 								} else {
-									Feature on my profile
+									<span class="material-symbols-outlined">keep</span>Feature on my profile
 								}
 							</a>
 						}
 						if viewer.ID == node.CreatedBy.String() {
-							<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="btn danger">Delete</a>
+							<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="btn danger"><span class="material-symbols-outlined">delete</span>Delete</a>
 						}
 					</div>
 				}
@@ -220,9 +220,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							via
 							<a href={ templ.SafeURL("/nodes/" + pin.ReasoningID.String()) }>{ pin.ReasoningTitle }</a>
 						}
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="muted" style="margin-left: auto; font-size: 13px;">Change</a>
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="muted" style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
 						<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/unpin") } class="inline">
-							<button type="submit" class="link">Remove</button>
+							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">pin_off</span>Remove</button>
 						</form>
 					</div>
 				}
@@ -243,12 +243,12 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 								<p>{ f.Body }</p>
 							}
 							if viewer != nil {
-								<div class="row gap-12 wrap" style="margin-top: 12px;">
+								<div class="row gap-8 wrap" style="margin-top: 12px;">
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/unfeature") } class="inline">
-										<button type="submit" class="link">Unfeature</button>
+										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">keep_off</span>Unfeature</button>
 									</form>
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
-										<button type="submit" class="link">Disconnect</button>
+										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
 									</form>
 								</div>
 							}
@@ -272,15 +272,17 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 											@nodeTypeChip(r.Type)
 											<span class="title">{ r.Title }</span>
 										</a>
-										if r.Outgoing && viewer != nil {
-											<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
-												<button type="submit" class="link">Feature</button>
-											</form>
-										}
 										if viewer != nil {
-											<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/delete") } class="inline edge-action">
-												<button type="submit" class="link">Disconnect</button>
-											</form>
+											<div class="edge-actions">
+												if r.Outgoing {
+													<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline">
+														<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">keep</span>Feature</button>
+													</form>
+												}
+												<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/delete") } class="inline">
+													<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
+												</form>
+											</div>
 										}
 									</li>
 								}
@@ -327,8 +329,8 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				<div class="form-row">
-					<button type="submit" class="btn accent">Save changes</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">save</span>Save changes</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
@@ -380,8 +382,8 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 					}
 				</label>
 				<div class="form-row">
-					<button type="submit" class="btn accent">Save pin</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">push_pin</span>Save pin</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
@@ -436,8 +438,8 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 				</label>
 				@CandidatePicker(find, candidates)
 				<div class="form-row">
-					<button type="submit" class="btn accent">Add connection</button>
-					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn ghost">Cancel</a>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">conversion_path</span>Add connection</button>
+					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
@@ -461,8 +463,8 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 			</ul>
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="form">
 				<div class="form-row">
-					<button type="submit" class="btn danger">Yes, delete this node</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
+					<button type="submit" class="btn danger"><span class="material-symbols-outlined">delete_forever</span>Yes, delete this node</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
