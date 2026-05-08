@@ -32,3 +32,7 @@ go.work.sum
 
 # Claude Code session files
 .claude/
+
+# Design assets (not source code)
+/redesign/
+/redesign.zip
