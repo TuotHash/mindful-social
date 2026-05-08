@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -233,17 +234,18 @@ func (s *Service) tx(ctx context.Context, fn func(*db.Queries) error) error {
 	return tx.Commit(ctx)
 }
 
-// mapUserConflict turns a unique-violation on users (email/username) into our
-// public error. Anything else passes through unchanged.
+// mapUserConflict turns a unique-violation on users.email or users.username
+// into our public error. Anything else passes through unchanged.
 func mapUserConflict(err error) error {
 	if err == nil {
 		return nil
 	}
-	msg := err.Error()
-	if strings.Contains(msg, "users_email_key") ||
-		strings.Contains(msg, "users_username_key") ||
-		strings.Contains(msg, "duplicate key value") {
-		return ErrUserExists
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		switch pgErr.ConstraintName {
+		case "users_email_key", "users_username_key":
+			return ErrUserExists
+		}
 	}
 	return err
 }
