@@ -689,7 +689,7 @@ fieldset.toggle-group legend {
   flex: 1;
   position: relative;
   display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;
-  padding: 10px 18px; border-radius: 999px;
+  padding: 7px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--paper);
   color: var(--ink-2); font-size: 14px; font-weight: 500;
   cursor: pointer; user-select: none;
