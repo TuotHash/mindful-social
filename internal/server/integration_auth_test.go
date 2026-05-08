@@ -73,13 +73,13 @@ func TestLogout_ClearsSession(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// After logout the home page shows Log in / Sign up, not the username.
+	// After logout the home page shows Sign in / Get started, not the username.
 	body := readBody(t, get(t, c, "/"))
 	if strings.Contains(body, ">alice<") {
 		t.Fatalf("home after logout still shows username; excerpt: %s", snippet(body))
 	}
-	if !strings.Contains(body, "Log in") {
-		t.Fatalf("home after logout missing Log in link; excerpt: %s", snippet(body))
+	if !strings.Contains(body, "Sign in") {
+		t.Fatalf("home after logout missing Sign in link; excerpt: %s", snippet(body))
 	}
 }
 
