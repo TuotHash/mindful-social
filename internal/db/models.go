@@ -75,7 +75,7 @@ const (
 	NodeTypeTopic     NodeType = "topic"
 	NodeTypeView      NodeType = "view"
 	NodeTypeReasoning NodeType = "reasoning"
-	NodeTypeFact      NodeType = "fact"
+	NodeTypeEvidence  NodeType = "evidence"
 )
 
 func (e *NodeType) Scan(src interface{}) error {
@@ -118,7 +118,7 @@ func (e NodeType) Valid() bool {
 	case NodeTypeTopic,
 		NodeTypeView,
 		NodeTypeReasoning,
-		NodeTypeFact:
+		NodeTypeEvidence:
 		return true
 	}
 	return false

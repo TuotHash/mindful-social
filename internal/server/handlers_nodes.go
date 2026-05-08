@@ -55,8 +55,8 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
-	case nt == db.NodeTypeFact && sourceURL == "":
-		flash = "Facts need a source URL."
+	case nt == db.NodeTypeEvidence && sourceURL == "":
+		flash = "Evidence needs a source URL."
 	}
 	if flash == "" && rawPin != "" {
 		var pinErr string
@@ -393,8 +393,8 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
-	case node.Type == db.NodeTypeFact && sourceURL == "":
-		flash = "Facts need a source URL."
+	case node.Type == db.NodeTypeEvidence && sourceURL == "":
+		flash = "Evidence needs a source URL."
 	}
 	if flash != "" {
 		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags))

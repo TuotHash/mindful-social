@@ -133,7 +133,7 @@ func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 func TestDisplayGroups_kindOrderingIsCanonical(t *testing.T) {
 	out := []db.ListEdgesFromNodeRow{
 		makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "rel"),
-		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeFact, "cite"),
+		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeEvidence, "cite"),
 		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeReasoning, "sup"),
 		makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "ref"),
 		makeOut(db.EdgeKindOpposes, nil, uuid.New(), db.NodeTypeView, "opp"),

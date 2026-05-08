@@ -58,17 +58,17 @@ func TestNodeDelete_AuthorOnly(t *testing.T) {
 	resp.Body.Close()
 }
 
-func TestNodeDelete_FactRequiresSourceURL(t *testing.T) {
+func TestNodeDelete_EvidenceRequiresSourceURL(t *testing.T) {
 	// Cross-check: node creation's own validation works through the HTTP
-	// boundary. Fact without source_url should re-render the form with a
+	// boundary. Evidence without source_url should re-render the form with a
 	// flash, not create the row.
 	integrationDB(t)
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
 
 	resp := formPost(t, c, "/nodes", url.Values{
-		"type":  {"fact"},
-		"title": {"A fact without a source"},
+		"type":  {"evidence"},
+		"title": {"A piece of evidence without a source"},
 	})
 	body := readBody(t, resp)
 	if !strings.Contains(body, "source URL") {

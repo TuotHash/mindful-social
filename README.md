@@ -2,7 +2,7 @@
 
 A community platform for respectful, mindful conversations. Combines free-form
 discussion with a structured **argument graph**: typed nodes (Topic / View /
-Reasoning / Fact) connected by typed edges (supports / opposes / refines /
+Reasoning / Evidence) connected by typed edges (supports / opposes / refines /
 cites / relates_to). Users commit to views and attach personal reasoning.
 
 > **Status:** early development — MVP in progress.
@@ -81,8 +81,8 @@ flake.nix           reproducible dev shell
 ## Domain model
 
 - **Node** — anything in the graph. `type` is one of `topic`, `view`,
-  `reasoning`, `fact`. Free-form `tags` add further grouping (domain, nature)
-  without bloating the type system.
+  `reasoning`, `evidence`. Free-form `tags` add further grouping (domain,
+  nature) without bloating the type system.
 - **Edge** — directed, typed link between two nodes. `kind` is one of
   `supports`, `opposes`, `refines`, `cites`, `relates_to`.
 - **Commitment** — a user pinning themselves to a View, optionally with a
