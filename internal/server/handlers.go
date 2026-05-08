@@ -36,3 +36,10 @@ func render(w http.ResponseWriter, r *http.Request, c templ.Component) {
 func chiURLParam(r *http.Request, key string) string {
 	return chi.URLParam(r, key)
 }
+
+// isHTMX reports whether the request was issued by htmx (it sets
+// HX-Request: true on every fetch). Handlers branch on this to return a
+// fragment instead of a full page, or to use HX-Redirect on success.
+func isHTMX(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
+}

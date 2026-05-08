@@ -421,6 +421,12 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// htmx-driven Connect button opens the form in a modal; direct URL
+	// hits (and no-JS clients) get the standalone full page.
+	if isHTMX(r) {
+		render(w, r, views.EdgeNewModal(node, "", "", find, candidates))
+		return
+	}
 	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", find, candidates))
 }
 
@@ -487,11 +493,19 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	rawToID := strings.TrimSpace(r.PostFormValue("to_id"))
 
 	find := strings.TrimSpace(r.PostFormValue("find"))
+	// rerender re-displays the form with a flash. When the request came
+	// from the modal (HX-Request), respond with the modal fragment so
+	// htmx swaps it back into #modal in place; otherwise re-render the
+	// full page.
 	rerender := func(flash string) {
 		candidates, lerr := s.searchEdgeCandidates(r, fromID, find)
 		if lerr != nil {
 			s.logger.Error("edge create: search candidates", "err", lerr)
 			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if isHTMX(r) {
+			render(w, r, views.EdgeNewModal(fromNode, flash, rawKind, find, candidates))
 			return
 		}
 		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, find, candidates))
@@ -526,6 +540,14 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		s.logger.Error("edge create", "err", err)
 		rerender("Could not create connection. Please try again.")
+		return
+	}
+	// On success from htmx, ask htmx to do a full page navigation back to
+	// the node — that closes the modal and shows the new edge in the
+	// connections list. Non-htmx submits get the usual 303 redirect.
+	if isHTMX(r) {
+		w.Header().Set("HX-Redirect", "/nodes/"+fromNode.Slug)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)

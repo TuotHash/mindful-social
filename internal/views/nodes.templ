@@ -207,7 +207,13 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 				}
 				if viewer != nil {
 					<div class="node-actions" style="margin-top: 22px;">
-						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") } class="btn"><span class="material-symbols-outlined">conversion_path</span>Connect</a>
+						<a
+							href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
+							class="btn"
+							hx-get={ "/nodes/" + node.Slug + "/edges/new" }
+							hx-target="#modal"
+							hx-swap="innerHTML"
+						><span class="material-symbols-outlined">conversion_path</span>Connect</a>
 						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						if pin == nil {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="btn accent">
@@ -427,31 +433,7 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + fromNode.Slug + "/edges") } class="form">
-				<label>
-					Relationship kind
-					<select name="kind" required>
-						<option value="supports" selected?={ formKind == "supports" || formKind == "" }>Supports — the source backs the target</option>
-						<option value="opposes" selected?={ formKind == "opposes" }>Opposes — the source argues against the target</option>
-						<option value="refines" selected?={ formKind == "refines" }>Refines — the source clarifies or narrows the target</option>
-						<option value="cites" selected?={ formKind == "cites" }>Cites — the source references the target as evidence</option>
-						<option value="relates_to" selected?={ formKind == "relates_to" }>Relates to — loosely connected</option>
-					</select>
-				</label>
-				<label>
-					Find target node
-					<input
-						type="search"
-						name="find"
-						value={ find }
-						placeholder="search by title or body…"
-						hx-get={ "/nodes/" + fromNode.Slug + "/edges/picker" }
-						hx-trigger="input changed delay:200ms, search"
-						hx-target="#picker-target"
-						hx-swap="outerHTML"
-					/>
-					<small>Results update as you type.</small>
-				</label>
-				@CandidatePicker(find, candidates)
+				@edgeFormFields(fromNode, formKind, find, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">conversion_path</span>Add connection</button>
 					<a href={ templ.SafeURL("/nodes/" + fromNode.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -459,6 +441,72 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 			</form>
 		</div>
 	}
+}
+
+// EdgeNewModal renders the edge-creation form inside a modal frame. Returned
+// when the GET hits /edges/new with HX-Request: true (Connect button opens it
+// in-place). Form submit is htmx-driven against the same /edges POST; on
+// validation error the server re-renders this fragment, on success it sets
+// HX-Redirect so htmx does a full page navigation.
+templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []EdgeCandidate) {
+	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
+				<span class="material-symbols-outlined">close</span>
+			</button>
+			<div class="row gap-12 wrap center" style="margin-bottom: 10px;">
+				<span class="eyebrow">Connect from</span>
+				@nodeTypeChip(fromNode.Type)
+			</div>
+			<h2 id="modal-title" style="margin: 0 0 6px; font-size: 22px;">{ fromNode.Title }</h2>
+			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
+				Create a directed connection from this node to another.
+			</p>
+			@Flash(flash)
+			<form
+				method="post"
+				action={ templ.SafeURL("/nodes/" + fromNode.Slug + "/edges") }
+				class="form"
+				hx-post={ "/nodes/" + fromNode.Slug + "/edges" }
+				hx-target="#modal"
+				hx-swap="innerHTML"
+			>
+				@edgeFormFields(fromNode, formKind, find, candidates)
+				<div class="form-row">
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">conversion_path</span>Add connection</button>
+					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeCandidate) {
+	<label>
+		Relationship kind
+		<select name="kind" required>
+			<option value="supports" selected?={ formKind == "supports" || formKind == "" }>Supports — the source backs the target</option>
+			<option value="opposes" selected?={ formKind == "opposes" }>Opposes — the source argues against the target</option>
+			<option value="refines" selected?={ formKind == "refines" }>Refines — the source clarifies or narrows the target</option>
+			<option value="cites" selected?={ formKind == "cites" }>Cites — the source references the target as evidence</option>
+			<option value="relates_to" selected?={ formKind == "relates_to" }>Relates to — loosely connected</option>
+		</select>
+	</label>
+	<label>
+		Find target node
+		<input
+			type="search"
+			name="find"
+			value={ find }
+			placeholder="search by title or body…"
+			hx-get={ "/nodes/" + fromNode.Slug + "/edges/picker" }
+			hx-trigger="input changed delay:200ms, search"
+			hx-target="#picker-target"
+			hx-swap="outerHTML"
+		/>
+		<small>Results update as you type.</small>
+	</label>
+	@CandidatePicker(find, candidates)
 }
 
 templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
