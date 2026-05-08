@@ -698,6 +698,8 @@ fieldset.toggle-group legend {
 .toggle-btn input[type="radio"] {
   position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
 }
+/* override .form label { flex-direction: column } — same pattern as .form-fieldset .radio */
+.toggle-btns .toggle-btn { flex-direction: row; gap: 8px; font-size: 14px; }
 .toggle-btn:hover { background: var(--bg-2); border-color: var(--ink-4); color: var(--ink); }
 .toggle-btn:focus-within { outline: 2px solid var(--accent-deep); outline-offset: 2px; }
 /* default selected: subtle */
