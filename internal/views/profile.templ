@@ -32,82 +32,103 @@ func pinKindShort(k db.PinKind) string {
 
 templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, identities []string) {
 	@Layout(profile.Username+" — profile", viewer) {
-		<section class="profile">
-			<header class="profile-head">
-				<h1>{ profile.Username }</h1>
-				<p class="muted">
-					Joined { profile.CreatedAt.Time.Format("January 2006") }
-					if isSelf {
-						· <span>this is you</span>
+		<div class="page medium">
+			<section class="profile">
+				<div class="profile-head">
+					@bloom(240, 105, "position: absolute; right: -40px; top: -60px; opacity: 0.5;")
+					<div style="position: relative; z-index: 2;">
+						<div class="row gap-24 wrap" style="align-items: flex-start;">
+							@Avatar(profile.Username, 88)
+							<div class="col gap-8 grow" style="min-width: 240px;">
+								<h1>{ profile.Username }</h1>
+								<div class="row gap-12 wrap muted" style="font-size: 13px; font-family: var(--mono);">
+									<span>Joined { profile.CreatedAt.Time.Format("January 2006") }</span>
+									if isSelf {
+										<span>·</span><span>this is you</span>
+									}
+								</div>
+							</div>
+							if !isSelf && viewer != nil {
+								<div class="col gap-8">
+									<button class="btn accent" type="button" disabled>+ Follow</button>
+								</div>
+							}
+						</div>
+					</div>
+				</div>
+
+				if isSelf && len(identities) > 0 {
+					<section>
+						<h2>Sign-in methods</h2>
+						<ul class="identity-list">
+							for _, label := range identities {
+								<li>{ label }</li>
+							}
+						</ul>
+					</section>
+				}
+
+				<section>
+					<h2>On profile</h2>
+					if len(pins) == 0 {
+						<div class="card muted" style="text-align: center; padding: 24px;">
+							if isSelf {
+								You haven't pinned any nodes yet.
+							} else {
+								No public pins.
+							}
+						</div>
+					} else {
+						<ul class="pin-list">
+							for _, p := range pins {
+								<li class={ "pin-row", "pin-" + string(p.Kind) }>
+									<span class="pin-kind">{ pinKindShort(p.Kind) }</span>
+									<a href={ templ.SafeURL("/nodes/" + p.NodeID.String()) } class="pin-node">
+										<span class={ "chip", string(p.NodeType) }>
+											<span class="dot"></span>
+											{ string(p.NodeType) }
+										</span>
+										<span class="title">{ p.NodeTitle }</span>
+									</a>
+									if p.ReasoningID != nil {
+										<div class="pin-reasoning">
+											via
+											<a href={ templ.SafeURL("/nodes/" + p.ReasoningID.String()) }>{ p.ReasoningTitle }</a>
+										</div>
+									}
+								</li>
+							}
+						</ul>
 					}
-				</p>
-			</header>
-
-			if isSelf && len(identities) > 0 {
-				<section class="profile-identities">
-					<h2>Sign-in methods</h2>
-					<ul class="identity-list">
-						for _, label := range identities {
-							<li>{ label }</li>
-						}
-					</ul>
 				</section>
-			}
 
-			<section class="profile-pins">
-				<h2>On profile</h2>
-				if len(pins) == 0 {
-					<p class="muted">
-						if isSelf {
-							You haven't pinned any nodes yet.
-						} else {
-							No public pins.
-						}
-					</p>
-				} else {
-					<ul class="pin-list">
-						for _, p := range pins {
-							<li class={ "pin-row", "pin-" + string(p.Kind) }>
-								<span class="pin-kind">{ pinKindShort(p.Kind) }</span>
-								<a href={ templ.SafeURL("/nodes/" + p.NodeID.String()) } class="pin-node">
-									<span class={ "badge", "badge-" + string(p.NodeType) }>{ string(p.NodeType) }</span>
-									<span class="title">{ p.NodeTitle }</span>
-								</a>
-								if p.ReasoningID != nil {
-									<div class="pin-reasoning">
-										via
-										<a href={ templ.SafeURL("/nodes/" + p.ReasoningID.String()) }>{ p.ReasoningTitle }</a>
-									</div>
-								}
-							</li>
-						}
-					</ul>
-				}
+				<section>
+					<h2>Authored nodes</h2>
+					if len(authored) == 0 {
+						<div class="card muted" style="text-align: center; padding: 24px;">
+							if isSelf {
+								You haven't authored any nodes yet. <a href="/nodes/new" style="color: var(--ink); font-weight: 500;">Create one</a>.
+							} else {
+								No authored nodes yet.
+							}
+						</div>
+					} else {
+						<ul class="node-list">
+							for _, n := range authored {
+								<li>
+									<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
+										<span class={ "chip", string(n.Type) }>
+											<span class="dot"></span>
+											{ string(n.Type) }
+										</span>
+										<span class="title">{ n.Title }</span>
+									</a>
+								</li>
+							}
+						</ul>
+					}
+				</section>
 			</section>
-
-			<section class="profile-authored">
-				<h2>Authored nodes</h2>
-				if len(authored) == 0 {
-					<p class="muted">
-						if isSelf {
-							You haven't authored any nodes yet. <a href="/nodes/new">Create one</a>.
-						} else {
-							No authored nodes yet.
-						}
-					</p>
-				} else {
-					<ul class="node-list">
-						for _, n := range authored {
-							<li>
-								<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
-									<span class={ "badge", "badge-" + string(n.Type) }>{ string(n.Type) }</span>
-									<span class="title">{ n.Title }</span>
-								</a>
-							</li>
-						}
-					</ul>
-				}
-			</section>
-		</section>
+		</div>
 	}
 }

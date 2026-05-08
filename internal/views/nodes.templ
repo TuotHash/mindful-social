@@ -9,9 +9,12 @@ import (
 
 templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags string) {
 	@Layout("New node", viewer) {
-		<section class="auth">
-			<h1>Add a node</h1>
-			<p class="muted">Pick a type. Topics group views; views are stances; reasonings are arguments; facts are external sources you cite.</p>
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Add to the graph</span>
+				<h1 class="h-1">Add a node</h1>
+				<p class="muted" style="margin: 0;">Pick a type. Topics group views; views are stances; reasonings are arguments; evidence is the external sources you cite.</p>
+			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form">
 				<label>
@@ -20,7 +23,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 						<option value="topic" selected?={ formType == "topic" || formType == "" }>Topic</option>
 						<option value="view" selected?={ formType == "view" }>View</option>
 						<option value="reasoning" selected?={ formType == "reasoning" }>Reasoning</option>
-						<option value="fact" selected?={ formType == "fact" }>Fact / Source</option>
+						<option value="evidence" selected?={ formType == "evidence" }>Evidence / Source</option>
 					</select>
 				</label>
 				<label>
@@ -33,7 +36,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 					<small>Optional. Describe the node in your own words.</small>
 				</label>
 				<label>
-					Source URL <small>(facts only)</small>
+					Source URL <small>(evidence only)</small>
 					<input type="url" name="source_url" value={ formSourceURL }/>
 				</label>
 				<label>
@@ -59,9 +62,12 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 						Oppose <small>(views only)</small>
 					</label>
 				</fieldset>
-				<button type="submit" class="btn primary">Create node</button>
+				<div class="form-row">
+					<button type="submit" class="btn accent">Create node</button>
+					<a href="/" class="btn ghost">Cancel</a>
+				</div>
 			</form>
-		</section>
+		</div>
 	}
 }
 
@@ -155,132 +161,147 @@ func cascadePinLabel(n int64) string {
 	return fmt.Sprintf("%d other users' pins to this node will be removed.", n)
 }
 
+// nodeTypeChip renders a chip with the node-type pastel.
+templ nodeTypeChip(t db.NodeType) {
+	<span class={ "chip", string(t) }>
+		<span class="dot"></span>
+		{ string(t) }
+	</span>
+}
+
 templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag) {
 	@Layout(node.Title, viewer) {
-		<article class="node">
-			<header>
-				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
-				<h1>{ node.Title }</h1>
-			</header>
-			if node.Body != "" {
-				<section class="body">
-					<p>{ node.Body }</p>
-				</section>
-			}
-			if node.SourceUrl != nil && *node.SourceUrl != "" {
-				<section class="source">
-					<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">{ *node.SourceUrl }</a>
-				</section>
-			}
-			if len(tags) > 0 {
-				<section class="node-tags">
-					for _, t := range tags {
-						<a href={ templ.SafeURL("/tags/" + t.Name) } class="tag-chip">{ t.Name }</a>
-					}
-				</section>
-			}
-			if viewer != nil {
-				<div class="node-actions">
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn">Edit</a>
-					if pin == nil {
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="btn primary">
-							if node.Type == db.NodeTypeView {
-								Pin to my profile
-							} else {
-								Feature on my profile
-							}
-						</a>
-					}
-					if viewer.ID == node.CreatedBy.String() {
-						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="btn danger">Delete</a>
-					}
-				</div>
-			}
-			if viewer != nil && pin != nil {
-				<div class={ pinBannerClass(pin.Kind) }>
-					<strong>{ pinKindLabel(pin.Kind) }.</strong>
-					if pin.ReasoningID != nil {
-						via
-						<a href={ templ.SafeURL("/nodes/" + pin.ReasoningID.String()) }>{ pin.ReasoningTitle }</a>
-					}
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="link">Change</a>
-					<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/unpin") } class="inline">
-						<button type="submit" class="link">Remove</button>
-					</form>
-				</div>
-			}
-		</article>
-
-		if len(featured) > 0 {
-			<section class="featured">
-				<h2>Key reasoning</h2>
-				for _, f := range featured {
-					<article class={ "featured-card", "edge-" + string(f.Kind) }>
-						<header class="featured-head">
-							<span class="kind-label">{ f.Label }</span>
-							<span class={ "badge", "badge-" + string(f.Type) }>{ string(f.Type) }</span>
-							<h3><a href={ templ.SafeURL("/nodes/" + f.ID.String()) }>{ f.Title }</a></h3>
-						</header>
-						if f.Body != "" {
-							<p>{ f.Body }</p>
-						}
-						if viewer != nil {
-							<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/unfeature") } class="inline">
-								<button type="submit" class="link">Unfeature</button>
-							</form>
-							<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
-								<button type="submit" class="link">Disconnect</button>
-							</form>
-						}
-					</article>
+		<div class="page medium">
+			<article class="node card" style="padding: 36px;">
+				<header class="node-header">
+					@nodeTypeChip(node.Type)
+					<span class="grow"></span>
+				</header>
+				<h1 style="margin-top: 18px;">{ node.Title }</h1>
+				if node.Body != "" {
+					<section class="body" style="margin-top: 14px;">
+						<p>{ node.Body }</p>
+					</section>
 				}
-			</section>
-		}
-
-		<aside class="legend">
-			<h2>Connections</h2>
-			if len(groups) == 0 {
-				<p class="muted">No connections yet.</p>
-			} else {
-				for _, g := range groups {
-					<div class={ "edge-group", "edge-" + string(g.Kind) }>
-						<h4>{ g.Label }</h4>
-						<ul>
-							for _, r := range g.Rows {
-								<li>
-									<a href={ templ.SafeURL("/nodes/" + r.ID.String()) }>
-										<span class={ "badge", "badge-" + string(r.Type) }>{ string(r.Type) }</span>
-										<span class="title">{ r.Title }</span>
-									</a>
-									if r.Outgoing && viewer != nil {
-										<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
-											<button type="submit" class="link">Feature</button>
-										</form>
-									}
-									if viewer != nil {
-										<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/delete") } class="inline edge-action">
-											<button type="submit" class="link">Disconnect</button>
-										</form>
-									}
-								</li>
-							}
-						</ul>
+				if node.SourceUrl != nil && *node.SourceUrl != "" {
+					<section class="source" style="margin-top: 14px;">
+						<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">↗ { *node.SourceUrl }</a>
+					</section>
+				}
+				if len(tags) > 0 {
+					<section class="node-tags" style="margin-top: 18px;">
+						for _, t := range tags {
+							<a href={ templ.SafeURL("/tags/" + t.Name) } class="tag">#{ t.Name }</a>
+						}
+					</section>
+				}
+				if viewer != nil {
+					<div class="node-actions" style="margin-top: 22px;">
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/new") } class="btn">+ Connect</a>
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/edit") } class="btn ghost">Edit</a>
+						if pin == nil {
+							<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="btn accent">
+								if node.Type == db.NodeTypeView {
+									Pin to my profile
+								} else {
+									Feature on my profile
+								}
+							</a>
+						}
+						if viewer.ID == node.CreatedBy.String() {
+							<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="btn danger">Delete</a>
+						}
 					</div>
 				}
+				if viewer != nil && pin != nil {
+					<div class={ pinBannerClass(pin.Kind) } style="margin-top: 18px;">
+						<strong>{ pinKindLabel(pin.Kind) }.</strong>
+						if pin.ReasoningID != nil {
+							via
+							<a href={ templ.SafeURL("/nodes/" + pin.ReasoningID.String()) }>{ pin.ReasoningTitle }</a>
+						}
+						<a href={ templ.SafeURL("/nodes/" + node.ID.String() + "/pin") } class="muted" style="margin-left: auto; font-size: 13px;">Change</a>
+						<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/unpin") } class="inline">
+							<button type="submit" class="link">Remove</button>
+						</form>
+					</div>
+				}
+			</article>
+
+			if len(featured) > 0 {
+				<section class="featured">
+					<h2>Key reasoning</h2>
+					for _, f := range featured {
+						<article class={ "featured-card", "edge-" + string(f.Kind) }>
+							<header class="featured-head">
+								<span class="kind-label">{ f.Label }</span>
+								@nodeTypeChip(f.Type)
+								<span class="grow"></span>
+							</header>
+							<h3><a href={ templ.SafeURL("/nodes/" + f.ID.String()) }>{ f.Title }</a></h3>
+							if f.Body != "" {
+								<p>{ f.Body }</p>
+							}
+							if viewer != nil {
+								<div class="row gap-12 wrap" style="margin-top: 12px;">
+									<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/unfeature") } class="inline">
+										<button type="submit" class="link">Unfeature</button>
+									</form>
+									<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
+										<button type="submit" class="link">Disconnect</button>
+									</form>
+								</div>
+							}
+						</article>
+					}
+				</section>
 			}
-		</aside>
+
+			<aside class="legend">
+				<h2>Connections</h2>
+				if len(groups) == 0 {
+					<p class="muted">No connections yet.</p>
+				} else {
+					for _, g := range groups {
+						<div class={ "edge-group", "edge-" + string(g.Kind) }>
+							<h4>{ g.Label }</h4>
+							<ul>
+								for _, r := range g.Rows {
+									<li>
+										<a href={ templ.SafeURL("/nodes/" + r.ID.String()) }>
+											@nodeTypeChip(r.Type)
+											<span class="title">{ r.Title }</span>
+										</a>
+										if r.Outgoing && viewer != nil {
+											<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/feature") } class="inline edge-action">
+												<button type="submit" class="link">Feature</button>
+											</form>
+										}
+										if viewer != nil {
+											<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/edges/" + r.EdgeID.String() + "/delete") } class="inline edge-action">
+												<button type="submit" class="link">Disconnect</button>
+											</form>
+										}
+									</li>
+								}
+							</ul>
+						</div>
+					}
+				}
+			</aside>
+		</div>
 	}
 }
 
 templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags string) {
 	@Layout("Edit "+node.Title, viewer) {
-		<section>
-			<h1>
-				Edit
-				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
-			</h1>
-			<p class="muted">The node type cannot be changed after creation.</p>
+		<div class="page narrow">
+			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
+				<span class="eyebrow">Edit</span>
+				@nodeTypeChip(node.Type)
+			</div>
+			<h1 class="h-1" style="margin-bottom: 8px;">{ node.Title }</h1>
+			<p class="muted" style="margin: 0 0 24px;">The node type cannot be changed after creation.</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String()) } class="form">
 				<label>
@@ -294,8 +315,8 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 				</label>
 				<label>
 					Source URL
-					if node.Type == db.NodeTypeFact {
-						<small>(required for facts)</small>
+					if node.Type == db.NodeTypeEvidence {
+						<small>(required for evidence)</small>
 					} else {
 						<small>(optional)</small>
 					}
@@ -306,23 +327,23 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				<div class="form-row">
-					<button type="submit" class="btn primary">Save changes</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
+					<button type="submit" class="btn accent">Save changes</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
 				</div>
 			</form>
-		</section>
+		</div>
 	}
 }
 
 templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID string, reasonings []ReasoningOption) {
 	@Layout("Pin "+node.Title, viewer) {
-		<section>
-			<h1>
-				Pin
-				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
-				{ node.Title }
-			</h1>
-			<p class="muted">
+		<div class="page narrow">
+			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
+				<span class="eyebrow">Pin</span>
+				@nodeTypeChip(node.Type)
+			</div>
+			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
+			<p class="muted" style="margin: 0 0 24px;">
 				Pin this node to your profile. For views you can take a stance —
 				support or oppose — and optionally attach one of your reasoning nodes
 				to explain why. For other node types you can just feature it.
@@ -359,11 +380,11 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 					}
 				</label>
 				<div class="form-row">
-					<button type="submit" class="btn primary">Save pin</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
+					<button type="submit" class="btn accent">Save pin</button>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
 				</div>
 			</form>
-		</section>
+		</div>
 	}
 }
 
@@ -377,13 +398,13 @@ type EdgeCandidate struct {
 
 templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, candidates []EdgeCandidate) {
 	@Layout("Add connection", viewer) {
-		<section>
-			<h1>
-				Connect from
-				<span class={ "badge", "badge-" + string(fromNode.Type) }>{ string(fromNode.Type) }</span>
-				{ fromNode.Title }
-			</h1>
-			<p class="muted">
+		<div class="page narrow">
+			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
+				<span class="eyebrow">Connect from</span>
+				@nodeTypeChip(fromNode.Type)
+			</div>
+			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ fromNode.Title }</h1>
+			<p class="muted" style="margin: 0 0 24px;">
 				You are creating a directed connection <strong>from</strong> this node <strong>to</strong> another.
 				The kind describes how the source relates to the target.
 			</p>
@@ -415,26 +436,24 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 				</label>
 				@CandidatePicker(find, candidates)
 				<div class="form-row">
-					<button type="submit" class="btn primary">Add connection</button>
-					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn">Cancel</a>
+					<button type="submit" class="btn accent">Add connection</button>
+					<a href={ templ.SafeURL("/nodes/" + fromNode.ID.String()) } class="btn ghost">Cancel</a>
 				</div>
 			</form>
-		</section>
+		</div>
 	}
 }
 
 templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 	@Layout("Delete "+node.Title, viewer) {
-		<section>
-			<h1>
-				Delete
-				<span class={ "badge", "badge-" + string(node.Type) }>{ string(node.Type) }</span>
-				{ node.Title }
-			</h1>
-			<p class="muted">
-				This permanently removes the node. The action cannot be undone.
-			</p>
-			<ul class="muted">
+		<div class="page narrow">
+			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
+				<span class="eyebrow">Delete</span>
+				@nodeTypeChip(node.Type)
+			</div>
+			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
+			<p class="muted" style="margin: 0 0 12px;">This permanently removes the node. The action cannot be undone.</p>
+			<ul class="muted" style="margin: 0 0 24px; padding-left: 20px; line-height: 1.7;">
 				<li>{ cascadeEdgeLabel(edgeCount) } will be removed.</li>
 				<li>{ cascadePinLabel(otherPinCount) }</li>
 				<li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li>
@@ -443,10 +462,10 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.ID.String() + "/delete") } class="form">
 				<div class="form-row">
 					<button type="submit" class="btn danger">Yes, delete this node</button>
-					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn">Cancel</a>
+					<a href={ templ.SafeURL("/nodes/" + node.ID.String()) } class="btn ghost">Cancel</a>
 				</div>
 			</form>
-		</section>
+		</div>
 	}
 }
 
@@ -468,12 +487,11 @@ templ CandidatePicker(find string, candidates []EdgeCandidate) {
 				for _, c := range candidates {
 					<label class="radio">
 						<input type="radio" name="to_id" value={ c.ID.String() } required/>
-						<span class={ "badge", "badge-" + string(c.Type) }>{ string(c.Type) }</span>
-						{ c.Title }
+						@nodeTypeChip(c.Type)
+						<span>{ c.Title }</span>
 					</label>
 				}
 			</fieldset>
 		}
 	</div>
 }
-

@@ -26,34 +26,40 @@ type ExcerptPart struct {
 
 templ SearchResults(viewer *Viewer, q string, hits []SearchHit) {
 	@Layout("Search", viewer) {
-		<section>
-			<h1>Search</h1>
+		<div class="page medium">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Search</span>
+				<h1 class="h-1">Search the graph</h1>
+			</div>
 			<form method="get" action="/search" class="search-form">
-				<input type="search" name="q" value={ q } placeholder="search nodes…"/>
-				<button type="submit" class="btn">Search</button>
+				<input type="search" name="q" value={ q } placeholder="search node titles and bodies…"/>
+				<button type="submit" class="btn accent">Search</button>
 			</form>
 			if q == "" {
 				<p class="muted">Type a query above to search node titles and bodies.</p>
 			}
 			if isQueryWithNoHits(q, hits) {
-				<p class="muted">No matches for <strong>{ q }</strong>.</p>
+				<div class="card muted" style="text-align: center; padding: 24px;">{ noMatchesPhrase(q) }</div>
 			}
 			if isQueryWithHits(q, hits) {
-				<p class="muted">{ strconv.Itoa(len(hits)) } results for <strong>{ q }</strong>.</p>
+				<p class="muted" style="margin: 0 0 12px;">{ resultsForPhrase(len(hits), q) }</p>
 				<ul class="search-results">
 					for _, h := range hits {
 						@searchHitItem(h)
 					}
 				</ul>
 			}
-		</section>
+		</div>
 	}
 }
 
 templ searchHitItem(h SearchHit) {
 	<li>
 		<a href={ templ.SafeURL("/nodes/" + h.ID.String()) } class="search-hit">
-			<span class={ "badge", "badge-" + string(h.Type) }>{ string(h.Type) }</span>
+			<span class={ "chip", string(h.Type) }>
+				<span class="dot"></span>
+				{ string(h.Type) }
+			</span>
 			<span class="title">{ h.Title }</span>
 		</a>
 		if len(h.Excerpt) > 0 {
@@ -78,12 +84,16 @@ templ searchExcerpt(parts []ExcerptPart) {
 func isQueryWithNoHits(q string, hits []SearchHit) bool { return q != "" && len(hits) == 0 }
 func isQueryWithHits(q string, hits []SearchHit) bool   { return q != "" && len(hits) > 0 }
 
-// resultCountPhrase returns "1 result" / "N results" — folded into a single
+// resultsForPhrase returns "N results for QUERY" — folded into one Go
 // expression because templ's parser refuses a paragraph that mixes two outer
 // {…} interpolations with an inline element that itself contains {…}.
-func resultCountPhrase(n int) string {
+func resultsForPhrase(n int, q string) string {
 	if n == 1 {
-		return "1 result"
+		return "1 result for " + q + "."
 	}
-	return strconv.Itoa(n) + " results"
+	return strconv.Itoa(n) + " results for " + q + "."
+}
+
+func noMatchesPhrase(q string) string {
+	return "No matches for " + q + "."
 }

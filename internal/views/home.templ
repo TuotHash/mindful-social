@@ -1,33 +1,173 @@
 package views
 
-import "github.com/TuotHash/mindful-social/internal/db"
+import (
+	"fmt"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
 
 templ Home(viewer *Viewer, recent []db.Node) {
 	@Layout("Home", viewer) {
-		<section class="hero">
-			<h1>Mindful Social</h1>
-			<p class="lede">A graph of views, reasoning, and the people who hold them.</p>
-			if viewer == nil {
-				<p>
-					<a class="btn primary" href="/signup">Create an account</a>
-					<a class="btn" href="/login">Log in</a>
+		if viewer == nil {
+			@landingMarketing()
+		} else {
+			@homeFeed(viewer, recent)
+		}
+	}
+}
+
+templ landingMarketing() {
+	<section class="hero">
+		<div class="page" style="position: relative; z-index: 2;">
+			<div class="hero-grid">
+				<div class="col gap-24 fadein">
+					<div class="row gap-8">
+						<span class="chip" style="background: var(--paper);">
+							<span class="dot" style="background: var(--accent-deep);"></span>
+							Public alpha · early development
+						</span>
+					</div>
+					<h1 class="h-display">
+						Disagree<br/>
+						<em>with grace.</em>
+					</h1>
+					<p class="lede" style="font-size: 21px; max-width: 50ch;">
+						Mindful Social is a community where people commit to views,
+						show their reasoning, and connect ideas in a shared
+						argument graph — not a feed of hot takes.
+					</p>
+					<div class="row gap-12 wrap">
+						<a class="btn accent lg" href="/signup">
+							Make your first commitment
+							<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+						</a>
+						<a class="btn lg" href="/tags">Read the graph</a>
+					</div>
+					<div class="row gap-24 wrap" style="margin-top: 12px; color: var(--ink-3); font-size: 13px;">
+						<span class="row gap-8">@checkIcon() Open source · AGPL</span>
+						<span class="row gap-8">@checkIcon() No ads · ever</span>
+						<span class="row gap-8">@checkIcon() Federation-ready</span>
+					</div>
+				</div>
+				<div style="position: relative; height: 520px; display: flex; align-items: center; justify-content: center;">
+					@bloom(420, 105, "position: absolute; right: -40px; top: 20px; opacity: 0.85; animation: drift 18s ease-in-out infinite;")
+					@bloom(150, 35, "position: absolute; left: -10px; bottom: 60px; opacity: 0.85; animation: drift 14s ease-in-out infinite reverse;")
+					<div class="hero-graph-card">
+						<div class="row between" style="margin-bottom: 8px; padding: 0 6px;">
+							<span class="eyebrow">Argument graph</span>
+							<span class="chip" style="font-size: 10px; padding: 2px 8px; background: var(--accent); color: var(--accent-ink); border: 0;">Coming soon</span>
+						</div>
+						<div class="hero-graph-inner">
+							<div class="col gap-12" style="text-align: center; max-width: 320px; padding: 24px;">
+								@bloom(120, 105, "margin: 0 auto; opacity: 0.5;")
+								<div class="h-3" style="font-family: var(--serif); font-size: 22px; color: var(--ink-2);">
+									Interactive graph view in development
+								</div>
+								<p class="muted" style="font-size: 14px; margin: 0;">
+									The argument graph will let you explore connections between topics, views, reasoning, and evidence — all in one visual space.
+								</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+	<section class="section-paper">
+		<div class="page" style="padding-top: 80px; padding-bottom: 80px;">
+			<div class="col gap-16" style="margin-bottom: 48px; max-width: 720px;">
+				<span class="eyebrow">The four primitives</span>
+				<h2 class="h-1">Every conversation, mapped to four shapes.</h2>
+				<p class="lede">No likes, no quote-replies, no algorithmic feed.
+					Each contribution is one of four kinds — and every connection is named.</p>
+			</div>
+			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+				@primitiveCard("topic", "Topic", "Big questions you want to think about — UBI, AI alignment, urban transit. Containers for views.")
+				@primitiveCard("view", "View", "A specific stance someone could commit to. Sharper than a topic, debatable as a sentence.")
+				@primitiveCard("reasoning", "Reasoning", "Your personal argument behind a view — why you committed. Attached to your profile.")
+				@primitiveCard("evidence", "Evidence", "A linkable external source. Reasoning cites evidence; evidence can be challenged on its own.")
+			</div>
+			<div class="card" style="margin-top: 32px; padding: 28px;">
+				<div class="row between wrap gap-16" style="margin-bottom: 18px;">
+					<div>
+						<span class="eyebrow">Edges</span>
+						<div class="h-2" style="margin-top: 4px;">Five named relationships.</div>
+					</div>
+					<p class="muted" style="margin: 0; max-width: 360px; font-size: 14px;">
+						Every link between two nodes carries a kind — so disagreement is structural, not interpretive.
+					</p>
+				</div>
+				<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+					@edgeCard("supports", "supports", "argues in favor")
+					@edgeCard("opposes", "opposes", "argues against")
+					@edgeCard("refines", "refines", "narrows or qualifies")
+					@edgeCard("cites", "cites", "points to evidence")
+					@edgeCard("relates_to", "relates to", "belongs in the same area")
+				</div>
+			</div>
+		</div>
+	</section>
+	<section class="section-cream">
+		<div class="page" style="padding-top: 80px; padding-bottom: 80px;">
+			<div class="col gap-12" style="margin-bottom: 40px; max-width: 700px;">
+				<span class="eyebrow">How it works</span>
+				<h2 class="h-1">From scrolling to thinking.</h2>
+			</div>
+			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and reasoning chains expand below.")
+				@stepCard("02", "Read the views and their evidence", "Each view shows who commits, opposing views, and cited evidence.")
+				@stepCard("03", "Write your own reasoning", "Pin your stance with a paragraph in your own words. Link evidence you find compelling.")
+				@stepCard("04", "Watch the graph rebuild itself", "Your contribution rewires the conversation — visible, named, accountable.")
+			</div>
+		</div>
+	</section>
+	<section class="page" style="padding-top: 100px; padding-bottom: 120px;">
+		<div class="card" style="padding: 64px 48px; text-align: center; position: relative; overflow: hidden; background: linear-gradient(135deg, var(--paper), var(--bg-2));">
+			@bloom(200, 105, "position: absolute; left: -50px; top: -40px; opacity: 0.6;")
+			@bloom(160, 35, "position: absolute; right: -30px; bottom: -40px; opacity: 0.6;")
+			<div style="position: relative; z-index: 2; max-width: 640px; margin: 0 auto;">
+				<h2 class="h-1" style="font-size: 56px;">Stop dunking. Start <em style="font-style: italic; color: var(--accent-deep);">thinking together.</em></h2>
+				<p class="lede" style="margin: 20px auto 32px;">
+					Free forever. No advertisers, no algorithm. Just you, your reasoning, and a slowly-better-organized internet.
 				</p>
-			} else {
-				<p>
-					<a class="btn primary" href="/nodes/new">Add a node</a>
-				</p>
-			}
+				<div class="row gap-12" style="justify-content: center;">
+					<a class="btn accent lg" href="/signup">Create your account</a>
+					<a class="btn lg" href="/login">I already have one</a>
+				</div>
+			</div>
+		</div>
+	</section>
+	@siteFooter()
+}
+
+templ homeFeed(viewer *Viewer, recent []db.Node) {
+	<div class="page">
+		<section class="col gap-16" style="margin-bottom: 32px;">
+			<span class="eyebrow">Welcome back, { viewer.Username }</span>
+			<h1 class="h-1">What do you want to commit to today?</h1>
+			<div class="row gap-12 wrap">
+				<a class="btn accent" href="/nodes/new">Add a node</a>
+				<a class="btn" href="/tags">Browse by tag</a>
+			</div>
 		</section>
-		<section>
-			<h2>Recent nodes</h2>
+		<section class="col gap-12">
+			<div class="row between wrap gap-12">
+				<span class="eyebrow">Recent nodes</span>
+				<a class="muted" href="/tags" style="font-size: 13px; text-decoration: none;">All tags →</a>
+			</div>
 			if len(recent) == 0 {
-				<p class="muted">The graph is empty. Be the first to add a node.</p>
+				<div class="card muted" style="padding: 24px; text-align: center;">
+					The graph is empty. <a href="/nodes/new" style="color: var(--ink); font-weight: 500;">Be the first to add a node.</a>
+				</div>
 			} else {
 				<ul class="node-list">
 					for _, n := range recent {
 						<li>
 							<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
-								<span class={ "badge", "badge-" + string(n.Type) }>{ string(n.Type) }</span>
+								<span class={ "chip", string(n.Type) }>
+									<span class="dot"></span>
+									{ string(n.Type) }
+								</span>
 								<span class="title">{ n.Title }</span>
 							</a>
 						</li>
@@ -35,5 +175,68 @@ templ Home(viewer *Viewer, recent []db.Node) {
 				</ul>
 			}
 		</section>
-	}
+	</div>
+}
+
+templ checkIcon() {
+	<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7l3 3 7-7" stroke="var(--supports)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+}
+
+templ bloom(size int, hue int, style string) {
+	<div aria-hidden="true" class="bloom" style={ bloomStyle(size, hue, style) }></div>
+}
+
+func bloomStyle(size int, hue int, extra string) string {
+	return fmt.Sprintf(
+		"width:%dpx;height:%dpx;background:radial-gradient(circle at 32%% 28%%, oklch(0.95 0.10 %d) 0%%, oklch(0.78 0.18 %d) 50%%, oklch(0.55 0.18 %d) 100%%);box-shadow:inset -20px -28px 60px oklch(0.42 0.18 %d / 0.5), inset 18px 22px 40px oklch(0.98 0.05 %d / 0.6), 0 30px 80px -20px oklch(0.60 0.18 %d / 0.45);%s",
+		size, size, hue, hue, hue+5, hue+10, hue, hue, extra,
+	)
+}
+
+templ primitiveCard(typ, label, blurb string) {
+	<div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+		<span class={ "chip", typ } style="padding: 6px 14px; font-size: 13px; align-self: flex-start;">
+			<span class="dot"></span>
+			{ label }
+		</span>
+		<div class="h-3" style="font-size: 22px; font-family: var(--serif); font-weight: 400;">{ label }</div>
+		<p class="muted" style="margin: 0; font-size: 14px;">{ blurb }</p>
+	</div>
+}
+
+templ edgeCard(kind, label, blurb string) {
+	<div class={ "edge-" + kind } style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);">
+		<span class="edge-dot" style="width: 10px; height: 10px;"></span>
+		<div class="col gap-4">
+			<div style="font-family: var(--mono); font-size: 13px; color: var(--edge);">{ label }</div>
+			<div class="muted" style="font-size: 12px;">{ blurb }</div>
+		</div>
+	</div>
+}
+
+templ stepCard(num, title, body string) {
+	<div class="card" style="background: var(--paper);">
+		<div class="eyebrow" style="color: var(--accent-deep); margin-bottom: 16px;">{ num }</div>
+		<div class="h-3" style="margin-bottom: 8px;">{ title }</div>
+		<p class="muted" style="margin: 0; font-size: 14px;">{ body }</p>
+	</div>
+}
+
+templ siteFooter() {
+	<footer class="site-footer">
+		<div class="page" style="padding-top: 48px; padding-bottom: 48px;">
+			<div class="row between wrap gap-16">
+				<div class="row gap-12 center">
+					<span class="brand-mark" style="width: 22px; height: 22px;"></span>
+					<span style="font-family: var(--serif); font-size: 18px;">Mindful Social</span>
+					<span class="muted" style="font-size: 12px; font-family: var(--mono);">v0.4 · early development</span>
+				</div>
+				<div class="row gap-24 wrap" style="font-size: 13px; color: var(--ink-3);">
+					<a href="/" style="text-decoration: none;">Home</a>
+					<a href="/tags" style="text-decoration: none;">Tags</a>
+					<a href="/search" style="text-decoration: none;">Search</a>
+				</div>
+			</div>
+		</div>
+	</footer>
 }

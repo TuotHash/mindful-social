@@ -1,5 +1,7 @@
 package views
 
+import "fmt"
+
 // Layout is the shared chrome around every page. Title is set per-page.
 // CurrentUser is rendered in the header when set; nil means logged-out.
 templ Layout(title string, currentUser *Viewer) {
@@ -9,34 +11,127 @@ templ Layout(title string, currentUser *Viewer) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ title } — Mindful Social</title>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/app.css"/>
+			<script>
+				(function () {
+					try {
+						var t = localStorage.getItem('theme');
+						if (t === 'dark' || t === 'light') {
+							document.documentElement.setAttribute('data-theme', t);
+						}
+					} catch (e) {}
+				})();
+			</script>
 			<script src="/static/htmx.min.js" defer></script>
 		</head>
 		<body>
-			<header class="topbar">
-				<a class="brand" href="/">Mindful Social</a>
-				<form method="get" action="/search" class="topbar-search">
-					<input type="search" name="q" placeholder="search…" aria-label="Search"/>
-				</form>
-				<nav>
-					<a href="/tags">Tags</a>
-					if currentUser != nil {
-						<a href="/nodes/new">New node</a>
-						<a href={ templ.SafeURL("/users/" + currentUser.Username) } class="user">{ currentUser.Username }</a>
-						<form method="post" action="/logout" class="inline">
-							<button type="submit" class="link">Log out</button>
-						</form>
-					} else {
-						<a href="/login">Log in</a>
-						<a href="/signup">Sign up</a>
+			<div class="app">
+				@TopNav(currentUser)
+				<main>
+					{ children... }
+				</main>
+			</div>
+			<script>
+				(function () {
+					var btn = document.getElementById('theme-toggle');
+					if (!btn) return;
+					var html = document.documentElement;
+					function sync() {
+						var dark = html.getAttribute('data-theme') === 'dark';
+						btn.textContent = dark ? '☀' : '☾';
+						btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
 					}
-				</nav>
-			</header>
-			<main>
-				{ children... }
-			</main>
+					sync();
+					btn.addEventListener('click', function () {
+						var dark = html.getAttribute('data-theme') === 'dark';
+						var next = dark ? 'light' : 'dark';
+						html.setAttribute('data-theme', next);
+						try { localStorage.setItem('theme', next); } catch (e) {}
+						sync();
+					});
+				})();
+			</script>
 		</body>
 	</html>
+}
+
+templ TopNav(currentUser *Viewer) {
+	<header class="nav">
+		<div class="nav-inner">
+			<a class="brand" href="/">
+				<span class="brand-mark"></span>
+				<span>Mindful Social</span>
+			</a>
+			<div class="nav-links">
+				<a class="nav-link" href="/">Home</a>
+				<a class="nav-link" href="/tags">Browse</a>
+				if currentUser != nil {
+					<a class="nav-link" href="/nodes/new">New node</a>
+				}
+			</div>
+			<span class="nav-spacer"></span>
+			<form method="get" action="/search" class="nav-search" role="search">
+				<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+					<circle cx="6" cy="6" r="4.2" stroke="currentColor" stroke-width="1.4" fill="none"></circle>
+					<path d="M9.2 9.2L12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path>
+				</svg>
+				<input type="search" name="q" placeholder="Search topics, views, evidence…" aria-label="Search"/>
+			</form>
+			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme">☾</button>
+			if currentUser != nil {
+				<a class="btn ghost" href={ templ.SafeURL("/users/" + currentUser.Username) } style="padding: 4px 10px 4px 4px; gap: 8px;">
+					@Avatar(currentUser.Username, 28)
+					<span style="font-size: 13px; font-weight: 500;">{ currentUser.Username }</span>
+				</a>
+				<form method="post" action="/logout" class="inline">
+					<button type="submit" class="btn ghost sm">Log out</button>
+				</form>
+			} else {
+				<a class="btn ghost" href="/login">Sign in</a>
+				<a class="btn accent" href="/signup">Get started</a>
+			}
+		</div>
+	</header>
+}
+
+// Avatar renders a deterministic-coloured circle with the first two letters of
+// the username. Hue derives from the username so a user always gets the same
+// background across pages.
+templ Avatar(username string, size int) {
+	<span
+		class="avatar"
+		style={ avatarStyle(username, size) }
+	>{ avatarInitials(username) }</span>
+}
+
+func avatarHue(s string) int {
+	h := 0
+	for _, c := range s {
+		h = (h*31 + int(c)) % 360
+	}
+	return h
+}
+
+func avatarInitials(username string) string {
+	if username == "" {
+		return "?"
+	}
+	r := []rune(username)
+	if len(r) == 1 {
+		return string(r)
+	}
+	return string(r[0:2])
+}
+
+func avatarStyle(username string, size int) string {
+	hue := avatarHue(username)
+	return fmt.Sprintf(
+		"display:inline-flex;align-items:center;justify-content:center;width:%dpx;height:%dpx;border-radius:50%%;background:oklch(0.86 0.07 %d);color:oklch(0.32 0.10 %d);font-size:%dpx;font-weight:600;font-family:var(--mono);letter-spacing:-0.02em;flex:none;",
+		size, size, hue, hue, int(float64(size)*0.4),
+	)
 }
 
 // Viewer is the small slice of user info templates need. We avoid passing

@@ -9,61 +9,91 @@ type OAuthButton struct {
 
 templ oauthButtons(buttons []OAuthButton) {
 	if len(buttons) > 0 {
+		<div class="row" style="margin: 24px 0; gap: 12px; color: var(--ink-3); font-size: 12px; align-items: center;">
+			<span style="flex: 1; height: 1px; background: var(--line);"></span>
+			or
+			<span style="flex: 1; height: 1px; background: var(--line);"></span>
+		</div>
 		<div class="oauth-buttons">
-			<p class="muted">Or sign in with:</p>
 			for _, b := range buttons {
-				<a class="btn" href={ templ.SafeURL("/auth/oauth/" + b.Key) }>{ b.Label }</a>
+				<a class="btn lg" href={ templ.SafeURL("/auth/oauth/" + b.Key) }>{ b.Label }</a>
 			}
 		</div>
 	}
 }
 
+templ authShell(title, subtitle string) {
+	<div style="min-height: calc(100vh - 70px); display: grid; grid-template-columns: 1fr 1fr;">
+		<div style="padding: 64px 48px; display: flex; flex-direction: column; justify-content: center; max-width: 520px; margin: 0 auto; width: 100%;">
+			<div class="col gap-12" style="margin-bottom: 36px;">
+				<span class="eyebrow">Mindful Social</span>
+				<h1 class="h-1" style="font-size: 44px;">{ title }</h1>
+				<p class="muted" style="margin: 0;">{ subtitle }</p>
+			</div>
+			{ children... }
+		</div>
+		<div style="position: relative; overflow: hidden; background: var(--bg-2); border-left: 1px solid var(--line);">
+			@bloom(460, 105, "position: absolute; right: -60px; top: 80px; animation: drift 18s ease-in-out infinite;")
+			@bloom(220, 35, "position: absolute; left: 40px; bottom: 60px; animation: drift 13s ease-in-out infinite reverse;")
+			<div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 64px;">
+				<blockquote style="position: relative; z-index: 2; background: color-mix(in oklch, var(--paper) 86%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 24px; padding: 32px; margin: 0; max-width: 480px;">
+					<div class="eyebrow" style="margin-bottom: 14px;">Why we built this</div>
+					<p style="font-family: var(--serif); font-size: 26px; line-height: 1.25; margin: 0;">
+						"The internet rewards the loudest hot take. We wanted a place that rewarded showing your work."
+					</p>
+				</blockquote>
+			</div>
+		</div>
+	</div>
+}
+
 templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) {
 	@Layout("Sign up", nil) {
-		<section class="auth">
-			<h1>Create an account</h1>
+		@authShell("Bring your reasoning.", "Pick a handle. We'll never email you marketing.") {
 			@Flash(flash)
-			<form method="post" action="/signup" class="form">
-				<label>
+			<form method="post" action="/signup" class="col gap-16">
+				<label class="field">
 					Username
-					<input type="text" name="username" required minlength="3" maxlength="32" value={ formUsername }/>
-					<small>3–32 chars: letters, digits, dot, dash, underscore.</small>
+					<input class="input lg" type="text" name="username" required minlength="3" maxlength="32" value={ formUsername } placeholder="e.g. quiet-octopus"/>
+					<small class="muted" style="font-size: 12px;">3–32 chars: letters, digits, dot, dash, underscore.</small>
 				</label>
-				<label>
+				<label class="field">
 					Email
-					<input type="email" name="email" required value={ formEmail }/>
+					<input class="input lg" type="email" name="email" required value={ formEmail } placeholder="you@example.org"/>
 				</label>
-				<label>
+				<label class="field">
 					Password
-					<input type="password" name="password" required minlength="12"/>
-					<small>At least 12 characters.</small>
+					<input class="input lg" type="password" name="password" required minlength="12" placeholder="at least 12 characters"/>
 				</label>
-				<button type="submit" class="btn primary">Sign up</button>
+				<button type="submit" class="btn accent lg" style="justify-content: center;">Create account</button>
 			</form>
 			@oauthButtons(oauth)
-			<p class="muted"><a href="/login">Already have an account? Log in.</a></p>
-		</section>
+			<div style="margin-top: 32px; font-size: 14px; color: var(--ink-3);">
+				Already a member? <a href="/login" style="color: var(--ink); font-weight: 500;">Sign in</a>.
+			</div>
+		}
 	}
 }
 
 templ Login(flash string, oauth []OAuthButton, formEmail string) {
 	@Layout("Log in", nil) {
-		<section class="auth">
-			<h1>Log in</h1>
+		@authShell("Welcome back.", "Sign in to keep your reasoning where you left it.") {
 			@Flash(flash)
-			<form method="post" action="/login" class="form">
-				<label>
+			<form method="post" action="/login" class="col gap-16">
+				<label class="field">
 					Email
-					<input type="email" name="email" required value={ formEmail }/>
+					<input class="input lg" type="email" name="email" required value={ formEmail } placeholder="you@example.org"/>
 				</label>
-				<label>
+				<label class="field">
 					Password
-					<input type="password" name="password" required/>
+					<input class="input lg" type="password" name="password" required placeholder="••••••••"/>
 				</label>
-				<button type="submit" class="btn primary">Log in</button>
+				<button type="submit" class="btn accent lg" style="justify-content: center;">Sign in</button>
 			</form>
 			@oauthButtons(oauth)
-			<p class="muted"><a href="/signup">Don&rsquo;t have an account? Sign up.</a></p>
-		</section>
+			<div style="margin-top: 32px; font-size: 14px; color: var(--ink-3);">
+				No account yet? <a href="/signup" style="color: var(--ink); font-weight: 500;">Sign up</a>.
+			</div>
+		}
 	}
 }
