@@ -86,6 +86,7 @@ SELECT
     e.position,
     e.created_at,
     n.id    AS to_id,
+    n.slug  AS to_slug,
     n.type  AS to_type,
     n.title AS to_title
 FROM edges e
@@ -100,6 +101,7 @@ type ListEdgesFromNodeRow struct {
 	Position  *int16             `json:"position"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	ToID      uuid.UUID          `json:"to_id"`
+	ToSlug    string             `json:"to_slug"`
 	ToType    NodeType           `json:"to_type"`
 	ToTitle   string             `json:"to_title"`
 }
@@ -122,6 +124,7 @@ func (q *Queries) ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]
 			&i.Position,
 			&i.CreatedAt,
 			&i.ToID,
+			&i.ToSlug,
 			&i.ToType,
 			&i.ToTitle,
 		); err != nil {
@@ -141,6 +144,7 @@ SELECT
     e.kind,
     e.created_at,
     n.id    AS from_id,
+    n.slug  AS from_slug,
     n.type  AS from_type,
     n.title AS from_title
 FROM edges e
@@ -154,6 +158,7 @@ type ListEdgesToNodeRow struct {
 	Kind      EdgeKind           `json:"kind"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	FromID    uuid.UUID          `json:"from_id"`
+	FromSlug  string             `json:"from_slug"`
 	FromType  NodeType           `json:"from_type"`
 	FromTitle string             `json:"from_title"`
 }
@@ -173,6 +178,7 @@ func (q *Queries) ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]List
 			&i.Kind,
 			&i.CreatedAt,
 			&i.FromID,
+			&i.FromSlug,
 			&i.FromType,
 			&i.FromTitle,
 		); err != nil {
@@ -192,6 +198,7 @@ SELECT
     e.kind,
     e.position,
     n.id    AS to_id,
+    n.slug  AS to_slug,
     n.type  AS to_type,
     n.title AS to_title,
     n.body  AS to_body
@@ -206,6 +213,7 @@ type ListFeaturedEdgesFromNodeRow struct {
 	Kind     EdgeKind  `json:"kind"`
 	Position *int16    `json:"position"`
 	ToID     uuid.UUID `json:"to_id"`
+	ToSlug   string    `json:"to_slug"`
 	ToType   NodeType  `json:"to_type"`
 	ToTitle  string    `json:"to_title"`
 	ToBody   string    `json:"to_body"`
@@ -228,6 +236,7 @@ func (q *Queries) ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.U
 			&i.Kind,
 			&i.Position,
 			&i.ToID,
+			&i.ToSlug,
 			&i.ToType,
 			&i.ToTitle,
 			&i.ToBody,

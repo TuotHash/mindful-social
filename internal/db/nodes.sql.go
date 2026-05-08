@@ -56,9 +56,9 @@ func (q *Queries) CountOtherUserPinsForNode(ctx context.Context, arg CountOtherU
 }
 
 const createNode = `-- name: CreateNode :one
-INSERT INTO nodes (type, title, body, source_url, created_by)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv
+INSERT INTO nodes (type, title, body, source_url, created_by, slug)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug
 `
 
 type CreateNodeParams struct {
@@ -67,6 +67,7 @@ type CreateNodeParams struct {
 	Body      string    `json:"body"`
 	SourceUrl *string   `json:"source_url"`
 	CreatedBy uuid.UUID `json:"created_by"`
+	Slug      string    `json:"slug"`
 }
 
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
@@ -76,6 +77,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		arg.Body,
 		arg.SourceUrl,
 		arg.CreatedBy,
+		arg.Slug,
 	)
 	var i Node
 	err := row.Scan(
@@ -88,6 +90,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SearchTsv,
+		&i.Slug,
 	)
 	return i, err
 }
@@ -102,7 +105,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -118,12 +121,35 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SearchTsv,
+		&i.Slug,
+	)
+	return i, err
+}
+
+const getNodeBySlug = `-- name: GetNodeBySlug :one
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes WHERE slug = $1
+`
+
+func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
+	row := q.db.QueryRow(ctx, getNodeBySlug, slug)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Title,
+		&i.Body,
+		&i.SourceUrl,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SearchTsv,
+		&i.Slug,
 	)
 	return i, err
 }
 
 const listNodesAuthoredBy = `-- name: ListNodesAuthoredBy :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
 WHERE created_by = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -155,6 +181,7 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SearchTsv,
+			&i.Slug,
 		); err != nil {
 			return nil, err
 		}
@@ -167,7 +194,7 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
 WHERE type = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -197,6 +224,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SearchTsv,
+			&i.Slug,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +237,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listRecentNodes = `-- name: ListRecentNodes :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
 ORDER BY created_at DESC
 LIMIT $1
 `
@@ -233,6 +261,7 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SearchTsv,
+			&i.Slug,
 		); err != nil {
 			return nil, err
 		}
@@ -292,7 +321,7 @@ func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesPa
 
 const searchNodes = `-- name: SearchNodes :many
 SELECT
-    n.id, n.type, n.title, n.body, n.source_url, n.created_by,
+    n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
     CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', $1::text)
          THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', $1::text))
@@ -314,6 +343,7 @@ type SearchNodesParams struct {
 
 type SearchNodesRow struct {
 	ID        uuid.UUID          `json:"id"`
+	Slug      string             `json:"slug"`
 	Type      NodeType           `json:"type"`
 	Title     string             `json:"title"`
 	Body      string             `json:"body"`
@@ -348,6 +378,7 @@ func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]Sea
 		var i SearchNodesRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Slug,
 			&i.Type,
 			&i.Title,
 			&i.Body,
@@ -375,7 +406,7 @@ SET title = $2,
     source_url = $4,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug
 `
 
 type UpdateNodeParams struct {
@@ -403,6 +434,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SearchTsv,
+		&i.Slug,
 	)
 	return i, err
 }

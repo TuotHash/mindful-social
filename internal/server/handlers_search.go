@@ -36,6 +36,7 @@ func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
 	for _, row := range rows {
 		out = append(out, views.SearchHit{
 			ID:      row.ID,
+			Slug:    row.Slug,
 			Type:    row.Type,
 			Title:   row.Title,
 			Excerpt: parseHighlightedExcerpt(row.Excerpt),

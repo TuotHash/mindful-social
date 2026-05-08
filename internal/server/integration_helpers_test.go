@@ -104,18 +104,20 @@ func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid
 		raw, _ := io.ReadAll(resp.Body)
 		t.Fatalf("create node: status %d body=%s", resp.StatusCode, string(raw))
 	}
-	// Handler redirects to /nodes/{uuid}; the client followed it so the
-	// final URL path is /nodes/{uuid}.
+	// Handler redirects to /nodes/{slug}; the client followed it so the
+	// final URL path is /nodes/{slug}. We look the slug up in the DB to
+	// return a UUID — keeps the existing test call sites working with
+	// id.String()-style URL construction (resolveNode accepts either form).
 	parts := strings.Split(strings.TrimPrefix(resp.Request.URL.Path, "/"), "/")
 	if len(parts) < 2 || parts[0] != "nodes" {
 		raw, _ := io.ReadAll(resp.Body)
 		t.Fatalf("create node: unexpected redirect to %s, body=%s", resp.Request.URL.Path, string(raw))
 	}
-	id, err := uuid.Parse(parts[1])
+	node, err := testServer.queries.GetNodeBySlug(t.Context(), parts[1])
 	if err != nil {
-		t.Fatalf("create node: redirect path %q has bad uuid: %v", resp.Request.URL.Path, err)
+		t.Fatalf("create node: lookup by slug %q: %v", parts[1], err)
 	}
-	return id
+	return node.ID
 }
 
 // snippet trims long bodies for failure messages. Helps keep test output

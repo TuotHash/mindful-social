@@ -20,6 +20,7 @@ SELECT
     p.kind,
     p.reasoning_id,
     p.created_at,
+    rn.slug  AS reasoning_slug,
     rn.title AS reasoning_title
 FROM user_node_pins p
 LEFT JOIN nodes rn ON rn.id = p.reasoning_id
@@ -41,8 +42,10 @@ SELECT
     p.kind,
     p.reasoning_id,
     p.created_at,
+    n.slug    AS node_slug,
     n.type    AS node_type,
     n.title   AS node_title,
+    rn.slug   AS reasoning_slug,
     rn.title  AS reasoning_title
 FROM user_node_pins p
 JOIN nodes n ON n.id = p.node_id

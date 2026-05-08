@@ -19,21 +19,11 @@ import (
 // the same page works for "set" and "change".
 func (s *Server) handlePinForm(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("pin form: get node", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 
 	current, hasCurrent := s.lookupPin(w, r, user.ID, id)
 	if !hasCurrent && current == nil {
@@ -53,21 +43,11 @@ func (s *Server) handlePinForm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("pin set: get node", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -101,25 +81,24 @@ func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 		s.rerenderPinForm(w, r, user, node, "Could not save your pin. Please try again.", rawKind, rawReasoningID)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handlePinDelete(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
 	if err := s.queries.DeletePin(r.Context(), db.DeletePinParams{
 		UserID: user.ID,
-		NodeID: id,
+		NodeID: node.ID,
 	}); err != nil {
 		s.logger.Error("pin delete", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
 // parsePinKind validates the form kind value against the node type.

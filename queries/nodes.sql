@@ -1,10 +1,13 @@
 -- name: CreateNode :one
-INSERT INTO nodes (type, title, body, source_url, created_by)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO nodes (type, title, body, source_url, created_by, slug)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetNode :one
 SELECT * FROM nodes WHERE id = $1;
+
+-- name: GetNodeBySlug :one
+SELECT * FROM nodes WHERE slug = $1;
 
 -- name: ListRecentNodes :many
 SELECT * FROM nodes
@@ -79,7 +82,7 @@ LIMIT 50;
 -- excerpt because the body did not contain the searched lexemes; the title
 -- carries enough information in that case.
 SELECT
-    n.id, n.type, n.title, n.body, n.source_url, n.created_by,
+    n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
     CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
          THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', sqlc.arg(query)::text))

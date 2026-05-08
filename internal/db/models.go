@@ -206,6 +206,7 @@ type Node struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	SearchTsv interface{}        `json:"search_tsv"`
+	Slug      string             `json:"slug"`
 }
 
 type NodeTag struct {

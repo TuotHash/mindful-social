@@ -49,7 +49,7 @@ templ TagDetail(viewer *Viewer, name string, nodes []db.Node) {
 				<ul class="node-list">
 					for _, n := range nodes {
 						<li>
-							<a href={ templ.SafeURL("/nodes/" + n.ID.String()) }>
+							<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
 								<span class={ "chip", string(n.Type) }>
 									<span class="dot"></span>
 									{ string(n.Type) }

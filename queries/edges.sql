@@ -13,6 +13,7 @@ SELECT
     e.position,
     e.created_at,
     n.id    AS to_id,
+    n.slug  AS to_slug,
     n.type  AS to_type,
     n.title AS to_title
 FROM edges e
@@ -27,6 +28,7 @@ SELECT
     e.kind,
     e.created_at,
     n.id    AS from_id,
+    n.slug  AS from_slug,
     n.type  AS from_type,
     n.title AS from_title
 FROM edges e
@@ -43,6 +45,7 @@ SELECT
     e.kind,
     e.position,
     n.id    AS to_id,
+    n.slug  AS to_slug,
     n.type  AS to_type,
     n.title AS to_title,
     n.body  AS to_body

@@ -13,6 +13,35 @@ import (
 	"github.com/TuotHash/mindful-social/internal/views"
 )
 
+// resolveNode loads a node by the URL param "id". The param may be either a
+// UUID or a slug — UUID is tried first (parses as a uuid.UUID), slug is the
+// fallback. On not-found or any other error the function writes the response
+// and returns ok=false; the caller should return immediately.
+func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, bool) {
+	raw := chiURLParam(r, "id")
+	if raw == "" {
+		http.NotFound(w, r)
+		return db.Node{}, false
+	}
+	var node db.Node
+	var err error
+	if id, parseErr := uuid.Parse(raw); parseErr == nil {
+		node, err = s.queries.GetNode(r.Context(), id)
+	} else {
+		node, err = s.queries.GetNodeBySlug(r.Context(), raw)
+	}
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return db.Node{}, false
+		}
+		s.logger.Error("resolve node", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return db.Node{}, false
+	}
+	return node, true
+}
+
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	recent, err := s.queries.ListRecentNodes(r.Context(), 25)
 	if err != nil {
@@ -75,12 +104,20 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		srcPtr = &sourceURL
 	}
 
+	slug, err := s.uniqueSlug(r.Context(), slugify(title))
+	if err != nil {
+		s.logger.Error("create node: unique slug", "err", err)
+		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags))
+		return
+	}
+
 	node, err := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
 		Type:      nt,
 		Title:     title,
 		Body:      body,
 		SourceUrl: srcPtr,
 		CreatedBy: user.ID,
+		Slug:      slug,
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
@@ -103,26 +140,15 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("create node: set tags", "err", err)
 		}
 	}
-	http.Redirect(w, r, "/nodes/"+node.ID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
-	idStr := chiURLParam(r, "id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("node detail: get", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 
 	out, err := s.queries.ListEdgesFromNode(r.Context(), id)
 	if err != nil {
@@ -161,6 +187,9 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 			if row.ReasoningTitle != nil {
 				info.ReasoningTitle = *row.ReasoningTitle
 			}
+			if row.ReasoningSlug != nil {
+				info.ReasoningSlug = *row.ReasoningSlug
+			}
 			pin = &info
 		}
 	}
@@ -176,9 +205,8 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEdgeFeature(w http.ResponseWriter, r *http.Request) {
-	fromID, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	fromNode, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
@@ -188,19 +216,18 @@ func (s *Server) handleEdgeFeature(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.queries.FeatureEdge(r.Context(), db.FeatureEdgeParams{
 		ID:       edgeID,
-		FromNode: fromID,
+		FromNode: fromNode.ID,
 	}); err != nil {
 		s.logger.Error("feature edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
-	fromID, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	fromNode, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
@@ -210,13 +237,13 @@ func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.queries.UnfeatureEdge(r.Context(), db.UnfeatureEdgeParams{
 		ID:       edgeID,
-		FromNode: fromID,
+		FromNode: fromNode.ID,
 	}); err != nil {
 		s.logger.Error("unfeature edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request) {
@@ -225,21 +252,11 @@ func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("node delete confirm: get", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 	if node.CreatedBy != user.ID {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -268,26 +285,15 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("node delete: get", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
 	if node.CreatedBy != user.ID {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	if err := s.queries.DeleteNode(r.Context(), id); err != nil {
+	if err := s.queries.DeleteNode(r.Context(), node.ID); err != nil {
 		s.logger.Error("node delete", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -296,12 +302,11 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
-	// pageID is the node whose page hosted the form — used for the redirect
+	// pageNode is the node whose page hosted the form — used for the redirect
 	// only. Edges can be deleted from either endpoint, so we don't constrain
 	// the delete to from_node.
-	pageID, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	pageNode, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
@@ -314,25 +319,15 @@ func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+pageID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+pageNode.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("node edit: get", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 	src := ""
 	if node.SourceUrl != nil {
 		src = *node.SourceUrl
@@ -362,21 +357,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("node update: get", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -406,7 +391,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		srcPtr = &sourceURL
 	}
 
-	_, err = s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
+	_, err := s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
 		ID:        id,
 		Title:     title,
 		Body:      body,
@@ -420,25 +405,15 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
 		s.logger.Error("update node: set tags", "err", err)
 	}
-	http.Redirect(w, r, "/nodes/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	node, err := s.queries.GetNode(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("edge new: get node", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	id := node.ID
 	find := strings.TrimSpace(r.URL.Query().Get("find"))
 	candidates, err := s.searchEdgeCandidates(r, id, find)
 	if err != nil {
@@ -453,11 +428,11 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 // for live search-as-you-type. The full form lives at /edges/new; this
 // endpoint serves only the part that needs to update on each keystroke.
 func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
+	id := node.ID
 	find := strings.TrimSpace(r.URL.Query().Get("find"))
 	candidates, err := s.searchEdgeCandidates(r, id, find)
 	if err != nil {
@@ -498,21 +473,11 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	fromID, err := uuid.Parse(chiURLParam(r, "id"))
-	if err != nil {
-		http.NotFound(w, r)
+	fromNode, ok := s.resolveNode(w, r)
+	if !ok {
 		return
 	}
-	fromNode, err := s.queries.GetNode(r.Context(), fromID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		s.logger.Error("edge create: get from node", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	fromID := fromNode.ID
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -563,7 +528,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		rerender("Could not create connection. Please try again.")
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+fromID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)
 }
 
 // edgeOrder fixes the canonical kind sequence for the legend and pins active
@@ -625,6 +590,7 @@ func outgoingRowsOfKind(rows []db.ListEdgesFromNodeRow, kind db.EdgeKind) []view
 			Kind:     row.Kind,
 			Outgoing: true,
 			ID:       row.ToID,
+			Slug:     row.ToSlug,
 			Type:     row.ToType,
 			Title:    row.ToTitle,
 		})
@@ -643,6 +609,7 @@ func incomingRowsOfKind(rows []db.ListEdgesToNodeRow, kind db.EdgeKind) []views.
 			Kind:     row.Kind,
 			Outgoing: false,
 			ID:       row.FromID,
+			Slug:     row.FromSlug,
 			Type:     row.FromType,
 			Title:    row.FromTitle,
 		})
@@ -665,6 +632,7 @@ func featuredRows(rows []db.ListFeaturedEdgesFromNodeRow) []views.FeaturedRow {
 			Kind:   row.Kind,
 			Label:  labels[row.Kind],
 			ID:     row.ToID,
+			Slug:   row.ToSlug,
 			Type:   row.ToType,
 			Title:  row.ToTitle,
 			Body:   row.ToBody,

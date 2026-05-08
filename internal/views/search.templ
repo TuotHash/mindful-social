@@ -12,6 +12,7 @@ import (
 // <mark> safely (without exposing user-authored HTML).
 type SearchHit struct {
 	ID      uuid.UUID
+	Slug    string
 	Type    db.NodeType
 	Title   string
 	Excerpt []ExcerptPart
@@ -55,7 +56,7 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit) {
 
 templ searchHitItem(h SearchHit) {
 	<li>
-		<a href={ templ.SafeURL("/nodes/" + h.ID.String()) } class="search-hit">
+		<a href={ templ.SafeURL("/nodes/" + h.Slug) } class="search-hit">
 			<span class={ "chip", string(h.Type) }>
 				<span class="dot"></span>
 				{ string(h.Type) }

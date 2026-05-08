@@ -85,7 +85,7 @@ func (q *Queries) ListAllTags(ctx context.Context) ([]ListAllTagsRow, error) {
 }
 
 const listNodesWithTag = `-- name: ListNodesWithTag :many
-SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv FROM nodes n
+SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv, n.slug FROM nodes n
 JOIN node_tags nt ON nt.node_id = n.id
 WHERE nt.tag_id = $1
 ORDER BY n.created_at DESC
@@ -112,6 +112,7 @@ func (q *Queries) ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SearchTsv,
+			&i.Slug,
 		); err != nil {
 			return nil, err
 		}

@@ -74,14 +74,18 @@ func pinRows(rows []db.ListPinsByUserRow) []views.PinRow {
 	out := make([]views.PinRow, 0, len(rows))
 	for _, r := range rows {
 		row := views.PinRow{
-			NodeID:    r.NodeID,
-			NodeType:  r.NodeType,
-			NodeTitle: r.NodeTitle,
-			Kind:      r.Kind,
+			NodeID:      r.NodeID,
+			NodeSlug:    r.NodeSlug,
+			NodeType:    r.NodeType,
+			NodeTitle:   r.NodeTitle,
+			Kind:        r.Kind,
 			ReasoningID: r.ReasoningID,
 		}
 		if r.ReasoningTitle != nil {
 			row.ReasoningTitle = *r.ReasoningTitle
+		}
+		if r.ReasoningSlug != nil {
+			row.ReasoningSlug = *r.ReasoningSlug
 		}
 		out = append(out, row)
 	}

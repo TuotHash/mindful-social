@@ -31,6 +31,7 @@ SELECT
     p.kind,
     p.reasoning_id,
     p.created_at,
+    rn.slug  AS reasoning_slug,
     rn.title AS reasoning_title
 FROM user_node_pins p
 LEFT JOIN nodes rn ON rn.id = p.reasoning_id
@@ -46,6 +47,7 @@ type GetPinForUserAndNodeRow struct {
 	Kind           PinKind            `json:"kind"`
 	ReasoningID    *uuid.UUID         `json:"reasoning_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ReasoningSlug  *string            `json:"reasoning_slug"`
 	ReasoningTitle *string            `json:"reasoning_title"`
 }
 
@@ -59,6 +61,7 @@ func (q *Queries) GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAnd
 		&i.Kind,
 		&i.ReasoningID,
 		&i.CreatedAt,
+		&i.ReasoningSlug,
 		&i.ReasoningTitle,
 	)
 	return i, err
@@ -70,8 +73,10 @@ SELECT
     p.kind,
     p.reasoning_id,
     p.created_at,
+    n.slug    AS node_slug,
     n.type    AS node_type,
     n.title   AS node_title,
+    rn.slug   AS reasoning_slug,
     rn.title  AS reasoning_title
 FROM user_node_pins p
 JOIN nodes n ON n.id = p.node_id
@@ -85,8 +90,10 @@ type ListPinsByUserRow struct {
 	Kind           PinKind            `json:"kind"`
 	ReasoningID    *uuid.UUID         `json:"reasoning_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	NodeSlug       string             `json:"node_slug"`
 	NodeType       NodeType           `json:"node_type"`
 	NodeTitle      string             `json:"node_title"`
+	ReasoningSlug  *string            `json:"reasoning_slug"`
 	ReasoningTitle *string            `json:"reasoning_title"`
 }
 
@@ -106,8 +113,10 @@ func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListP
 			&i.Kind,
 			&i.ReasoningID,
 			&i.CreatedAt,
+			&i.NodeSlug,
 			&i.NodeType,
 			&i.NodeTitle,
+			&i.ReasoningSlug,
 			&i.ReasoningTitle,
 		); err != nil {
 			return nil, err

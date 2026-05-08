@@ -39,6 +39,7 @@ type Querier interface {
 	FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
+	GetNodeBySlug(ctx context.Context, slug string) (Node, error)
 	// Lookup used by the password-login flow: find the user by email AND the
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
