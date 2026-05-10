@@ -35,6 +35,7 @@ func integrationDB(t *testing.T) *Server {
 			ListenAddr:    "127.0.0.1:0",
 			DatabaseURL:   url,
 			PublicBaseURL: "http://127.0.0.1",
+			SignupEnabled: true,
 		}
 		// Discard logs in tests; failures surface via assertions.
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))

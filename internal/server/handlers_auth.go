@@ -30,10 +30,18 @@ func (s *Server) oauthButtons() []views.OAuthButton {
 }
 
 func (s *Server) handleSignupGet(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.SignupEnabled {
+		render(w, r, views.SignupClosed(s.oauthButtons()))
+		return
+	}
 	render(w, r, views.Signup("", s.oauthButtons(), "", ""))
 }
 
 func (s *Server) handleSignupPost(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.SignupEnabled {
+		render(w, r, views.SignupClosed(s.oauthButtons()))
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return

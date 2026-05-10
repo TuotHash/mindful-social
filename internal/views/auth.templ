@@ -75,6 +75,28 @@ templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) 
 	}
 }
 
+// SignupClosed is rendered in place of the signup form when SIGNUP_ENABLED
+// is false. OAuth providers are still offered because SSO is the intended
+// route into a closed instance.
+templ SignupClosed(oauth []OAuthButton) {
+	@Layout("Sign up", nil) {
+		@authShell("New password accounts are closed.", "This instance isn't accepting new email + password sign-ups right now. You can still join via a single sign-on provider below.") {
+			if len(oauth) == 0 {
+				<div class="flash" role="status">No sign-in providers are configured on this instance. Check back later.</div>
+			} else {
+				<div class="oauth-buttons">
+					for _, b := range oauth {
+						<a class="btn lg" href={ templ.SafeURL("/auth/oauth/" + b.Key) }>{ b.Label }</a>
+					}
+				</div>
+			}
+			<div style="margin-top: 32px; font-size: 14px; color: var(--ink-3);">
+				Already a member? <a href="/login" style="color: var(--ink); font-weight: 500;">Sign in</a>.
+			</div>
+		}
+	}
+}
+
 templ Login(flash string, oauth []OAuthButton, formEmail string) {
 	@Layout("Log in", nil) {
 		@authShell("Welcome back.", "Sign in to keep your reasoning where you left it.") {
@@ -91,9 +113,11 @@ templ Login(flash string, oauth []OAuthButton, formEmail string) {
 				<button type="submit" class="btn accent lg" style="justify-content: center;">Sign in</button>
 			</form>
 			@oauthButtons(oauth)
-			<div style="margin-top: 32px; font-size: 14px; color: var(--ink-3);">
-				No account yet? <a href="/signup" style="color: var(--ink); font-weight: 500;">Sign up</a>.
-			</div>
+			if SignupEnabled() {
+				<div style="margin-top: 32px; font-size: 14px; color: var(--ink-3);">
+					No account yet? <a href="/signup" style="color: var(--ink); font-weight: 500;">Sign up</a>.
+				</div>
+			}
 		}
 	}
 }

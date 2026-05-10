@@ -128,7 +128,9 @@ templ TopNav(currentUser *Viewer) {
 				</details>
 			} else {
 				<a class="btn ghost" href="/login">Sign in</a>
-				<a class="btn accent" href="/signup">Get started</a>
+				if SignupEnabled() {
+					<a class="btn accent" href="/signup">Get started</a>
+				}
 			}
 		</div>
 	</header>

@@ -42,10 +42,17 @@ templ landingMarketing(viewer *Viewer) {
 						argument graph — not a feed of hot takes.
 					</p>
 					<div class="row gap-12 wrap">
-						<a class="btn accent lg" href="/signup">
-							Make your first commitment
-							<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-						</a>
+						if SignupEnabled() {
+							<a class="btn accent lg" href="/signup">
+								Make your first commitment
+								<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+							</a>
+						} else {
+							<a class="btn accent lg" href="/login">
+								Sign in to commit
+								<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+							</a>
+						}
 						<a class="btn lg" href="/tags">Read the graph</a>
 					</div>
 					<div class="row gap-24 wrap" style="margin-top: 12px; color: var(--ink-3); font-size: 13px;">
@@ -136,8 +143,12 @@ templ landingMarketing(viewer *Viewer) {
 					Free forever. No advertisers, no algorithm. Just you, your reasoning, and a slowly-better-organized internet.
 				</p>
 				<div class="row gap-12" style="justify-content: center;">
-					<a class="btn accent lg" href="/signup">Create your account</a>
-					<a class="btn lg" href="/login">I already have one</a>
+					if SignupEnabled() {
+						<a class="btn accent lg" href="/signup">Create your account</a>
+						<a class="btn lg" href="/login">I already have one</a>
+					} else {
+						<a class="btn accent lg" href="/login">Sign in</a>
+					}
 				</div>
 			</div>
 		</div>

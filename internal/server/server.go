@@ -17,6 +17,7 @@ import (
 	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/config"
 	"github.com/TuotHash/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/views"
 )
 
 type Server struct {
@@ -80,6 +81,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		sessions: sm,
 		oauth:    registry,
 	}
+	views.SetSignupEnabled(cfg.SignupEnabled)
 	s.routes()
 	return s, nil
 }
