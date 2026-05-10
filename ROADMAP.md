@@ -43,6 +43,22 @@ This document outlines upcoming features beyond the MVP.
 
 - **Voting system** — Upvote / downvote mechanism for nodes and edges. Powers the trending section and personalizes graph visualizations with community emphasis.
 
+### Moderation & Trust
+
+- **Version history + rollback** — Every edit to a node body creates a versioned snapshot. Any user can view the edit history and revert to a previous version. Turns the wiki-open model into a self-healing system: edit wars get rolled back by the community rather than escalated to admins.
+
+- **Trust score system** — Each user has a trust score derived from community signals, not just time on the platform. Possible inputs: net votes received on authored nodes/edges, how often your contributions survive without being reverted, explicit endorsements from high-trust users. Score is visible on profiles and gates certain actions (see tiers below). Domain-scoped trust is a stretch goal: high trust in "climate" does not carry over to "economics".
+
+- **Trust tiers** — Actions are gated by tier rather than a single moderator flag:
+  - **Tier 0 (new):** can post and pin; cannot edit others' content
+  - **Tier 1 (member):** unlocked after basic participation; can edit nodes wiki-open, feature/unfeature edges
+  - **Tier 2 (trusted):** requires meaningful trust score; can flag content, access the mod queue, hide nodes pending review
+  - **Tier 3 (moderator):** manually assigned by admins; full mod powers — permanent deletion, user suspension, override flags
+
+- **Flagging + mod queue** — Any Tier 1+ user can flag a node or edge. After a threshold of flags (or a single Tier 2 flag) the content is soft-hidden: invisible to other users but accessible to the creator and visible in the mod queue. Tier 2/3 users review the queue and restore or permanently remove flagged content.
+
+- **Vouching** — Tier 2+ users can vouch for a newcomer, giving them an accelerated path to Tier 1. Vouches are recorded and factor into the voucher's own trust score to discourage abuse.
+
 ## Future Considerations
 
 - AI helpers (link suggestion, compaction, thread→graph promotion)
