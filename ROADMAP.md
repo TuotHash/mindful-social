@@ -47,7 +47,15 @@ This document outlines upcoming features beyond the MVP.
 
 - **Version history + rollback** — Every edit to a node body creates a versioned snapshot. Any user can view the edit history and revert to a previous version. Turns the wiki-open model into a self-healing system: edit wars get rolled back by the community rather than escalated to admins.
 
-- **Trust score system** — Each user has a trust score derived from community signals, not just time on the platform. Possible inputs: net votes received on authored nodes/edges, how often your contributions survive without being reverted, explicit endorsements from high-trust users. Score is visible on profiles and gates certain actions (see tiers below). Domain-scoped trust is a stretch goal: high trust in "climate" does not carry over to "economics".
+- **Trust score system** — Each user has a trust score derived from community signals, not just time on the platform. Inputs:
+  - **Net votes on authored nodes/edges** — the most direct signal of contribution quality
+  - **Revert rate** — fraction of your edits to others' nodes that were rolled back; low revert rate means you edit constructively
+  - **Content longevity** — nodes you authored that are still standing (not deleted/hidden) after 30/90 days
+  - **Endorsements from high-trust users** — explicit and weighted; a Tier 2 endorsement counts more than a Tier 1 one
+  - **What is intentionally excluded:** raw post count (gameable by spamming), follower count (popularity ≠ trustworthiness), account age alone
+  - Score is visible on profiles and gates actions via trust tiers (see below).
+
+- **Domain-scoped trust (stretch goal)** — Trust score is scoped per tag: high trust in "climate science" does not carry over to "economics". Lets subject-matter experts moderate their corner of the graph without having power outside it. Maps naturally onto the existing tag system. Deferred until the flat trust score is proven; makes the score harder to explain to users.
 
 - **Trust tiers** — Actions are gated by tier rather than a single moderator flag:
   - **Tier 0 (new):** can post and pin; cannot edit others' content
