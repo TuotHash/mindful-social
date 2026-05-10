@@ -258,7 +258,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if rawPin != "" {
-		if err := s.queries.SetPin(r.Context(), db.SetPinParams{
+		if _, err := s.queries.SetPin(r.Context(), db.SetPinParams{
 			UserID: user.ID,
 			NodeID: node.ID,
 			Kind:   pinKind,
@@ -334,12 +334,12 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 			return // error already written
 		}
 		if row != nil {
-			info := views.PinInfo{Kind: row.Kind, ReasoningID: row.ReasoningID}
-			if row.ReasoningTitle != nil {
-				info.ReasoningTitle = *row.ReasoningTitle
-			}
-			if row.ReasoningSlug != nil {
-				info.ReasoningSlug = *row.ReasoningSlug
+			info := views.PinInfo{Kind: row.Kind}
+			rs, err := s.queries.ListReasoningsForPin(r.Context(), row.ID)
+			if err != nil {
+				s.logger.Error("node detail: pin reasonings", "err", err)
+			} else {
+				info.Reasonings = pinReasoningsFromRows(rs)
 			}
 			pin = &info
 		}

@@ -14,6 +14,9 @@ type Querier interface {
 	// Idempotent. The handler treats "already a member" the same as "now a
 	// member" so the form doesn't need to know which it was.
 	AddListMember(ctx context.Context, arg AddListMemberParams) error
+	// Attach one reasoning to a pin. ON CONFLICT DO NOTHING so the same
+	// (pin, reasoning) pair is a harmless retry rather than an error.
+	AddPinReasoning(ctx context.Context, arg AddPinReasoningParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
@@ -48,6 +51,9 @@ type Querier interface {
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
+	// Clear all attached reasonings for a pin. Combined with AddPinReasoning
+	// this implements "replace the set" semantics for the pin form.
+	DeleteReasoningsForPin(ctx context.Context, pinID uuid.UUID) error
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.
 	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error
@@ -66,9 +72,9 @@ type Querier interface {
 	// Lookup used by the password-login flow: find the user by email AND the
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
-	// Whether and how the viewer has pinned a given node. Returns the optional
-	// reasoning's title alongside, so the node detail page can render
-	// "you support this via <reasoning title>" in one round-trip.
+	// Whether and how the viewer has pinned a given node. Attached reasonings
+	// are loaded separately via ListReasoningsForPin so the same shape covers
+	// 0, 1, or many reasonings without nested aggregation here.
 	GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error)
 	GetTagByName(ctx context.Context, name string) (Tag, error)
 	// Lookup the user's built-in Trusted list. Should always succeed for
@@ -113,9 +119,17 @@ type Querier interface {
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
 	// Filtered through node_visible_to() so a viewer only sees nodes they can.
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
-	// A user's pins with the joined node and optional reasoning titles — for
-	// the "On my profile" section on a profile page.
+	// A user's pins with the joined node — for the "On my profile" section on
+	// a profile page. Reasonings are loaded separately via ListReasoningsForPins
+	// to avoid row-multiplying joins.
 	ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error)
+	// Reasonings attached to a single pin, oldest-attached first so the order
+	// the user added them is preserved.
+	ListReasoningsForPin(ctx context.Context, pinID uuid.UUID) ([]ListReasoningsForPinRow, error)
+	// Batch-load reasonings for multiple pins at once — used to avoid N+1 when
+	// rendering a profile's pin list. Result includes the pin_id so callers
+	// can group by pin.
+	ListReasoningsForPins(ctx context.Context, pinIds []uuid.UUID) ([]ListReasoningsForPinsRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
@@ -144,14 +158,20 @@ type Querier interface {
 	//
 	// node_visible_to() filters out anything the viewer isn't entitled to.
 	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
+	// Reasoning picker for the pin form: same fuzzy + recency-fallback shape as
+	// SearchTopics, but filtered to type='reasoning'. Returns reasoning nodes
+	// the viewer is permitted to see — authorship is irrelevant, anyone can
+	// attach any visible reasoning to their pin.
+	SearchReasonings(ctx context.Context, arg SearchReasoningsParams) ([]SearchReasoningsRow, error)
 	// Topic picker for the post form: fuzzy-searches topic titles when a query is
 	// given; falls back to recency order when empty so the picker is pre-populated.
 	// Respects node_visible_to() so viewers only see topics they can post under.
 	SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
-	// update so the profile shows the most recent stance change first.
-	SetPin(ctx context.Context, arg SetPinParams) error
+	// update so the profile shows the most recent stance change first. Returns
+	// the pin's id so callers can attach reasonings to it.
+	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
 	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	// Idempotent: returns the tag id whether it already existed or just got

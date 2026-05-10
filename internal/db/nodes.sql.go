@@ -433,6 +433,54 @@ func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]Sea
 	return items, nil
 }
 
+const searchReasonings = `-- name: SearchReasonings :many
+SELECT id, slug, title
+FROM nodes
+WHERE type = 'reasoning'
+  AND node_visible_to(nodes.*, $1::uuid)
+  AND ($2::text = '' OR title %> $2::text)
+ORDER BY
+    CASE WHEN $2::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
+    word_similarity($2::text, title) DESC,
+    title ASC
+LIMIT 50
+`
+
+type SearchReasoningsParams struct {
+	ViewerID *uuid.UUID `json:"viewer_id"`
+	Query    string     `json:"query"`
+}
+
+type SearchReasoningsRow struct {
+	ID    uuid.UUID `json:"id"`
+	Slug  string    `json:"slug"`
+	Title string    `json:"title"`
+}
+
+// Reasoning picker for the pin form: same fuzzy + recency-fallback shape as
+// SearchTopics, but filtered to type='reasoning'. Returns reasoning nodes
+// the viewer is permitted to see — authorship is irrelevant, anyone can
+// attach any visible reasoning to their pin.
+func (q *Queries) SearchReasonings(ctx context.Context, arg SearchReasoningsParams) ([]SearchReasoningsRow, error) {
+	rows, err := q.db.Query(ctx, searchReasonings, arg.ViewerID, arg.Query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchReasoningsRow
+	for rows.Next() {
+		var i SearchReasoningsRow
+		if err := rows.Scan(&i.ID, &i.Slug, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchTopics = `-- name: SearchTopics :many
 SELECT id, title
 FROM nodes

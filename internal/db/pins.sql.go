@@ -12,6 +12,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addPinReasoning = `-- name: AddPinReasoning :exec
+INSERT INTO pin_reasonings (pin_id, reasoning_id)
+VALUES ($1, $2)
+ON CONFLICT (pin_id, reasoning_id) DO NOTHING
+`
+
+type AddPinReasoningParams struct {
+	PinID       uuid.UUID `json:"pin_id"`
+	ReasoningID uuid.UUID `json:"reasoning_id"`
+}
+
+// Attach one reasoning to a pin. ON CONFLICT DO NOTHING so the same
+// (pin, reasoning) pair is a harmless retry rather than an error.
+func (q *Queries) AddPinReasoning(ctx context.Context, arg AddPinReasoningParams) error {
+	_, err := q.db.Exec(ctx, addPinReasoning, arg.PinID, arg.ReasoningID)
+	return err
+}
+
 const deletePin = `-- name: DeletePin :exec
 DELETE FROM user_node_pins WHERE user_id = $1 AND node_id = $2
 `
@@ -26,15 +44,23 @@ func (q *Queries) DeletePin(ctx context.Context, arg DeletePinParams) error {
 	return err
 }
 
+const deleteReasoningsForPin = `-- name: DeleteReasoningsForPin :exec
+DELETE FROM pin_reasonings WHERE pin_id = $1
+`
+
+// Clear all attached reasonings for a pin. Combined with AddPinReasoning
+// this implements "replace the set" semantics for the pin form.
+func (q *Queries) DeleteReasoningsForPin(ctx context.Context, pinID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteReasoningsForPin, pinID)
+	return err
+}
+
 const getPinForUserAndNode = `-- name: GetPinForUserAndNode :one
 SELECT
+    p.id,
     p.kind,
-    p.reasoning_id,
-    p.created_at,
-    rn.slug  AS reasoning_slug,
-    rn.title AS reasoning_title
+    p.created_at
 FROM user_node_pins p
-LEFT JOIN nodes rn ON rn.id = p.reasoning_id
 WHERE p.user_id = $1 AND p.node_id = $2
 `
 
@@ -44,61 +70,49 @@ type GetPinForUserAndNodeParams struct {
 }
 
 type GetPinForUserAndNodeRow struct {
-	Kind           PinKind            `json:"kind"`
-	ReasoningID    *uuid.UUID         `json:"reasoning_id"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	ReasoningSlug  *string            `json:"reasoning_slug"`
-	ReasoningTitle *string            `json:"reasoning_title"`
+	ID        uuid.UUID          `json:"id"`
+	Kind      PinKind            `json:"kind"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-// Whether and how the viewer has pinned a given node. Returns the optional
-// reasoning's title alongside, so the node detail page can render
-// "you support this via <reasoning title>" in one round-trip.
+// Whether and how the viewer has pinned a given node. Attached reasonings
+// are loaded separately via ListReasoningsForPin so the same shape covers
+// 0, 1, or many reasonings without nested aggregation here.
 func (q *Queries) GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error) {
 	row := q.db.QueryRow(ctx, getPinForUserAndNode, arg.UserID, arg.NodeID)
 	var i GetPinForUserAndNodeRow
-	err := row.Scan(
-		&i.Kind,
-		&i.ReasoningID,
-		&i.CreatedAt,
-		&i.ReasoningSlug,
-		&i.ReasoningTitle,
-	)
+	err := row.Scan(&i.ID, &i.Kind, &i.CreatedAt)
 	return i, err
 }
 
 const listPinsByUser = `-- name: ListPinsByUser :many
 SELECT
+    p.id,
     p.node_id,
     p.kind,
-    p.reasoning_id,
     p.created_at,
-    n.slug    AS node_slug,
-    n.type    AS node_type,
-    n.title   AS node_title,
-    rn.slug   AS reasoning_slug,
-    rn.title  AS reasoning_title
+    n.slug  AS node_slug,
+    n.type  AS node_type,
+    n.title AS node_title
 FROM user_node_pins p
 JOIN nodes n ON n.id = p.node_id
-LEFT JOIN nodes rn ON rn.id = p.reasoning_id
 WHERE p.user_id = $1
 ORDER BY p.created_at DESC
 `
 
 type ListPinsByUserRow struct {
-	NodeID         uuid.UUID          `json:"node_id"`
-	Kind           PinKind            `json:"kind"`
-	ReasoningID    *uuid.UUID         `json:"reasoning_id"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	NodeSlug       string             `json:"node_slug"`
-	NodeType       NodeType           `json:"node_type"`
-	NodeTitle      string             `json:"node_title"`
-	ReasoningSlug  *string            `json:"reasoning_slug"`
-	ReasoningTitle *string            `json:"reasoning_title"`
+	ID        uuid.UUID          `json:"id"`
+	NodeID    uuid.UUID          `json:"node_id"`
+	Kind      PinKind            `json:"kind"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	NodeSlug  string             `json:"node_slug"`
+	NodeType  NodeType           `json:"node_type"`
+	NodeTitle string             `json:"node_title"`
 }
 
-// A user's pins with the joined node and optional reasoning titles — for
-// the "On my profile" section on a profile page.
+// A user's pins with the joined node — for the "On my profile" section on
+// a profile page. Reasonings are loaded separately via ListReasoningsForPins
+// to avoid row-multiplying joins.
 func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error) {
 	rows, err := q.db.Query(ctx, listPinsByUser, userID)
 	if err != nil {
@@ -109,15 +123,13 @@ func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListP
 	for rows.Next() {
 		var i ListPinsByUserRow
 		if err := rows.Scan(
+			&i.ID,
 			&i.NodeID,
 			&i.Kind,
-			&i.ReasoningID,
 			&i.CreatedAt,
 			&i.NodeSlug,
 			&i.NodeType,
 			&i.NodeTitle,
-			&i.ReasoningSlug,
-			&i.ReasoningTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -129,31 +141,107 @@ func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListP
 	return items, nil
 }
 
-const setPin = `-- name: SetPin :exec
-INSERT INTO user_node_pins (user_id, node_id, kind, reasoning_id)
-VALUES ($1, $2, $3, $4)
+const listReasoningsForPin = `-- name: ListReasoningsForPin :many
+SELECT n.id, n.slug, n.title
+FROM pin_reasonings pr
+JOIN nodes n ON n.id = pr.reasoning_id
+WHERE pr.pin_id = $1
+ORDER BY pr.created_at ASC
+`
+
+type ListReasoningsForPinRow struct {
+	ID    uuid.UUID `json:"id"`
+	Slug  string    `json:"slug"`
+	Title string    `json:"title"`
+}
+
+// Reasonings attached to a single pin, oldest-attached first so the order
+// the user added them is preserved.
+func (q *Queries) ListReasoningsForPin(ctx context.Context, pinID uuid.UUID) ([]ListReasoningsForPinRow, error) {
+	rows, err := q.db.Query(ctx, listReasoningsForPin, pinID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReasoningsForPinRow
+	for rows.Next() {
+		var i ListReasoningsForPinRow
+		if err := rows.Scan(&i.ID, &i.Slug, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReasoningsForPins = `-- name: ListReasoningsForPins :many
+SELECT pr.pin_id, n.id, n.slug, n.title
+FROM pin_reasonings pr
+JOIN nodes n ON n.id = pr.reasoning_id
+WHERE pr.pin_id = ANY($1::uuid[])
+ORDER BY pr.created_at ASC
+`
+
+type ListReasoningsForPinsRow struct {
+	PinID uuid.UUID `json:"pin_id"`
+	ID    uuid.UUID `json:"id"`
+	Slug  string    `json:"slug"`
+	Title string    `json:"title"`
+}
+
+// Batch-load reasonings for multiple pins at once — used to avoid N+1 when
+// rendering a profile's pin list. Result includes the pin_id so callers
+// can group by pin.
+func (q *Queries) ListReasoningsForPins(ctx context.Context, pinIds []uuid.UUID) ([]ListReasoningsForPinsRow, error) {
+	rows, err := q.db.Query(ctx, listReasoningsForPins, pinIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReasoningsForPinsRow
+	for rows.Next() {
+		var i ListReasoningsForPinsRow
+		if err := rows.Scan(
+			&i.PinID,
+			&i.ID,
+			&i.Slug,
+			&i.Title,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setPin = `-- name: SetPin :one
+INSERT INTO user_node_pins (user_id, node_id, kind)
+VALUES ($1, $2, $3)
 ON CONFLICT (user_id, node_id) DO UPDATE SET
     kind = EXCLUDED.kind,
-    reasoning_id = EXCLUDED.reasoning_id,
     created_at = now()
+RETURNING id
 `
 
 type SetPinParams struct {
-	UserID      uuid.UUID  `json:"user_id"`
-	NodeID      uuid.UUID  `json:"node_id"`
-	Kind        PinKind    `json:"kind"`
-	ReasoningID *uuid.UUID `json:"reasoning_id"`
+	UserID uuid.UUID `json:"user_id"`
+	NodeID uuid.UUID `json:"node_id"`
+	Kind   PinKind   `json:"kind"`
 }
 
 // Upsert: changing your stance from supports → opposes (or any other
 // transition) replaces the existing row in place. created_at is reset on
-// update so the profile shows the most recent stance change first.
-func (q *Queries) SetPin(ctx context.Context, arg SetPinParams) error {
-	_, err := q.db.Exec(ctx, setPin,
-		arg.UserID,
-		arg.NodeID,
-		arg.Kind,
-		arg.ReasoningID,
-	)
-	return err
+// update so the profile shows the most recent stance change first. Returns
+// the pin's id so callers can attach reasonings to it.
+func (q *Queries) SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, setPin, arg.UserID, arg.NodeID, arg.Kind)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }

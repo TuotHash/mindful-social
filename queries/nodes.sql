@@ -76,6 +76,22 @@ ORDER BY
     title ASC
 LIMIT 20;
 
+-- name: SearchReasonings :many
+-- Reasoning picker for the pin form: same fuzzy + recency-fallback shape as
+-- SearchTopics, but filtered to type='reasoning'. Returns reasoning nodes
+-- the viewer is permitted to see — authorship is irrelevant, anyone can
+-- attach any visible reasoning to their pin.
+SELECT id, slug, title
+FROM nodes
+WHERE type = 'reasoning'
+  AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
+  AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
+ORDER BY
+    CASE WHEN sqlc.arg(query)::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
+    word_similarity(sqlc.arg(query)::text, title) DESC,
+    title ASC
+LIMIT 50;
+
 -- name: PickerSearchNodes :many
 -- Trigram fuzzy match against the title for the edge-creation picker.
 -- Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and

@@ -18,17 +18,15 @@ func followingLabel(n int64) string {
 	return fmt.Sprintf("%d following", n)
 }
 
-// PinRow is one entry in the "On profile" section: the pinned node and the
-// kind of pin (supports / opposes / featured), with an optional reasoning.
+// PinRow is one entry in the "On profile" section: the pinned node, the
+// kind of pin (supports / opposes / featured), and any attached reasonings.
 type PinRow struct {
-	NodeID         uuid.UUID
-	NodeSlug       string
-	NodeType       db.NodeType
-	NodeTitle      string
-	Kind           db.PinKind
-	ReasoningID    *uuid.UUID
-	ReasoningSlug  string
-	ReasoningTitle string
+	NodeID     uuid.UUID
+	NodeSlug   string
+	NodeType   db.NodeType
+	NodeTitle  string
+	Kind       db.PinKind
+	Reasonings []PinReasoning
 }
 
 // FollowRelation captures the follow relationship between the viewer and
@@ -137,10 +135,15 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 										</span>
 										<span class="title">{ p.NodeTitle }</span>
 									</a>
-									if p.ReasoningID != nil {
+									if len(p.Reasonings) > 0 {
 										<div class="pin-reasoning">
 											via
-											<a href={ templ.SafeURL("/nodes/" + p.ReasoningSlug) }>{ p.ReasoningTitle }</a>
+											for i, rs := range p.Reasonings {
+												if i > 0 {
+													{ ", " }
+												}
+												<a href={ templ.SafeURL("/nodes/" + rs.Slug) }>{ rs.Title }</a>
+											}
 										</div>
 									}
 								</li>

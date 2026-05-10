@@ -184,12 +184,18 @@ type FeaturedRow struct {
 }
 
 // PinInfo is non-nil when the current viewer has pinned the node being
-// rendered. ReasoningTitle is empty when the pin has no attached reasoning.
+// rendered. Reasonings is empty when the pin has no attached reasoning.
 type PinInfo struct {
-	Kind           db.PinKind
-	ReasoningID    *uuid.UUID
-	ReasoningSlug  string
-	ReasoningTitle string
+	Kind       db.PinKind
+	Reasonings []PinReasoning
+}
+
+// PinReasoning is one reasoning node attached to a pin, in the shape the
+// banner and profile list need to render a link.
+type PinReasoning struct {
+	ID    uuid.UUID
+	Slug  string
+	Title string
 }
 
 // pinKindLabel turns a PinKind value into the verb shown in the UI banner
@@ -295,9 +301,14 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 				if viewer != nil && pin != nil {
 					<div class={ pinBannerClass(pin.Kind) } style="margin-top: 18px;">
 						<strong>{ pinKindLabel(pin.Kind) }.</strong>
-						if pin.ReasoningID != nil {
+						if len(pin.Reasonings) > 0 {
 							via
-							<a href={ templ.SafeURL("/nodes/" + pin.ReasoningSlug) }>{ pin.ReasoningTitle }</a>
+							for i, rs := range pin.Reasonings {
+								if i > 0 {
+									{ ", " }
+								}
+								<a href={ templ.SafeURL("/nodes/" + rs.Slug) }>{ rs.Title }</a>
+							}
 						}
 						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="muted" style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
 						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/unpin") } class="inline">
@@ -454,7 +465,15 @@ templ visibilitySelect(selected string, lists []db.AudienceList) {
 	</fieldset>
 }
 
-templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
+// ReasoningCandidate is one reasoning node row rendered as a checkbox toggle
+// in the pin form's reasoning picker.
+type ReasoningCandidate struct {
+	ID    uuid.UUID
+	Slug  string
+	Title string
+}
+
+templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
 	@Layout("Pin "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -465,7 +484,7 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 			<p class="muted" style="margin: 0 0 24px;">
 				Pin this node to your profile.
 				if node.Type == db.NodeTypeView {
-					Take a stance — support or oppose — or just feature it.
+					Take a stance — support or oppose — or just feature it. Optionally attach reasonings that explain your thinking.
 				} else {
 					Topics and other node types can be featured.
 				}
@@ -494,6 +513,39 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 						</label>
 					</div>
 				</fieldset>
+				if node.Type == db.NodeTypeView {
+					<fieldset class="toggle-group">
+						<legend>Reasonings <small>(optional, multiple allowed)</small></legend>
+						if len(attached) > 0 {
+							<div class="toggle-btns toggle-btns-stack">
+								for _, a := range attached {
+									<label class="toggle-btn" data-reasoning="attached">
+										<input type="checkbox" name="reasoning_ids" value={ a.ID.String() } checked/>
+										<span class="material-symbols-outlined">psychology</span>
+										{ a.Title }
+									</label>
+								}
+							</div>
+							<small class="muted" style="font-size: 12px;">Currently attached. Untick to remove.</small>
+						}
+						<label>
+							Find more reasonings to attach
+							<input
+								type="search"
+								name="find_reasoning"
+								value={ findReasoning }
+								placeholder="search reasoning titles…"
+								autocomplete="off"
+								hx-get={ "/nodes/" + node.Slug + "/reasoning-picker" }
+								hx-trigger="input changed delay:200ms, search"
+								hx-target="#reasoning-picker-target"
+								hx-swap="outerHTML"
+								hx-include="[name='find_reasoning'],[name='reasoning_ids']"
+							/>
+						</label>
+						@ReasoningCandidatePicker(findReasoning, selectedReasoningIDs, attached, candidates)
+					</fieldset>
+				}
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">push_pin</span>Save pin</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -501,6 +553,47 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 			</form>
 		</div>
 	}
+}
+
+// ReasoningCandidatePicker renders the reasoning search results. Stable id
+// lets HTMX swap it on each keystroke. Reasonings already attached to the
+// pin (or selected in this form session) are filtered out so the picker
+// only shows new options to add.
+templ ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+	<div id="reasoning-picker-target">
+		{{
+			exclude := map[string]struct{}{}
+			for _, a := range attached {
+				exclude[a.ID.String()] = struct{}{}
+			}
+			for _, id := range selectedIDs {
+				exclude[id] = struct{}{}
+			}
+			visible := make([]ReasoningCandidate, 0, len(candidates))
+			for _, c := range candidates {
+				if _, hit := exclude[c.ID.String()]; !hit {
+					visible = append(visible, c)
+				}
+			}
+		}}
+		if find == "" && len(visible) == 0 {
+			<p class="muted" style="font-size: 13px;">No more reasonings to attach. Start typing to search.</p>
+		}
+		if find != "" && len(visible) == 0 {
+			<p class="muted" style="font-size: 13px;">No reasonings match that query.</p>
+		}
+		if len(visible) > 0 {
+			<div class="toggle-btns toggle-btns-stack">
+				for _, c := range visible {
+					<label class="toggle-btn" data-reasoning="candidate">
+						<input type="checkbox" name="reasoning_ids" value={ c.ID.String() }/>
+						<span class="material-symbols-outlined">psychology</span>
+						{ c.Title }
+					</label>
+				}
+			</div>
+		}
+	</div>
 }
 
 // TopicCandidate is a slim topic row for the parent-topic picker on the post form.

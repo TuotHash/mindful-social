@@ -291,6 +291,12 @@ type NodeTag struct {
 	TagID  uuid.UUID `json:"tag_id"`
 }
 
+type PinReasoning struct {
+	PinID       uuid.UUID          `json:"pin_id"`
+	ReasoningID uuid.UUID          `json:"reasoning_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type Session struct {
 	Token  string             `json:"token"`
 	Data   []byte             `json:"data"`
@@ -310,10 +316,9 @@ type User struct {
 }
 
 type UserNodePin struct {
-	ID          uuid.UUID          `json:"id"`
-	UserID      uuid.UUID          `json:"user_id"`
-	NodeID      uuid.UUID          `json:"node_id"`
-	Kind        PinKind            `json:"kind"`
-	ReasoningID *uuid.UUID         `json:"reasoning_id"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	NodeID    uuid.UUID          `json:"node_id"`
+	Kind      PinKind            `json:"kind"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

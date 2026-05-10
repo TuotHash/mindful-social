@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -89,37 +90,56 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		relation.FollowsViewer = state.FollowsViewer
 	}
 
+	pinRowsOut, err := s.pinRows(r, pins)
+	if err != nil {
+		s.logger.Error("profile: pin reasonings", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	render(w, r, views.Profile(
 		viewerFor(viewer),
 		user,
 		isSelf,
 		authored,
-		pinRows(pins),
+		pinRowsOut,
 		identityLabels(identities),
 		relation,
 	))
 }
 
-func pinRows(rows []db.ListPinsByUserRow) []views.PinRow {
+// pinRows turns DB pin rows into view rows, batch-loading reasonings for
+// all pins in one query to avoid N+1.
+func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.PinRow, error) {
 	out := make([]views.PinRow, 0, len(rows))
-	for _, r := range rows {
-		row := views.PinRow{
-			NodeID:      r.NodeID,
-			NodeSlug:    r.NodeSlug,
-			NodeType:    r.NodeType,
-			NodeTitle:   r.NodeTitle,
-			Kind:        r.Kind,
-			ReasoningID: r.ReasoningID,
-		}
-		if r.ReasoningTitle != nil {
-			row.ReasoningTitle = *r.ReasoningTitle
-		}
-		if r.ReasoningSlug != nil {
-			row.ReasoningSlug = *r.ReasoningSlug
-		}
-		out = append(out, row)
+	pinIDs := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, views.PinRow{
+			NodeID:    row.NodeID,
+			NodeSlug:  row.NodeSlug,
+			NodeType:  row.NodeType,
+			NodeTitle: row.NodeTitle,
+			Kind:      row.Kind,
+		})
+		pinIDs = append(pinIDs, row.ID)
 	}
-	return out
+	if len(pinIDs) == 0 {
+		return out, nil
+	}
+	rs, err := s.queries.ListReasoningsForPins(r.Context(), pinIDs)
+	if err != nil {
+		return nil, err
+	}
+	byPin := map[uuid.UUID][]views.PinReasoning{}
+	for _, row := range rs {
+		byPin[row.PinID] = append(byPin[row.PinID], views.PinReasoning{
+			ID: row.ID, Slug: row.Slug, Title: row.Title,
+		})
+	}
+	for i, row := range rows {
+		out[i].Reasonings = byPin[row.ID]
+	}
+	return out, nil
 }
 
 // identityLabels turns auth-identity rows into the short, user-friendly
