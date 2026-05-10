@@ -6,13 +6,18 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-templ Home(viewer *Viewer, recent []db.Node) {
+// Landing renders the public marketing page at /. Shown to everyone regardless
+// of auth state — logged-in users can navigate here by clicking the brand logo.
+templ Landing(viewer *Viewer) {
 	@Layout("Home", viewer) {
-		if viewer == nil {
-			@landingMarketing(viewer)
-		} else {
-			@homeFeed(viewer, recent)
-		}
+		@landingMarketing(viewer)
+	}
+}
+
+// Feed renders the personal feed at /home for logged-in users.
+templ Feed(viewer *Viewer, recent []db.Node) {
+	@Layout("Home", viewer) {
+		@homeFeed(viewer, recent)
 	}
 }
 
