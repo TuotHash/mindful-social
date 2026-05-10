@@ -7,76 +7,126 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags, formVisibility string, lists []db.AudienceList) {
-	@Layout("New node", viewer) {
+// NodeNew renders the standalone Post form. Used as a fallback for direct
+// URL hits and no-JS clients; the nav button opens NodeNewModal via htmx.
+// Source URL is intentionally absent — only Topic and View are creatable
+// from the Post path; reasoning and evidence are created by attachment to
+// an existing topic or view.
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
-				<span class="eyebrow">Add to the graph</span>
-				<h1 class="h-1">Add a node</h1>
-				<p class="muted" style="margin: 0;">Pick a type. Topics group views; views are stances; reasonings are arguments; evidence is the external sources you cite.</p>
+				<span class="eyebrow">Post</span>
+				<h1 class="h-1">New post</h1>
+				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. Reasoning and evidence are added later as connections off an existing topic or view.</p>
 			</div>
 			@Flash(flash)
-			<form method="post" action="/nodes" class="form">
-				<label>
-					Type
-					<select name="type" required>
-						<option value="topic" selected?={ formType == "topic" || formType == "" }>Topic</option>
-						<option value="view" selected?={ formType == "view" }>View</option>
-						<option value="reasoning" selected?={ formType == "reasoning" }>Reasoning</option>
-						<option value="evidence" selected?={ formType == "evidence" }>Evidence / Source</option>
-					</select>
-				</label>
-				<label>
-					Title
-					<input type="text" name="title" required maxlength="200" value={ formTitle }/>
-				</label>
-				<label>
-					Body
-					<textarea name="body" rows="6">{ formBody }</textarea>
-					<small>Optional. Describe the node in your own words.</small>
-				</label>
-				<label>
-					Source URL <small>(evidence only)</small>
-					<input type="url" name="source_url" value={ formSourceURL }/>
-				</label>
-				<label>
-					Tags <small>(comma-separated, optional)</small>
-					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
-				</label>
-				@visibilitySelect(formVisibility, lists)
-				<fieldset class="toggle-group">
-					<legend>Pin to my profile</legend>
-					<div class="toggle-btns">
-						<label class="toggle-btn" data-kind="none">
-							<input type="radio" name="pin" value="" checked?={ formPin == "" }/>
-							<span class="material-symbols-outlined">keep_off</span>
-							Don't pin
-						</label>
-						<label class="toggle-btn" data-kind="featured">
-							<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
-							<span class="material-symbols-outlined">keep</span>
-							Feature
-						</label>
-						<label class="toggle-btn" data-kind="supports">
-							<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
-							<span class="material-symbols-outlined">heart_plus</span>
-							Support
-						</label>
-						<label class="toggle-btn" data-kind="opposes">
-							<input type="radio" name="pin" value="opposes" checked?={ formPin == "opposes" }/>
-							<span class="material-symbols-outlined">heart_minus</span>
-							Oppose
-						</label>
-					</div>
-					<small class="muted" style="font-size: 12px;">Support and Oppose are only available for View nodes.</small>
-				</fieldset>
+			<form method="post" action="/nodes" class="form post-form">
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists)
 				<div class="form-row">
-					<button type="submit" class="btn accent"><span class="material-symbols-outlined">add</span>Create node</button>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
 	}
+}
+
+// NodeNewModal renders the same Post form inside a modal frame. Returned
+// when GET /nodes/new arrives with HX-Request: true. Form submit posts
+// via htmx; on validation error the server re-renders this fragment, on
+// success the handler returns HX-Redirect so htmx does a full navigation.
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
+			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
+				<span class="material-symbols-outlined">close</span>
+			</button>
+			<div class="row gap-12 wrap center" style="margin-bottom: 6px;">
+				<span class="eyebrow">Post</span>
+			</div>
+			<h2 id="post-modal-title" style="margin: 0 0 6px; font-size: 22px;">New post</h2>
+			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
+				Share a view or start a topic. Reasoning and evidence are added later as connections.
+			</p>
+			@Flash(flash)
+			<form
+				method="post"
+				action="/nodes"
+				class="form post-form"
+				hx-post="/nodes"
+				hx-target="#modal"
+				hx-swap="innerHTML"
+			>
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists)
+				<div class="form-row">
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
+					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// postFormFields are the shared body of NodeNew and NodeNewModal. The outer
+// .post-form class enables CSS :has() rules in app.css to hide
+// view-specific options (Support / Oppose pin) when Topic is selected.
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+	<fieldset class="toggle-group">
+		<legend>Type</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-type="view">
+				<input type="radio" name="type" value="view" required checked?={ formType == "view" || formType == "" }/>
+				<span class="material-symbols-outlined">campaign</span>
+				View
+			</label>
+			<label class="toggle-btn" data-type="topic">
+				<input type="radio" name="type" value="topic" checked?={ formType == "topic" }/>
+				<span class="material-symbols-outlined">workspaces</span>
+				Topic
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views.</small>
+	</fieldset>
+	<label>
+		Title
+		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
+	</label>
+	<label>
+		Body
+		<textarea name="body" rows="5">{ formBody }</textarea>
+		<small>Optional. Describe the node in your own words.</small>
+	</label>
+	<label>
+		Tags <small>(comma-separated, optional)</small>
+		<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
+	</label>
+	@visibilitySelect(formVisibility, lists)
+	<fieldset class="toggle-group">
+		<legend>Pin to my profile</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-kind="none">
+				<input type="radio" name="pin" value="" checked?={ formPin == "" }/>
+				<span class="material-symbols-outlined">keep_off</span>
+				Don't pin
+			</label>
+			<label class="toggle-btn" data-kind="featured">
+				<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
+				<span class="material-symbols-outlined">keep</span>
+				Feature
+			</label>
+			<label class="toggle-btn if-view" data-kind="supports">
+				<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
+				<span class="material-symbols-outlined">heart_plus</span>
+				Support
+			</label>
+			<label class="toggle-btn if-view" data-kind="opposes">
+				<input type="radio" name="pin" value="opposes" checked?={ formPin == "opposes" }/>
+				<span class="material-symbols-outlined">heart_minus</span>
+				Oppose
+			</label>
+		</div>
+	</fieldset>
 }
 
 // EdgeRow is one entry in a legend section. Outgoing is true when this row
@@ -332,15 +382,12 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<textarea name="body" rows="6">{ formBody }</textarea>
 					<small>Optional. Describe the node in your own words.</small>
 				</label>
-				<label>
-					Source URL
-					if node.Type == db.NodeTypeEvidence {
-						<small>(required for evidence)</small>
-					} else {
-						<small>(optional)</small>
-					}
-					<input type="url" name="source_url" value={ formSourceURL }/>
-				</label>
+				if node.Type == db.NodeTypeEvidence {
+					<label>
+						Source URL <small>(required for evidence)</small>
+						<input type="url" name="source_url" value={ formSourceURL }/>
+					</label>
+				}
 				<label>
 					Tags <small>(comma-separated, optional)</small>
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
@@ -355,31 +402,44 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 	}
 }
 
-// visibilitySelect renders the per-node audience picker shared by NodeNew
-// and NodeEdit. Values: "public", "connections", "list:<uuid>", "private".
-// The "list:<uuid>" format keeps the form a single field while still
+// visibilitySelect renders the per-node audience picker as a toggle-button
+// group. Values: "public", "connections", "list:<uuid>", "private". The
+// "list:<uuid>" format keeps the form a single field while still
 // identifying which list governs visibility.
 templ visibilitySelect(selected string, lists []db.AudienceList) {
-	<label>
-		Visibility
-		<select name="visibility">
-			<option value="public" selected?={ selected == "public" || selected == "" }>Public — anyone, including logged-out visitors</option>
-			<option value="connections" selected?={ selected == "connections" }>Connections — people you mutually follow</option>
+	<fieldset class="toggle-group">
+		<legend>Visibility</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-visibility="public">
+				<input type="radio" name="visibility" value="public" checked?={ selected == "public" || selected == "" }/>
+				<span class="material-symbols-outlined">public</span>
+				Public
+			</label>
+			<label class="toggle-btn" data-visibility="connections">
+				<input type="radio" name="visibility" value="connections" checked?={ selected == "connections" }/>
+				<span class="material-symbols-outlined">handshake</span>
+				Connections
+			</label>
 			for _, l := range lists {
-				<option value={ "list:" + l.ID.String() } selected?={ selected == "list:"+l.ID.String() }>
+				<label class="toggle-btn" data-visibility="list">
+					<input type="radio" name="visibility" value={ "list:" + l.ID.String() } checked?={ selected == "list:"+l.ID.String() }/>
 					if l.IsTrusted {
-						List · Trusted
+						<span class="material-symbols-outlined">verified_user</span>
+						Trusted
 					} else {
-						List · { l.Name }
+						<span class="material-symbols-outlined">groups</span>
+						{ l.Name }
 					}
-				</option>
+				</label>
 			}
-			<option value="private" selected?={ selected == "private" }>Private — only you</option>
-		</select>
-		<small>
-			Connections only work if both of you follow each other. Manage lists in <a href="/lists">Lists</a>.
-		</small>
-	</label>
+			<label class="toggle-btn" data-visibility="private">
+				<input type="radio" name="visibility" value="private" checked?={ selected == "private" }/>
+				<span class="material-symbols-outlined">lock</span>
+				Private
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>.</small>
+	</fieldset>
 }
 
 templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID string, reasonings []ReasoningOption) {

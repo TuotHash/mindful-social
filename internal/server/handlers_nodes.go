@@ -74,7 +74,11 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "", "", "", "", "", "", "public", lists))
+	if isHTMX(r) {
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", "public", lists))
+		return
+	}
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", "public", lists))
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +95,6 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rawType := strings.TrimSpace(r.PostFormValue("type"))
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	body := strings.TrimSpace(r.PostFormValue("body"))
-	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawPin := strings.TrimSpace(r.PostFormValue("pin")) // "" | "supports" | "opposes" | "featured"
 	rawTags := r.PostFormValue("tags")
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
@@ -106,18 +109,26 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rerender := func(flash string) {
+		if isHTMX(r) {
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists))
+			return
+		}
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists))
+	}
+
 	flash := ""
 	nt := db.NodeType(rawType)
 	var pinKind db.PinKind
 	switch {
-	case !nt.Valid():
-		flash = "Pick a valid node type."
+	// The Post path only creates topics or views. Reasoning and evidence
+	// are created later as connections off an existing topic or view.
+	case nt != db.NodeTypeTopic && nt != db.NodeTypeView:
+		flash = "Pick a type: View or Topic."
 	case title == "":
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
-	case nt == db.NodeTypeEvidence && sourceURL == "":
-		flash = "Evidence needs a source URL."
 	}
 	if flash == "" && rawPin != "" {
 		var pinErr string
@@ -131,19 +142,14 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		flash = visErr
 	}
 	if flash != "" {
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
+		rerender(flash)
 		return
-	}
-
-	var srcPtr *string
-	if sourceURL != "" {
-		srcPtr = &sourceURL
 	}
 
 	slug, err := s.uniqueSlug(r.Context(), slugify(title))
 	if err != nil {
 		s.logger.Error("create node: unique slug", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
+		rerender("Could not create post. Please try again.")
 		return
 	}
 
@@ -151,7 +157,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		Type:             nt,
 		Title:            title,
 		Body:             body,
-		SourceUrl:        srcPtr,
+		SourceUrl:        nil,
 		CreatedBy:        user.ID,
 		Slug:             slug,
 		Visibility:       visKind,
@@ -159,7 +165,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
+		rerender("Could not create post. Please try again.")
 		return
 	}
 	if rawPin != "" {
@@ -177,6 +183,14 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		if err := s.setTagsForNode(r, node.ID, names); err != nil {
 			s.logger.Error("create node: set tags", "err", err)
 		}
+	}
+	// Modal submit: ask htmx to do a full navigation to the new post so the
+	// modal closes and the page actually changes. Non-htmx submits get the
+	// usual 303 redirect.
+	if isHTMX(r) {
+		w.Header().Set("HX-Redirect", "/nodes/"+node.Slug)
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }

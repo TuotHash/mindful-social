@@ -71,7 +71,13 @@ templ TopNav(currentUser *Viewer) {
 				<a class="nav-link" href="/">Home</a>
 				<a class="nav-link" href="/tags">Browse</a>
 				if currentUser != nil {
-					<a class="nav-link" href="/nodes/new">New node</a>
+					<a
+						class="nav-link"
+						href="/nodes/new"
+						hx-get="/nodes/new"
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>Post</a>
 					<a class="nav-link" href="/lists">Lists</a>
 				}
 			</div>

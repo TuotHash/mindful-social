@@ -58,24 +58,26 @@ func TestNodeDelete_AuthorOnly(t *testing.T) {
 	resp.Body.Close()
 }
 
-func TestNodeDelete_EvidenceRequiresSourceURL(t *testing.T) {
-	// Cross-check: node creation's own validation works through the HTTP
-	// boundary. Evidence without source_url should re-render the form with a
-	// flash, not create the row.
+func TestNodeCreate_RejectsReasoningAndEvidence(t *testing.T) {
+	// The Post path is intentionally limited to topics and views — reasoning
+	// and evidence are created later as connections off an existing node.
+	// Direct POSTs of those types should re-render with a flash, not create
+	// a row.
 	integrationDB(t)
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
 
-	resp := formPost(t, c, "/nodes", url.Values{
-		"type":  {"evidence"},
-		"title": {"A piece of evidence without a source"},
-	})
-	body := readBody(t, resp)
-	if !strings.Contains(body, "source URL") {
-		t.Fatalf("expected validation flash mentioning source URL; got: %s", snippet(body))
-	}
-	// We didn't navigate to a /nodes/{uuid} page.
-	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
-		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
+	for _, ty := range []string{"reasoning", "evidence"} {
+		resp := formPost(t, c, "/nodes", url.Values{
+			"type":  {ty},
+			"title": {"Should not create"},
+		})
+		body := readBody(t, resp)
+		if !strings.Contains(body, "View or Topic") {
+			t.Fatalf("type=%s: expected flash about View or Topic, got: %s", ty, snippet(body))
+		}
+		if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
+			t.Fatalf("type=%s: unexpected redirect to %s", ty, resp.Request.URL.Path)
+		}
 	}
 }

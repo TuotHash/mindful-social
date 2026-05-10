@@ -719,6 +719,13 @@ fieldset.toggle-group legend {
   box-shadow: 0 1px 2px rgba(28,26,20,0.08), 0 8px 20px -8px color-mix(in oklch, var(--accent-deep) 50%, transparent);
 }
 
+/* Conditional fields driven by the type radio in the Post form. When type
+   is topic, hide options that only make sense on a view (Support / Oppose
+   pin). Pure-CSS, no JS — relies on widely-supported :has(). */
+.post-form:has(input[name="type"][value="topic"]:checked) .if-view {
+  display: none;
+}
+
 /* ===== Candidate picker ===== */
 .candidate-list label.radio {
   background: var(--bg);
