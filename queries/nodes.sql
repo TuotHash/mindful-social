@@ -61,6 +61,21 @@ WHERE n.created_by = sqlc.arg(author_id)
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 
+-- name: SearchTopics :many
+-- Topic picker for the post form: fuzzy-searches topic titles when a query is
+-- given; falls back to recency order when empty so the picker is pre-populated.
+-- Respects node_visible_to() so viewers only see topics they can post under.
+SELECT id, title
+FROM nodes
+WHERE type = 'topic'
+  AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
+  AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
+ORDER BY
+    CASE WHEN sqlc.arg(query)::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
+    word_similarity(sqlc.arg(query)::text, title) DESC,
+    title ASC
+LIMIT 20;
+
 -- name: PickerSearchNodes :many
 -- Trigram fuzzy match against the title for the edge-creation picker.
 -- Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and

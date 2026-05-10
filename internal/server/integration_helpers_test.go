@@ -100,11 +100,18 @@ func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid
 	if nodeType == "reasoning" || nodeType == "evidence" {
 		return createNodeDirect(t, c, nodeType, title, body)
 	}
-	resp := formPost(t, c, "/nodes", url.Values{
+	vals := url.Values{
 		"type":  {nodeType},
 		"title": {title},
 		"body":  {body},
-	})
+	}
+	// Views require a parent topic. When the caller doesn't supply one,
+	// create a throwaway topic so the validation passes.
+	if nodeType == "view" {
+		topicID := createNode(t, c, "topic", "Auto topic for: "+title, "")
+		vals.Set("parent_topic_id", topicID.String())
+	}
+	resp := formPost(t, c, "/nodes", vals)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)

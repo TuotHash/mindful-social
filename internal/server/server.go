@@ -129,6 +129,7 @@ func (s *Server) routes() {
 	r.Group(func(r chi.Router) {
 		r.Use(s.requireUser)
 		r.Get("/nodes/new", s.handleNodeNew)
+		r.Get("/nodes/topic-picker", s.handleTopicPicker)
 		r.Post("/nodes", s.handleNodeCreate)
 		r.Get("/nodes/{id}/edit", s.handleNodeEdit)
 		r.Post("/nodes/{id}", s.handleNodeUpdate)

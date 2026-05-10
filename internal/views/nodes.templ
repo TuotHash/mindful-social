@@ -12,7 +12,7 @@ import (
 // Source URL is intentionally absent — only Topic and View are creatable
 // from the Post path; reasoning and evidence are created by attachment to
 // an existing topic or view.
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -22,7 +22,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -36,7 +36,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -58,7 +58,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -70,8 +70,8 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 
 // postFormFields are the shared body of NodeNew and NodeNewModal. The outer
 // .post-form class enables CSS :has() rules in app.css to hide
-// view-specific options (Support / Oppose pin) when Topic is selected.
-templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList) {
+// view-specific options (topic picker, Support / Oppose pin) when Topic is selected.
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
 		<div class="toggle-btns">
@@ -88,6 +88,25 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		</div>
 		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views.</small>
 	</fieldset>
+	<div class="if-view topic-picker-section">
+		<label>
+			Parent topic <span style="color: var(--opposes);">*</span>
+			<input
+				type="search"
+				name="find_topic"
+				value={ findTopic }
+				placeholder="search topics…"
+				autocomplete="off"
+				hx-get="/nodes/topic-picker"
+				hx-trigger="input changed delay:200ms, search"
+				hx-target="#topic-picker-target"
+				hx-swap="outerHTML"
+				hx-include="[name='find_topic']"
+			/>
+			<small>Views must belong to a topic.</small>
+		</label>
+		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
+	</div>
 	<label>
 		Title
 		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
@@ -506,6 +525,38 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 			</form>
 		</div>
 	}
+}
+
+// TopicCandidate is a slim topic row for the parent-topic picker on the post form.
+type TopicCandidate struct {
+	ID    uuid.UUID
+	Title string
+}
+
+// TopicCandidatePicker renders the topic search results in the post form.
+// Stable id="topic-picker-target" lets HTMX swap it on each live-search update.
+// selectedID pre-checks the radio that matches — used when re-rendering on error.
+templ TopicCandidatePicker(find, selectedID string, candidates []TopicCandidate) {
+	<div id="topic-picker-target">
+		if find == "" && len(candidates) == 0 {
+			<p class="muted" style="font-size: 13px;">Search above to find a topic.</p>
+		}
+		if find != "" && len(candidates) == 0 {
+			<p class="muted" style="font-size: 13px;">No topics match that query.</p>
+		}
+		if len(candidates) > 0 {
+			<fieldset class="form-fieldset candidate-list">
+				<legend>Pick a topic</legend>
+				for _, c := range candidates {
+					<label class="radio">
+						<input type="radio" name="parent_topic_id" value={ c.ID.String() } required?={ selectedID == "" } checked?={ c.ID.String() == selectedID }/>
+						@nodeTypeChip(db.NodeTypeTopic)
+						<span>{ c.Title }</span>
+					</label>
+				}
+			</fieldset>
+		}
+	</div>
 }
 
 // EdgeCandidate is the slim row the edge-creation picker renders for each

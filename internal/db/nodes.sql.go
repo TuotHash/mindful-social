@@ -433,6 +433,52 @@ func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]Sea
 	return items, nil
 }
 
+const searchTopics = `-- name: SearchTopics :many
+SELECT id, title
+FROM nodes
+WHERE type = 'topic'
+  AND node_visible_to(nodes.*, $1::uuid)
+  AND ($2::text = '' OR title %> $2::text)
+ORDER BY
+    CASE WHEN $2::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
+    word_similarity($2::text, title) DESC,
+    title ASC
+LIMIT 20
+`
+
+type SearchTopicsParams struct {
+	ViewerID *uuid.UUID `json:"viewer_id"`
+	Query    string     `json:"query"`
+}
+
+type SearchTopicsRow struct {
+	ID    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+}
+
+// Topic picker for the post form: fuzzy-searches topic titles when a query is
+// given; falls back to recency order when empty so the picker is pre-populated.
+// Respects node_visible_to() so viewers only see topics they can post under.
+func (q *Queries) SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error) {
+	rows, err := q.db.Query(ctx, searchTopics, arg.ViewerID, arg.Query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchTopicsRow
+	for rows.Next() {
+		var i SearchTopicsRow
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateNode = `-- name: UpdateNode :one
 UPDATE nodes
 SET title = $2,
