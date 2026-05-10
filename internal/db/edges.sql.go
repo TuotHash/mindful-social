@@ -15,7 +15,7 @@ import (
 const createEdge = `-- name: CreateEdge :one
 INSERT INTO edges (from_node, to_node, kind, created_by)
 VALUES ($1, $2, $3, $4)
-RETURNING id, from_node, to_node, kind, created_by, created_at, position
+RETURNING id, from_node, to_node, kind, created_by, created_at, position, to_position
 `
 
 type CreateEdgeParams struct {
@@ -41,6 +41,7 @@ func (q *Queries) CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.Position,
+		&i.ToPosition,
 	)
 	return i, err
 }
@@ -50,32 +51,46 @@ DELETE FROM edges WHERE id = $1
 `
 
 // Any logged-in user can delete any edge (wiki-open curation, same as
-// feature/unfeature). Both endpoints of an edge can trigger this — the page
-// the user is on is just where they get redirected after the delete.
+// highlight/unhighlight). Both endpoints of an edge can trigger this — the
+// page the user is on is just where they get redirected after the delete.
 func (q *Queries) DeleteEdge(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteEdge, id)
 	return err
 }
 
-const featureEdge = `-- name: FeatureEdge :exec
+const highlightEdge = `-- name: HighlightEdge :exec
 UPDATE edges AS e
-SET position = COALESCE(
-    (SELECT MAX(sib.position) + 1 FROM edges AS sib WHERE sib.from_node = $2),
-    1
-)
-WHERE e.id = $1 AND e.from_node = $2
+SET
+    position = CASE
+        WHEN e.from_node = $1 THEN COALESCE(
+            (SELECT MAX(sib.position) + 1 FROM edges sib WHERE sib.from_node = $1),
+            1
+        )
+        ELSE e.position
+    END,
+    to_position = CASE
+        WHEN e.to_node = $1 THEN COALESCE(
+            (SELECT MAX(sib.to_position) + 1 FROM edges sib WHERE sib.to_node = $1),
+            1
+        )
+        ELSE e.to_position
+    END
+WHERE e.id = $2
+  AND $1 IN (e.from_node, e.to_node)
 `
 
-type FeatureEdgeParams struct {
-	ID       uuid.UUID `json:"id"`
-	FromNode uuid.UUID `json:"from_node"`
+type HighlightEdgeParams struct {
+	PovNode uuid.UUID `json:"pov_node"`
+	EdgeID  uuid.UUID `json:"edge_id"`
 }
 
-// Promote an edge to the featured section by assigning it the next position
-// after the current max for its source node. from_node is required so callers
-// can't accidentally feature an edge against the wrong source.
-func (q *Queries) FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error {
-	_, err := q.db.Exec(ctx, featureEdge, arg.ID, arg.FromNode)
+// Promote an edge into the highlights section from the perspective of
+// `pov_node`, which must be one of the edge's endpoints. The rank is the
+// next-highest across the existing highlights on that side, so the new
+// card lands at the bottom by default. If pov_node is not an endpoint
+// the WHERE clause filters it out and nothing changes.
+func (q *Queries) HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error {
+	_, err := q.db.Exec(ctx, highlightEdge, arg.PovNode, arg.EdgeID)
 	return err
 }
 
@@ -114,8 +129,9 @@ type ListEdgesFromNodeForViewerRow struct {
 
 // Outgoing edges with the destination node's title and type joined in,
 // ready to render the "this node points at..." section of the legend.
-// position is NULL for legend-only edges and an integer rank for featured ones.
-// node_visible_to() hides edges whose endpoint the viewer isn't entitled to.
+// position is NULL for legend-only edges and an integer rank when the
+// FROM-node has highlighted it. node_visible_to() hides edges whose
+// endpoint the viewer isn't entitled to.
 func (q *Queries) ListEdgesFromNodeForViewer(ctx context.Context, arg ListEdgesFromNodeForViewerParams) ([]ListEdgesFromNodeForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listEdgesFromNodeForViewer, arg.FromNode, arg.ViewerID)
 	if err != nil {
@@ -149,6 +165,7 @@ const listEdgesToNodeForViewer = `-- name: ListEdgesToNodeForViewer :many
 SELECT
     e.id,
     e.kind,
+    e.to_position,
     e.created_at,
     n.id    AS from_id,
     n.slug  AS from_slug,
@@ -167,16 +184,19 @@ type ListEdgesToNodeForViewerParams struct {
 }
 
 type ListEdgesToNodeForViewerRow struct {
-	ID        uuid.UUID          `json:"id"`
-	Kind      EdgeKind           `json:"kind"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	FromID    uuid.UUID          `json:"from_id"`
-	FromSlug  string             `json:"from_slug"`
-	FromType  NodeType           `json:"from_type"`
-	FromTitle string             `json:"from_title"`
+	ID         uuid.UUID          `json:"id"`
+	Kind       EdgeKind           `json:"kind"`
+	ToPosition *int16             `json:"to_position"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	FromID     uuid.UUID          `json:"from_id"`
+	FromSlug   string             `json:"from_slug"`
+	FromType   NodeType           `json:"from_type"`
+	FromTitle  string             `json:"from_title"`
 }
 
 // Incoming edges, similar shape — for "what points at this node".
+// to_position is the rank when this node (the TO endpoint) has highlighted
+// the edge from its side; NULL keeps it in the legend only.
 func (q *Queries) ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToNodeForViewerParams) ([]ListEdgesToNodeForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listEdgesToNodeForViewer, arg.ToNode, arg.ViewerID)
 	if err != nil {
@@ -189,6 +209,7 @@ func (q *Queries) ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToN
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
+			&i.ToPosition,
 			&i.CreatedAt,
 			&i.FromID,
 			&i.FromSlug,
@@ -205,62 +226,67 @@ func (q *Queries) ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToN
 	return items, nil
 }
 
-const listFeaturedEdgesFromNodeForViewer = `-- name: ListFeaturedEdgesFromNodeForViewer :many
+const listHighlightedEdgesForNode = `-- name: ListHighlightedEdgesForNode :many
 SELECT
     e.id,
     e.kind,
-    e.position,
-    n.id    AS to_id,
-    n.slug  AS to_slug,
-    n.type  AS to_type,
-    n.title AS to_title,
-    n.body  AS to_body
+    CASE WHEN e.from_node = $1 THEN 'outgoing' ELSE 'incoming' END::text AS direction,
+    CASE WHEN e.from_node = $1 THEN e.position ELSE e.to_position END AS pos,
+    other.id    AS other_id,
+    other.slug  AS other_slug,
+    other.type  AS other_type,
+    other.title AS other_title,
+    other.body  AS other_body
 FROM edges e
-JOIN nodes n ON n.id = e.to_node
-WHERE e.from_node = $1
-  AND e.position IS NOT NULL
-  AND node_visible_to(n.*, $2::uuid)
-ORDER BY e.position ASC
+JOIN nodes other ON other.id = CASE WHEN e.from_node = $1 THEN e.to_node ELSE e.from_node END
+WHERE (e.from_node = $1 OR e.to_node = $1)
+  AND ((e.from_node = $1 AND e.position IS NOT NULL)
+       OR (e.to_node = $1 AND e.to_position IS NOT NULL))
+  AND node_visible_to(other.*, $2::uuid)
+ORDER BY pos ASC
 `
 
-type ListFeaturedEdgesFromNodeForViewerParams struct {
-	FromNode uuid.UUID  `json:"from_node"`
+type ListHighlightedEdgesForNodeParams struct {
+	NodeID   uuid.UUID  `json:"node_id"`
 	ViewerID *uuid.UUID `json:"viewer_id"`
 }
 
-type ListFeaturedEdgesFromNodeForViewerRow struct {
-	ID       uuid.UUID `json:"id"`
-	Kind     EdgeKind  `json:"kind"`
-	Position *int16    `json:"position"`
-	ToID     uuid.UUID `json:"to_id"`
-	ToSlug   string    `json:"to_slug"`
-	ToType   NodeType  `json:"to_type"`
-	ToTitle  string    `json:"to_title"`
-	ToBody   string    `json:"to_body"`
+type ListHighlightedEdgesForNodeRow struct {
+	ID         uuid.UUID   `json:"id"`
+	Kind       EdgeKind    `json:"kind"`
+	Direction  string      `json:"direction"`
+	Pos        interface{} `json:"pos"`
+	OtherID    uuid.UUID   `json:"other_id"`
+	OtherSlug  string      `json:"other_slug"`
+	OtherType  NodeType    `json:"other_type"`
+	OtherTitle string      `json:"other_title"`
+	OtherBody  string      `json:"other_body"`
 }
 
-// Outgoing edges marked as featured (position IS NOT NULL), with the
-// destination node's full body included so it can be rendered inline on the
-// source node's page. Ordered by position ascending. Filtered through
-// node_visible_to() so a hidden destination simply doesn't appear.
-func (q *Queries) ListFeaturedEdgesFromNodeForViewer(ctx context.Context, arg ListFeaturedEdgesFromNodeForViewerParams) ([]ListFeaturedEdgesFromNodeForViewerRow, error) {
-	rows, err := q.db.Query(ctx, listFeaturedEdgesFromNodeForViewer, arg.FromNode, arg.ViewerID)
+// All edges where `node_id` is an endpoint AND that endpoint has marked
+// the edge as highlighted (position when from_node, to_position when
+// to_node). Returns the "other" endpoint regardless of direction so the
+// highlight card can render uniformly. direction tells the UI which
+// active/passive label to apply.
+func (q *Queries) ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error) {
+	rows, err := q.db.Query(ctx, listHighlightedEdgesForNode, arg.NodeID, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListFeaturedEdgesFromNodeForViewerRow
+	var items []ListHighlightedEdgesForNodeRow
 	for rows.Next() {
-		var i ListFeaturedEdgesFromNodeForViewerRow
+		var i ListHighlightedEdgesForNodeRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
-			&i.Position,
-			&i.ToID,
-			&i.ToSlug,
-			&i.ToType,
-			&i.ToTitle,
-			&i.ToBody,
+			&i.Direction,
+			&i.Pos,
+			&i.OtherID,
+			&i.OtherSlug,
+			&i.OtherType,
+			&i.OtherTitle,
+			&i.OtherBody,
 		); err != nil {
 			return nil, err
 		}
@@ -272,16 +298,23 @@ func (q *Queries) ListFeaturedEdgesFromNodeForViewer(ctx context.Context, arg Li
 	return items, nil
 }
 
-const unfeatureEdge = `-- name: UnfeatureEdge :exec
-UPDATE edges AS e SET position = NULL WHERE e.id = $1 AND e.from_node = $2
+const unhighlightEdge = `-- name: UnhighlightEdge :exec
+UPDATE edges AS e
+SET
+    position    = CASE WHEN e.from_node = $1 THEN NULL ELSE e.position END,
+    to_position = CASE WHEN e.to_node   = $1 THEN NULL ELSE e.to_position END
+WHERE e.id = $2
+  AND $1 IN (e.from_node, e.to_node)
 `
 
-type UnfeatureEdgeParams struct {
-	ID       uuid.UUID `json:"id"`
-	FromNode uuid.UUID `json:"from_node"`
+type UnhighlightEdgeParams struct {
+	PovNode uuid.UUID `json:"pov_node"`
+	EdgeID  uuid.UUID `json:"edge_id"`
 }
 
-func (q *Queries) UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error {
-	_, err := q.db.Exec(ctx, unfeatureEdge, arg.ID, arg.FromNode)
+// Reverse of HighlightEdge: clears the rank on whichever side matches
+// pov_node. No-op if pov_node isn't one of the edge's endpoints.
+func (q *Queries) UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error {
+	_, err := q.db.Exec(ctx, unhighlightEdge, arg.PovNode, arg.EdgeID)
 	return err
 }

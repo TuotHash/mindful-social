@@ -81,7 +81,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Trust tiers** — Actions are gated by tier rather than a single moderator flag:
   - **Tier 0 (new):** can post and pin; cannot edit others' content
-  - **Tier 1 (member):** unlocked after basic participation; can edit nodes wiki-open, feature/unfeature edges
+  - **Tier 1 (member):** unlocked after basic participation; can edit nodes wiki-open, highlight/unhighlight edges
   - **Tier 2 (trusted):** requires meaningful trust score; can flag content, access the mod queue, hide nodes pending review
   - **Tier 3 (moderator):** manually assigned by admins; full mod powers — permanent deletion, user suspension, override flags
 

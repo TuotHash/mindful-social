@@ -149,9 +149,9 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 }
 
 // EdgeRow is one entry in a legend section. Outgoing is true when this row
-// represents an edge that *originates* at the current node (eligible for the
-// "Feature" button); false for incoming edges where the current node is the
-// destination.
+// represents an edge that *originates* at the current node; false when the
+// current node is the destination. Both directions can be highlighted, so
+// this flag is informational rather than gating any button.
 type EdgeRow struct {
 	EdgeID   uuid.UUID
 	Kind     db.EdgeKind
@@ -334,8 +334,8 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							}
 							if viewer != nil {
 								<div class="row gap-8 wrap" style="margin-top: 12px;">
-									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/unfeature") } class="inline">
-										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">keep_off</span>Unfeature</button>
+									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/unhighlight") } class="inline">
+										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star_off</span>Unhighlight</button>
 									</form>
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
 										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
@@ -364,11 +364,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 										</a>
 										if viewer != nil {
 											<div class="edge-actions">
-												if r.Outgoing {
-													<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/feature") } class="inline">
-														<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">keep</span>Feature</button>
-													</form>
-												}
+												<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/highlight") } class="inline">
+													<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star</span>Highlight</button>
+												</form>
 												<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/delete") } class="inline">
 													<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
 												</form>

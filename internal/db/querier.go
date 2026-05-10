@@ -47,8 +47,8 @@ type Querier interface {
 	DeleteAudienceList(ctx context.Context, arg DeleteAudienceListParams) error
 	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
 	// Any logged-in user can delete any edge (wiki-open curation, same as
-	// feature/unfeature). Both endpoints of an edge can trigger this — the page
-	// the user is on is just where they get redirected after the delete.
+	// highlight/unhighlight). Both endpoints of an edge can trigger this — the
+	// page the user is on is just where they get redirected after the delete.
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
@@ -59,10 +59,6 @@ type Querier interface {
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.
 	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error
-	// Promote an edge to the featured section by assigning it the next position
-	// after the current max for its source node. from_node is required so callers
-	// can't accidentally feature an edge against the wrong source.
-	FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error
 	GetAudienceList(ctx context.Context, id uuid.UUID) (AudienceList, error)
 	// One round-trip lookup the profile page uses to render the button: does
 	// the viewer follow this profile, and does the profile follow the viewer
@@ -87,6 +83,12 @@ type Querier interface {
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	// Promote an edge into the highlights section from the perspective of
+	// `pov_node`, which must be one of the edge's endpoints. The rank is the
+	// next-highest across the existing highlights on that side, so the new
+	// card lands at the bottom by default. If pov_node is not an endpoint
+	// the WHERE clause filters it out and nothing changes.
+	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error
 	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
 	// Tags with zero nodes (orphans from previous edits) come last.
@@ -99,20 +101,24 @@ type Querier interface {
 	ListConnections(ctx context.Context, followerID uuid.UUID) ([]ListConnectionsRow, error)
 	// Outgoing edges with the destination node's title and type joined in,
 	// ready to render the "this node points at..." section of the legend.
-	// position is NULL for legend-only edges and an integer rank for featured ones.
-	// node_visible_to() hides edges whose endpoint the viewer isn't entitled to.
+	// position is NULL for legend-only edges and an integer rank when the
+	// FROM-node has highlighted it. node_visible_to() hides edges whose
+	// endpoint the viewer isn't entitled to.
 	ListEdgesFromNodeForViewer(ctx context.Context, arg ListEdgesFromNodeForViewerParams) ([]ListEdgesFromNodeForViewerRow, error)
 	// Incoming edges, similar shape — for "what points at this node".
+	// to_position is the rank when this node (the TO endpoint) has highlighted
+	// the edge from its side; NULL keeps it in the legend only.
 	ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToNodeForViewerParams) ([]ListEdgesToNodeForViewerRow, error)
-	// Outgoing edges marked as featured (position IS NOT NULL), with the
-	// destination node's full body included so it can be rendered inline on the
-	// source node's page. Ordered by position ascending. Filtered through
-	// node_visible_to() so a hidden destination simply doesn't appear.
-	ListFeaturedEdgesFromNodeForViewer(ctx context.Context, arg ListFeaturedEdgesFromNodeForViewerParams) ([]ListFeaturedEdgesFromNodeForViewerRow, error)
 	// Users that follow $1.
 	ListFollowers(ctx context.Context, followedID uuid.UUID) ([]ListFollowersRow, error)
 	// Users that $1 follows.
 	ListFollowing(ctx context.Context, followerID uuid.UUID) ([]ListFollowingRow, error)
+	// All edges where `node_id` is an endpoint AND that endpoint has marked
+	// the edge as highlighted (position when from_node, to_position when
+	// to_node). Returns the "other" endpoint regardless of direction so the
+	// highlight card can render uniformly. direction tells the UI which
+	// active/passive label to apply.
+	ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
@@ -176,7 +182,9 @@ type Querier interface {
 	// update so the profile shows the most recent stance change first. Returns
 	// the pin's id so callers can attach reasonings to it.
 	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
-	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
+	// Reverse of HighlightEdge: clears the rank on whichever side matches
+	// pov_node. No-op if pov_node isn't one of the edge's endpoints.
+	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Idempotent: returns the tag id whether it already existed or just got

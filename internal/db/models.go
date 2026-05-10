@@ -256,13 +256,14 @@ type AuthIdentity struct {
 }
 
 type Edge struct {
-	ID        uuid.UUID          `json:"id"`
-	FromNode  uuid.UUID          `json:"from_node"`
-	ToNode    uuid.UUID          `json:"to_node"`
-	Kind      EdgeKind           `json:"kind"`
-	CreatedBy uuid.UUID          `json:"created_by"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	Position  *int16             `json:"position"`
+	ID         uuid.UUID          `json:"id"`
+	FromNode   uuid.UUID          `json:"from_node"`
+	ToNode     uuid.UUID          `json:"to_node"`
+	Kind       EdgeKind           `json:"kind"`
+	CreatedBy  uuid.UUID          `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	Position   *int16             `json:"position"`
+	ToPosition *int16             `json:"to_position"`
 }
 
 type Follow struct {

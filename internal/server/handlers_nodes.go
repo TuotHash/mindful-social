@@ -310,12 +310,12 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	feat, err := s.queries.ListFeaturedEdgesFromNodeForViewer(r.Context(), db.ListFeaturedEdgesFromNodeForViewerParams{
-		FromNode: id,
+	feat, err := s.queries.ListHighlightedEdgesForNode(r.Context(), db.ListHighlightedEdgesForNodeParams{
+		NodeID:   id,
 		ViewerID: vid,
 	})
 	if err != nil {
-		s.logger.Error("node detail: featured edges", "err", err)
+		s.logger.Error("node detail: highlighted edges", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -348,15 +348,15 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.NodeDetail(
 		viewerFor(user),
 		node,
-		featuredRows(feat),
+		highlightedRows(feat),
 		displayGroups(out, in),
 		pin,
 		tags,
 	))
 }
 
-func (s *Server) handleEdgeFeature(w http.ResponseWriter, r *http.Request) {
-	fromNode, ok := s.resolveNode(w, r)
+func (s *Server) handleEdgeHighlight(w http.ResponseWriter, r *http.Request) {
+	povNode, ok := s.resolveNode(w, r)
 	if !ok {
 		return
 	}
@@ -365,19 +365,19 @@ func (s *Server) handleEdgeFeature(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.queries.FeatureEdge(r.Context(), db.FeatureEdgeParams{
-		ID:       edgeID,
-		FromNode: fromNode.ID,
+	if err := s.queries.HighlightEdge(r.Context(), db.HighlightEdgeParams{
+		PovNode: povNode.ID,
+		EdgeID:  edgeID,
 	}); err != nil {
-		s.logger.Error("feature edge", "err", err)
+		s.logger.Error("highlight edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
 }
 
-func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
-	fromNode, ok := s.resolveNode(w, r)
+func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
+	povNode, ok := s.resolveNode(w, r)
 	if !ok {
 		return
 	}
@@ -386,15 +386,15 @@ func (s *Server) handleEdgeUnfeature(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.queries.UnfeatureEdge(r.Context(), db.UnfeatureEdgeParams{
-		ID:       edgeID,
-		FromNode: fromNode.ID,
+	if err := s.queries.UnhighlightEdge(r.Context(), db.UnhighlightEdgeParams{
+		PovNode: povNode.ID,
+		EdgeID:  edgeID,
 	}); err != nil {
-		s.logger.Error("unfeature edge", "err", err)
+		s.logger.Error("unhighlight edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/nodes/"+fromNode.Slug, http.StatusSeeOther)
+	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request) {
@@ -780,6 +780,8 @@ func displayGroups(out []db.ListEdgesFromNodeForViewerRow, in []db.ListEdgesToNo
 func outgoingRowsOfKind(rows []db.ListEdgesFromNodeForViewerRow, kind db.EdgeKind) []views.EdgeRow {
 	var out []views.EdgeRow
 	for _, row := range rows {
+		// Skip edges this node has already highlighted from its FROM side
+		// — they're rendered inline above the legend.
 		if row.Kind != kind || row.Position != nil {
 			continue
 		}
@@ -799,7 +801,9 @@ func outgoingRowsOfKind(rows []db.ListEdgesFromNodeForViewerRow, kind db.EdgeKin
 func incomingRowsOfKind(rows []db.ListEdgesToNodeForViewerRow, kind db.EdgeKind) []views.EdgeRow {
 	var out []views.EdgeRow
 	for _, row := range rows {
-		if row.Kind != kind {
+		// Same idea as outgoingRowsOfKind: hide edges that already appear
+		// inline in the highlights section above.
+		if row.Kind != kind || row.ToPosition != nil {
 			continue
 		}
 		out = append(out, views.EdgeRow{
@@ -815,25 +819,32 @@ func incomingRowsOfKind(rows []db.ListEdgesToNodeForViewerRow, kind db.EdgeKind)
 	return out
 }
 
-// featuredRows turns the DB projection into the view-layer FeaturedRow,
-// looking up the active label from edgeOrder so templates don't need to
-// hardcode "supports → Supports" mappings.
-func featuredRows(rows []db.ListFeaturedEdgesFromNodeForViewerRow) []views.FeaturedRow {
-	labels := make(map[db.EdgeKind]string, len(edgeOrder))
+// highlightedRows turns the DB projection into the view-layer FeaturedRow,
+// picking the active or passive label from edgeOrder based on the edge's
+// direction relative to the current node so the card reads naturally
+// ("Supports …" outgoing, "Supported by …" incoming).
+func highlightedRows(rows []db.ListHighlightedEdgesForNodeRow) []views.FeaturedRow {
+	active := make(map[db.EdgeKind]string, len(edgeOrder))
+	passive := make(map[db.EdgeKind]string, len(edgeOrder))
 	for _, ek := range edgeOrder {
-		labels[ek.kind] = ek.activeLabel
+		active[ek.kind] = ek.activeLabel
+		passive[ek.kind] = ek.passiveLabel
 	}
 	out := make([]views.FeaturedRow, 0, len(rows))
 	for _, row := range rows {
+		label := active[row.Kind]
+		if row.Direction == "incoming" {
+			label = passive[row.Kind]
+		}
 		out = append(out, views.FeaturedRow{
 			EdgeID: row.ID,
 			Kind:   row.Kind,
-			Label:  labels[row.Kind],
-			ID:     row.ToID,
-			Slug:   row.ToSlug,
-			Type:   row.ToType,
-			Title:  row.ToTitle,
-			Body:   row.ToBody,
+			Label:  label,
+			ID:     row.OtherID,
+			Slug:   row.OtherSlug,
+			Type:   row.OtherType,
+			Title:  row.OtherTitle,
+			Body:   row.OtherBody,
 		})
 	}
 	return out
