@@ -192,13 +192,6 @@ type PinInfo struct {
 	ReasoningTitle string
 }
 
-// ReasoningOption is one row in the reasoning-picker dropdown on the
-// pin-to-profile form: a node id and its title.
-type ReasoningOption struct {
-	ID    uuid.UUID
-	Title string
-}
-
 // pinKindLabel turns a PinKind value into the verb shown in the UI banner
 // ("You support this", "You oppose this", "On your profile").
 func pinKindLabel(k db.PinKind) string {
@@ -461,7 +454,7 @@ templ visibilitySelect(selected string, lists []db.AudienceList) {
 	</fieldset>
 }
 
-templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID string, reasonings []ReasoningOption) {
+templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 	@Layout("Pin "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -470,9 +463,12 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 			</div>
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
-				Pin this node to your profile. For views you can take a stance —
-				support or oppose — and optionally attach one of your reasoning nodes
-				to explain why. For other node types you can just feature it.
+				Pin this node to your profile.
+				if node.Type == db.NodeTypeView {
+					Take a stance — support or oppose — or just feature it.
+				} else {
+					Topics and other node types can be featured.
+				}
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="form">
@@ -481,7 +477,7 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 					<div class="toggle-btns">
 						if node.Type == db.NodeTypeView {
 							<label class="toggle-btn" data-kind="supports">
-								<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" }/>
+								<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" || formKind == "" }/>
 								<span class="material-symbols-outlined">heart_plus</span>
 								Support
 							</label>
@@ -492,31 +488,11 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 							</label>
 						}
 						<label class="toggle-btn" data-kind="featured">
-							<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (formKind == "" && node.Type != db.NodeTypeView) }/>
+							<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (node.Type != db.NodeTypeView && formKind == "") }/>
 							<span class="material-symbols-outlined">keep</span>
 							Just feature
 						</label>
 					</div>
-				</fieldset>
-				<fieldset class="toggle-group">
-					<legend>Reasoning <small>(optional)</small></legend>
-					<div class="toggle-btns toggle-btns-stack">
-						<label class="toggle-btn" data-reasoning="none">
-							<input type="radio" name="reasoning_id" value="" checked?={ formReasoningID == "" }/>
-							<span class="material-symbols-outlined">block</span>
-							No specific reasoning
-						</label>
-						for _, r := range reasonings {
-							<label class="toggle-btn" data-reasoning="node">
-								<input type="radio" name="reasoning_id" value={ r.ID.String() } checked?={ r.ID.String() == formReasoningID }/>
-								<span class="material-symbols-outlined">psychology</span>
-								{ r.Title }
-							</label>
-						}
-					</div>
-					if len(reasonings) == 0 {
-						<small class="muted" style="font-size: 12px;">You haven't authored any reasoning nodes yet. You can still pin without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
-					}
 				</fieldset>
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">push_pin</span>Save pin</button>

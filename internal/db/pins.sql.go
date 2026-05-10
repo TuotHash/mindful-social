@@ -129,40 +129,6 @@ func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListP
 	return items, nil
 }
 
-const listReasoningsAuthoredBy = `-- name: ListReasoningsAuthoredBy :many
-SELECT id, title FROM nodes
-WHERE type = 'reasoning' AND created_by = $1
-ORDER BY title ASC
-LIMIT 200
-`
-
-type ListReasoningsAuthoredByRow struct {
-	ID    uuid.UUID `json:"id"`
-	Title string    `json:"title"`
-}
-
-// Reasoning-type nodes the user has authored, alphabetical — used as the
-// picker on the pin form when kind is supports/opposes.
-func (q *Queries) ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error) {
-	rows, err := q.db.Query(ctx, listReasoningsAuthoredBy, createdBy)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListReasoningsAuthoredByRow
-	for rows.Next() {
-		var i ListReasoningsAuthoredByRow
-		if err := rows.Scan(&i.ID, &i.Title); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const setPin = `-- name: SetPin :exec
 INSERT INTO user_node_pins (user_id, node_id, kind, reasoning_id)
 VALUES ($1, $2, $3, $4)

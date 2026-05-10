@@ -26,14 +26,6 @@ FROM user_node_pins p
 LEFT JOIN nodes rn ON rn.id = p.reasoning_id
 WHERE p.user_id = $1 AND p.node_id = $2;
 
--- name: ListReasoningsAuthoredBy :many
--- Reasoning-type nodes the user has authored, alphabetical — used as the
--- picker on the pin form when kind is supports/opposes.
-SELECT id, title FROM nodes
-WHERE type = 'reasoning' AND created_by = $1
-ORDER BY title ASC
-LIMIT 200;
-
 -- name: ListPinsByUser :many
 -- A user's pins with the joined node and optional reasoning titles — for
 -- the "On my profile" section on a profile page.

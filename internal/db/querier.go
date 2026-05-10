@@ -116,9 +116,6 @@ type Querier interface {
 	// A user's pins with the joined node and optional reasoning titles — for
 	// the "On my profile" section on a profile page.
 	ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error)
-	// Reasoning-type nodes the user has authored, alphabetical — used as the
-	// picker on the pin form when kind is supports/opposes.
-	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
@@ -147,6 +144,10 @@ type Querier interface {
 	//
 	// node_visible_to() filters out anything the viewer isn't entitled to.
 	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
+	// Topic picker for the post form: fuzzy-searches topic titles when a query is
+	// given; falls back to recency order when empty so the picker is pre-populated.
+	// Respects node_visible_to() so viewers only see topics they can post under.
+	SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first.
