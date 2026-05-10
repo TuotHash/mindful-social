@@ -9,14 +9,14 @@ import (
 templ Home(viewer *Viewer, recent []db.Node) {
 	@Layout("Home", viewer) {
 		if viewer == nil {
-			@landingMarketing()
+			@landingMarketing(viewer)
 		} else {
 			@homeFeed(viewer, recent)
 		}
 	}
 }
 
-templ landingMarketing() {
+templ landingMarketing(viewer *Viewer) {
 	<section class="hero">
 		<div class="page" style="position: relative; z-index: 2;">
 			<div class="hero-grid">
@@ -137,7 +137,7 @@ templ landingMarketing() {
 			</div>
 		</div>
 	</section>
-	@siteFooter()
+	@siteFooter(viewer)
 }
 
 templ homeFeed(viewer *Viewer, recent []db.Node) {
@@ -222,7 +222,7 @@ templ stepCard(num, title, body string) {
 	</div>
 }
 
-templ siteFooter() {
+templ siteFooter(viewer *Viewer) {
 	<footer class="site-footer">
 		<div class="page" style="padding-top: 48px; padding-bottom: 48px;">
 			<div class="row between wrap gap-16">
@@ -232,7 +232,11 @@ templ siteFooter() {
 					<span class="muted" style="font-size: 12px; font-family: var(--mono);">v0.4 · early development</span>
 				</div>
 				<div class="row gap-24 wrap" style="font-size: 13px; color: var(--ink-3);">
-					<a href="/" style="text-decoration: none;">Home</a>
+					if viewer != nil {
+						<a href="/home" style="text-decoration: none;">Home</a>
+					} else {
+						<a href="/" style="text-decoration: none;">Home</a>
+					}
 					<a href="/tags" style="text-decoration: none;">Tags</a>
 					<a href="/search" style="text-decoration: none;">Search</a>
 				</div>

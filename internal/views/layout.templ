@@ -68,7 +68,11 @@ templ TopNav(currentUser *Viewer) {
 				<span>Mindful Social</span>
 			</a>
 			<div class="nav-links">
-				<a class="nav-link" href="/">Home</a>
+				if currentUser != nil {
+					<a class="nav-link" href="/home">Home</a>
+				} else {
+					<a class="nav-link" href="/">Home</a>
+				}
 				<a class="nav-link" href="/tags">Browse</a>
 				if currentUser != nil {
 					<a

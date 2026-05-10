@@ -109,7 +109,7 @@ func (s *Server) routes() {
 	staticFS := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", staticFS))
 
-	r.Get("/", s.handleHome)
+	r.Get("/", s.handleLanding)
 
 	r.Get("/signup", s.handleSignupGet)
 	r.Post("/signup", s.handleSignupPost)
@@ -128,6 +128,7 @@ func (s *Server) routes() {
 	// Routes that require an authenticated user.
 	r.Group(func(r chi.Router) {
 		r.Use(s.requireUser)
+		r.Get("/home", s.handleHome)
 		r.Get("/nodes/new", s.handleNodeNew)
 		r.Get("/nodes/topic-picker", s.handleTopicPicker)
 		r.Post("/nodes", s.handleNodeCreate)

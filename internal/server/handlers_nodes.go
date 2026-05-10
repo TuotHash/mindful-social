@@ -53,7 +53,24 @@ func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, b
 	return node, true
 }
 
+// handleLanding serves the public landing page at /. Accessible to everyone
+// including logged-in users who want to browse the marketing page.
+func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
+	recent, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
+		Limit:    25,
+		ViewerID: nil,
+	})
+	if err != nil {
+		s.logger.Error("landing: list recent", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.Home(viewerFor(currentUser(r)), recent))
+}
+
+// handleHome serves the personal feed at /home for logged-in users.
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
 	recent, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
 		Limit:    25,
 		ViewerID: viewerID(r),
@@ -63,7 +80,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.Home(viewerFor(currentUser(r)), recent))
+	render(w, r, views.Home(viewerFor(user), recent))
 }
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
