@@ -6,9 +6,17 @@ This document outlines upcoming features beyond the MVP.
 
 ### Social Foundation
 
-- **Followers system** — Users can follow each other. Enables personalized feeds, visibility controls, and community discovery.
+- **Follow system** — One-directional follow with one button. When two users follow each other, they automatically become **connections** (mutuals). No friend requests, no private accounts.
 
-- **Visibility controls** — Nodes and threads can be marked as public, followers-only, private (creator only), or other granular permission levels. Visibility set at creation time, changeable later.
+- **Audience lists** — Beyond connections, users can curate named lists of specific people to enable fine-grained sharing:
+  - **Trusted** — a built-in list for people you explicitly trust, independent of mutual-follow status
+  - **Custom lists** — user-created named lists (e.g. "Colleagues", "Research group") for any grouping that makes sense to the author
+
+- **Visibility controls** — Every node and thread is assigned a visibility level at creation time, changeable later. Levels in order from most to least open:
+  - `public` — visible to anyone, including logged-out users
+  - `connections` — visible to mutual followers only; provides real protection since you control who you follow back
+  - `[list name]` — visible to members of a specific audience list (Trusted or any custom list)
+  - `private` — visible only to the author (drafts, personal notes)
 
 ### Personal Feeds & Discovery
 
