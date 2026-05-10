@@ -22,6 +22,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
 		Query:       q,
 		ResultLimit: searchResultLimit,
+		ViewerID:    viewerID(r),
 	})
 	if err != nil {
 		s.logger.Error("search", "err", err, "q", q)

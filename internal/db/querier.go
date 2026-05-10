@@ -11,23 +11,41 @@ import (
 )
 
 type Querier interface {
+	// Idempotent. The handler treats "already a member" the same as "now a
+	// member" so the form doesn't need to know which it was.
+	AddListMember(ctx context.Context, arg AddListMemberParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
+	CountFollowers(ctx context.Context, followedID uuid.UUID) (int64, error)
+	CountFollowing(ctx context.Context, followerID uuid.UUID) (int64, error)
+	CountListMembers(ctx context.Context, listID uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
 	// Pins on this node by users other than the node's author. The author's own
 	// pin is excluded — they obviously consent to losing it. Other users' pins
 	// are surfaced on the confirmation page so the author knows what cascades.
 	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
+	// Creates a new list for an owner. The unique index on (owner_id) WHERE
+	// is_trusted means at most one trusted list per user; passing is_trusted=true
+	// twice for the same owner raises a unique-violation that the caller maps to
+	// a friendly error.
+	CreateAudienceList(ctx context.Context, arg CreateAudienceListParams) (AudienceList, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
+	// Idempotent: re-following is a no-op rather than an error so the button
+	// handler doesn't need to disambiguate states.
+	CreateFollow(ctx context.Context, arg CreateFollowParams) error
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Trusted lists can't be deleted; the WHERE clause enforces this without
+	// the caller having to remember.
+	DeleteAudienceList(ctx context.Context, arg DeleteAudienceListParams) error
 	// Any logged-in user can delete any edge (wiki-open curation, same as
 	// feature/unfeature). Both endpoints of an edge can trigger this — the page
 	// the user is on is just where they get redirected after the delete.
 	DeleteEdge(ctx context.Context, id uuid.UUID) error
+	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
 	// Used by the "replace all tags" path on node update — the handler deletes
@@ -37,6 +55,11 @@ type Querier interface {
 	// after the current max for its source node. from_node is required so callers
 	// can't accidentally feature an edge against the wrong source.
 	FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error
+	GetAudienceList(ctx context.Context, id uuid.UUID) (AudienceList, error)
+	// One round-trip lookup the profile page uses to render the button: does
+	// the viewer follow this profile, and does the profile follow the viewer
+	// back (mutual = connection)?
+	GetFollowState(ctx context.Context, arg GetFollowStateParams) (GetFollowStateRow, error)
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	GetNodeBySlug(ctx context.Context, slug string) (Node, error)
@@ -48,45 +71,67 @@ type Querier interface {
 	// "you support this via <reasoning title>" in one round-trip.
 	GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error)
 	GetTagByName(ctx context.Context, name string) (Tag, error)
+	// Lookup the user's built-in Trusted list. Should always succeed for
+	// existing users (created on signup or backfilled by the migration).
+	GetTrustedList(ctx context.Context, ownerID uuid.UUID) (AudienceList, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
 	// Tags with zero nodes (orphans from previous edits) come last.
 	ListAllTags(ctx context.Context) ([]ListAllTagsRow, error)
+	// Trusted list first, then custom lists alphabetically — order the visibility
+	// selector and the lists-management page both rely on.
+	ListAudienceLists(ctx context.Context, ownerID uuid.UUID) ([]AudienceList, error)
+	// People the user has a mutual follow with — drives the "friends bubble"
+	// graph view. Alphabetical for stable rendering.
+	ListConnections(ctx context.Context, followerID uuid.UUID) ([]ListConnectionsRow, error)
 	// Outgoing edges with the destination node's title and type joined in,
 	// ready to render the "this node points at..." section of the legend.
 	// position is NULL for legend-only edges and an integer rank for featured ones.
-	ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListEdgesFromNodeRow, error)
+	// node_visible_to() hides edges whose endpoint the viewer isn't entitled to.
+	ListEdgesFromNodeForViewer(ctx context.Context, arg ListEdgesFromNodeForViewerParams) ([]ListEdgesFromNodeForViewerRow, error)
 	// Incoming edges, similar shape — for "what points at this node".
-	ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]ListEdgesToNodeRow, error)
+	ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToNodeForViewerParams) ([]ListEdgesToNodeForViewerRow, error)
 	// Outgoing edges marked as featured (position IS NOT NULL), with the
 	// destination node's full body included so it can be rendered inline on the
-	// source node's page. Ordered by position ascending.
-	ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListFeaturedEdgesFromNodeRow, error)
+	// source node's page. Ordered by position ascending. Filtered through
+	// node_visible_to() so a hidden destination simply doesn't appear.
+	ListFeaturedEdgesFromNodeForViewer(ctx context.Context, arg ListFeaturedEdgesFromNodeForViewerParams) ([]ListFeaturedEdgesFromNodeForViewerRow, error)
+	// Users that follow $1.
+	ListFollowers(ctx context.Context, followedID uuid.UUID) ([]ListFollowersRow, error)
+	// Users that $1 follows.
+	ListFollowing(ctx context.Context, followerID uuid.UUID) ([]ListFollowingRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
+	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
-	// on a profile page.
-	ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthoredByParams) ([]Node, error)
+	// on a profile page. Filtered through node_visible_to() so a visitor only
+	// sees nodes they're entitled to.
+	ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
-	ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node, error)
+	// Filtered through node_visible_to() so a viewer only sees nodes they can.
+	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
 	// A user's pins with the joined node and optional reasoning titles — for
 	// the "On my profile" section on a profile page.
 	ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error)
 	// Reasoning-type nodes the user has authored, alphabetical — used as the
 	// picker on the pin form when kind is supports/opposes.
 	ListReasoningsAuthoredBy(ctx context.Context, createdBy uuid.UUID) ([]ListReasoningsAuthoredByRow, error)
-	ListRecentNodes(ctx context.Context, limit int32) ([]Node, error)
+	// Home page feed. node_visible_to() handles the per-row visibility check;
+	// viewer_id is NULL for logged-out users (only public nodes match).
+	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
 	// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
 	// uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
 	// which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
-	// ($2). Raw user text is safe here — pg_trgm operators take plain text, no
-	// query syntax to escape.
+	// and skips nodes the viewer can't see. Raw user text is safe here —
+	// pg_trgm operators take plain text, no query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
+	RemoveListMember(ctx context.Context, arg RemoveListMemberParams) error
 	// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
 	// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
 	// title catches typos and partial words ("nucear" → "Nuclear"). A row
@@ -99,6 +144,8 @@ type Querier interface {
 	// ts_headline runs over the tsquery only — fuzzy-only matches get an empty
 	// excerpt because the body did not contain the searched lexemes; the title
 	// carries enough information in that case.
+	//
+	// node_visible_to() filters out anything the viewer isn't entitled to.
 	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on

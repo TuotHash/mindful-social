@@ -32,9 +32,10 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authored, err := s.queries.ListNodesAuthoredBy(r.Context(), db.ListNodesAuthoredByParams{
-		CreatedBy: user.ID,
-		Limit:     profileNodesLimit,
+	authored, err := s.queries.ListNodesAuthoredByForViewer(r.Context(), db.ListNodesAuthoredByForViewerParams{
+		AuthorID:    user.ID,
+		ViewerID:    viewerID(r),
+		ResultLimit: profileNodesLimit,
 	})
 	if err != nil {
 		s.logger.Error("profile: list authored", "err", err)
@@ -60,6 +61,34 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	followers, err := s.queries.CountFollowers(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("profile: count followers", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	following, err := s.queries.CountFollowing(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("profile: count following", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	relation := views.FollowRelation{Followers: followers, Following: following}
+	if viewer != nil && !isSelf {
+		state, err := s.queries.GetFollowState(r.Context(), db.GetFollowStateParams{
+			ViewerID:  viewer.ID,
+			ProfileID: user.ID,
+		})
+		if err != nil {
+			s.logger.Error("profile: follow state", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		relation.ViewerFollows = state.ViewerFollows
+		relation.FollowsViewer = state.FollowsViewer
+	}
+
 	render(w, r, views.Profile(
 		viewerFor(viewer),
 		user,
@@ -67,6 +96,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		authored,
 		pinRows(pins),
 		identityLabels(identities),
+		relation,
 	))
 }
 

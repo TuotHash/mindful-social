@@ -84,17 +84,24 @@ func (q *Queries) ListAllTags(ctx context.Context) ([]ListAllTagsRow, error) {
 	return items, nil
 }
 
-const listNodesWithTag = `-- name: ListNodesWithTag :many
-SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv, n.slug FROM nodes n
+const listNodesWithTagForViewer = `-- name: ListNodesWithTagForViewer :many
+SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv, n.slug, n.visibility, n.visibility_list_id FROM nodes n
 JOIN node_tags nt ON nt.node_id = n.id
 WHERE nt.tag_id = $1
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
 LIMIT 100
 `
 
+type ListNodesWithTagForViewerParams struct {
+	TagID    uuid.UUID  `json:"tag_id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
 // Nodes that carry a given tag, most recent first — for /tags/{name}.
-func (q *Queries) ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node, error) {
-	rows, err := q.db.Query(ctx, listNodesWithTag, tagID)
+// Filtered through node_visible_to() so a viewer only sees nodes they can.
+func (q *Queries) ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listNodesWithTagForViewer, arg.TagID, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +120,8 @@ func (q *Queries) ListNodesWithTag(ctx context.Context, tagID uuid.UUID) ([]Node
 			&i.UpdatedAt,
 			&i.SearchTsv,
 			&i.Slug,
+			&i.Visibility,
+			&i.VisibilityListID,
 		); err != nil {
 			return nil, err
 		}

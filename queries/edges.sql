@@ -3,10 +3,11 @@ INSERT INTO edges (from_node, to_node, kind, created_by)
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
--- name: ListEdgesFromNode :many
+-- name: ListEdgesFromNodeForViewer :many
 -- Outgoing edges with the destination node's title and type joined in,
 -- ready to render the "this node points at..." section of the legend.
 -- position is NULL for legend-only edges and an integer rank for featured ones.
+-- node_visible_to() hides edges whose endpoint the viewer isn't entitled to.
 SELECT
     e.id,
     e.kind,
@@ -18,10 +19,11 @@ SELECT
     n.title AS to_title
 FROM edges e
 JOIN nodes n ON n.id = e.to_node
-WHERE e.from_node = $1
+WHERE e.from_node = sqlc.arg(from_node)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY e.created_at DESC;
 
--- name: ListEdgesToNode :many
+-- name: ListEdgesToNodeForViewer :many
 -- Incoming edges, similar shape — for "what points at this node".
 SELECT
     e.id,
@@ -33,13 +35,15 @@ SELECT
     n.title AS from_title
 FROM edges e
 JOIN nodes n ON n.id = e.from_node
-WHERE e.to_node = $1
+WHERE e.to_node = sqlc.arg(to_node)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY e.created_at DESC;
 
--- name: ListFeaturedEdgesFromNode :many
+-- name: ListFeaturedEdgesFromNodeForViewer :many
 -- Outgoing edges marked as featured (position IS NOT NULL), with the
 -- destination node's full body included so it can be rendered inline on the
--- source node's page. Ordered by position ascending.
+-- source node's page. Ordered by position ascending. Filtered through
+-- node_visible_to() so a hidden destination simply doesn't appear.
 SELECT
     e.id,
     e.kind,
@@ -51,7 +55,9 @@ SELECT
     n.body  AS to_body
 FROM edges e
 JOIN nodes n ON n.id = e.to_node
-WHERE e.from_node = $1 AND e.position IS NOT NULL
+WHERE e.from_node = sqlc.arg(from_node)
+  AND e.position IS NOT NULL
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY e.position ASC;
 
 -- name: FeatureEdge :exec

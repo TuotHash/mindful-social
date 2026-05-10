@@ -15,8 +15,9 @@ import (
 
 // resolveNode loads a node by the URL param "id". The param may be either a
 // UUID or a slug — UUID is tried first (parses as a uuid.UUID), slug is the
-// fallback. On not-found or any other error the function writes the response
-// and returns ok=false; the caller should return immediately.
+// fallback. On not-found, any other error, or visibility denial the function
+// writes the response and returns ok=false; the caller should return
+// immediately. Hidden nodes are reported as 404 so existence isn't leaked.
 func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, bool) {
 	raw := chiURLParam(r, "id")
 	if raw == "" {
@@ -39,11 +40,24 @@ func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, b
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return db.Node{}, false
 	}
+	visible, err := s.canViewNode(r.Context(), node, viewerID(r))
+	if err != nil {
+		s.logger.Error("resolve node: visibility", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return db.Node{}, false
+	}
+	if !visible {
+		http.NotFound(w, r)
+		return db.Node{}, false
+	}
 	return node, true
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	recent, err := s.queries.ListRecentNodes(r.Context(), 25)
+	recent, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
+		Limit:    25,
+		ViewerID: viewerID(r),
+	})
 	if err != nil {
 		s.logger.Error("home: list recent", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -53,7 +67,14 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
-	render(w, r, views.NodeNew(viewerFor(currentUser(r)), "", "", "", "", "", "", ""))
+	user := currentUser(r)
+	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("node new: lists", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.NodeNew(viewerFor(user), "", "", "", "", "", "", "", "public", lists))
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +94,17 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawPin := strings.TrimSpace(r.PostFormValue("pin")) // "" | "supports" | "opposes" | "featured"
 	rawTags := r.PostFormValue("tags")
+	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
+	if rawVisibility == "" {
+		rawVisibility = "public"
+	}
+
+	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if listsErr != nil {
+		s.logger.Error("create node: lists", "err", listsErr)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	flash := ""
 	nt := db.NodeType(rawType)
@@ -94,8 +126,12 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			flash = pinErr
 		}
 	}
+	visKind, visListID, visErr := parseVisibility(rawVisibility, user.ID, lists)
+	if flash == "" && visErr != "" {
+		flash = visErr
+	}
 	if flash != "" {
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin, rawTags))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
 		return
 	}
 
@@ -107,21 +143,23 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	slug, err := s.uniqueSlug(r.Context(), slugify(title))
 	if err != nil {
 		s.logger.Error("create node: unique slug", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags))
+		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
 		return
 	}
 
 	node, err := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
-		Type:      nt,
-		Title:     title,
-		Body:      body,
-		SourceUrl: srcPtr,
-		CreatedBy: user.ID,
-		Slug:      slug,
+		Type:             nt,
+		Title:            title,
+		Body:             body,
+		SourceUrl:        srcPtr,
+		CreatedBy:        user.ID,
+		Slug:             slug,
+		Visibility:       visKind,
+		VisibilityListID: visListID,
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
-		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags))
+		render(w, r, views.NodeNew(viewerFor(user), "Could not create node. Please try again.", rawType, title, body, sourceURL, rawPin, rawTags, rawVisibility, lists))
 		return
 	}
 	if rawPin != "" {
@@ -150,19 +188,29 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	id := node.ID
 
-	out, err := s.queries.ListEdgesFromNode(r.Context(), id)
+	vid := viewerID(r)
+	out, err := s.queries.ListEdgesFromNodeForViewer(r.Context(), db.ListEdgesFromNodeForViewerParams{
+		FromNode: id,
+		ViewerID: vid,
+	})
 	if err != nil {
 		s.logger.Error("node detail: outgoing edges", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	in, err := s.queries.ListEdgesToNode(r.Context(), id)
+	in, err := s.queries.ListEdgesToNodeForViewer(r.Context(), db.ListEdgesToNodeForViewerParams{
+		ToNode:   id,
+		ViewerID: vid,
+	})
 	if err != nil {
 		s.logger.Error("node detail: incoming edges", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	feat, err := s.queries.ListFeaturedEdgesFromNode(r.Context(), id)
+	feat, err := s.queries.ListFeaturedEdgesFromNodeForViewer(r.Context(), db.ListFeaturedEdgesFromNodeForViewerParams{
+		FromNode: id,
+		ViewerID: vid,
+	})
 	if err != nil {
 		s.logger.Error("node detail: featured edges", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -323,6 +371,7 @@ func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
 	node, ok := s.resolveNode(w, r)
 	if !ok {
 		return
@@ -338,7 +387,13 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.NodeEdit(viewerFor(currentUser(r)), node, "", node.Title, node.Body, src, joinTagNames(tags)))
+	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("node edit: lists", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatVisibility(node.Visibility, node.VisibilityListID), lists))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -371,6 +426,17 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	body := strings.TrimSpace(r.PostFormValue("body"))
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawTags := r.PostFormValue("tags")
+	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
+	if rawVisibility == "" {
+		rawVisibility = formatVisibility(node.Visibility, node.VisibilityListID)
+	}
+
+	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if listsErr != nil {
+		s.logger.Error("update node: lists", "err", listsErr)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	flash := ""
 	switch {
@@ -381,8 +447,12 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	case node.Type == db.NodeTypeEvidence && sourceURL == "":
 		flash = "Evidence needs a source URL."
 	}
+	visKind, visListID, visErr := parseVisibility(rawVisibility, user.ID, lists)
+	if flash == "" && visErr != "" {
+		flash = visErr
+	}
 	if flash != "" {
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists))
 		return
 	}
 
@@ -392,14 +462,16 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
-		ID:        id,
-		Title:     title,
-		Body:      body,
-		SourceUrl: srcPtr,
+		ID:               id,
+		Title:            title,
+		Body:             body,
+		SourceUrl:        srcPtr,
+		Visibility:       visKind,
+		VisibilityListID: visListID,
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists))
 		return
 	}
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
@@ -462,6 +534,7 @@ func (s *Server) searchEdgeCandidates(r *http.Request, sourceID uuid.UUID, query
 	rows, err := s.queries.PickerSearchNodes(r.Context(), db.PickerSearchNodesParams{
 		Query:    q,
 		SourceID: sourceID,
+		ViewerID: viewerID(r),
 	})
 	if err != nil {
 		return nil, err
@@ -574,7 +647,7 @@ var edgeOrder = []struct {
 // "Supported by"). For relates_to (symmetric) both directions merge into a
 // single "Relates to" section. Featured outgoing edges are excluded — they
 // render inline in the "Key reasoning" section above the legend.
-func displayGroups(out []db.ListEdgesFromNodeRow, in []db.ListEdgesToNodeRow) []views.EdgeGroup {
+func displayGroups(out []db.ListEdgesFromNodeForViewerRow, in []db.ListEdgesToNodeForViewerRow) []views.EdgeGroup {
 	var groups []views.EdgeGroup
 	for _, ek := range edgeOrder {
 		outRows := outgoingRowsOfKind(out, ek.kind)
@@ -601,7 +674,7 @@ func displayGroups(out []db.ListEdgesFromNodeRow, in []db.ListEdgesToNodeRow) []
 	return groups
 }
 
-func outgoingRowsOfKind(rows []db.ListEdgesFromNodeRow, kind db.EdgeKind) []views.EdgeRow {
+func outgoingRowsOfKind(rows []db.ListEdgesFromNodeForViewerRow, kind db.EdgeKind) []views.EdgeRow {
 	var out []views.EdgeRow
 	for _, row := range rows {
 		if row.Kind != kind || row.Position != nil {
@@ -620,7 +693,7 @@ func outgoingRowsOfKind(rows []db.ListEdgesFromNodeRow, kind db.EdgeKind) []view
 	return out
 }
 
-func incomingRowsOfKind(rows []db.ListEdgesToNodeRow, kind db.EdgeKind) []views.EdgeRow {
+func incomingRowsOfKind(rows []db.ListEdgesToNodeForViewerRow, kind db.EdgeKind) []views.EdgeRow {
 	var out []views.EdgeRow
 	for _, row := range rows {
 		if row.Kind != kind {
@@ -642,7 +715,7 @@ func incomingRowsOfKind(rows []db.ListEdgesToNodeRow, kind db.EdgeKind) []views.
 // featuredRows turns the DB projection into the view-layer FeaturedRow,
 // looking up the active label from edgeOrder so templates don't need to
 // hardcode "supports → Supports" mappings.
-func featuredRows(rows []db.ListFeaturedEdgesFromNodeRow) []views.FeaturedRow {
+func featuredRows(rows []db.ListFeaturedEdgesFromNodeForViewerRow) []views.FeaturedRow {
 	labels := make(map[db.EdgeKind]string, len(edgeOrder))
 	for _, ek := range edgeOrder {
 		labels[ek.kind] = ek.activeLabel

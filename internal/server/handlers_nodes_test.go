@@ -10,8 +10,8 @@ import (
 )
 
 // makeOut builds a synthetic ListEdgesFromNode row.
-func makeOut(kind db.EdgeKind, position *int16, toID uuid.UUID, toType db.NodeType, toTitle string) db.ListEdgesFromNodeRow {
-	return db.ListEdgesFromNodeRow{
+func makeOut(kind db.EdgeKind, position *int16, toID uuid.UUID, toType db.NodeType, toTitle string) db.ListEdgesFromNodeForViewerRow {
+	return db.ListEdgesFromNodeForViewerRow{
 		ID:        uuid.New(),
 		Kind:      kind,
 		Position:  position,
@@ -23,8 +23,8 @@ func makeOut(kind db.EdgeKind, position *int16, toID uuid.UUID, toType db.NodeTy
 }
 
 // makeIn builds a synthetic ListEdgesToNode row.
-func makeIn(kind db.EdgeKind, fromID uuid.UUID, fromType db.NodeType, fromTitle string) db.ListEdgesToNodeRow {
-	return db.ListEdgesToNodeRow{
+func makeIn(kind db.EdgeKind, fromID uuid.UUID, fromType db.NodeType, fromTitle string) db.ListEdgesToNodeForViewerRow {
+	return db.ListEdgesToNodeForViewerRow{
 		ID:        uuid.New(),
 		Kind:      kind,
 		CreatedAt: pgtype.Timestamptz{},
@@ -43,7 +43,7 @@ func TestDisplayGroups_emptyInput(t *testing.T) {
 
 func TestDisplayGroups_outgoingOnly_assignsActiveLabel(t *testing.T) {
 	target := uuid.New()
-	out := []db.ListEdgesFromNodeRow{makeOut(db.EdgeKindSupports, nil, target, db.NodeTypeReasoning, "R")}
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindSupports, nil, target, db.NodeTypeReasoning, "R")}
 	groups := displayGroups(out, nil)
 
 	if len(groups) != 1 {
@@ -63,7 +63,7 @@ func TestDisplayGroups_outgoingOnly_assignsActiveLabel(t *testing.T) {
 
 func TestDisplayGroups_incomingOnly_assignsPassiveLabel(t *testing.T) {
 	source := uuid.New()
-	in := []db.ListEdgesToNodeRow{makeIn(db.EdgeKindSupports, source, db.NodeTypeReasoning, "R")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindSupports, source, db.NodeTypeReasoning, "R")}
 	groups := displayGroups(nil, in)
 
 	if len(groups) != 1 {
@@ -79,8 +79,8 @@ func TestDisplayGroups_incomingOnly_assignsPassiveLabel(t *testing.T) {
 }
 
 func TestDisplayGroups_outgoingAndIncoming_sameKind_yieldsTwoGroups(t *testing.T) {
-	out := []db.ListEdgesFromNodeRow{makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "T")}
-	in := []db.ListEdgesToNodeRow{makeIn(db.EdgeKindRefines, uuid.New(), db.NodeTypeView, "V")}
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "T")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindRefines, uuid.New(), db.NodeTypeView, "V")}
 	groups := displayGroups(out, in)
 
 	if len(groups) != 2 {
@@ -92,8 +92,8 @@ func TestDisplayGroups_outgoingAndIncoming_sameKind_yieldsTwoGroups(t *testing.T
 }
 
 func TestDisplayGroups_relatesTo_mergesIntoOneBucket(t *testing.T) {
-	out := []db.ListEdgesFromNodeRow{makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "A")}
-	in := []db.ListEdgesToNodeRow{makeIn(db.EdgeKindRelatesTo, uuid.New(), db.NodeTypeView, "B")}
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "A")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindRelatesTo, uuid.New(), db.NodeTypeView, "B")}
 	groups := displayGroups(out, in)
 
 	if len(groups) != 1 {
@@ -113,7 +113,7 @@ func TestDisplayGroups_relatesTo_mergesIntoOneBucket(t *testing.T) {
 
 func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 	pos := int16(1)
-	out := []db.ListEdgesFromNodeRow{
+	out := []db.ListEdgesFromNodeForViewerRow{
 		makeOut(db.EdgeKindSupports, &pos, uuid.New(), db.NodeTypeReasoning, "Featured"),
 		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeReasoning, "Legend"),
 	}
@@ -131,7 +131,7 @@ func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 }
 
 func TestDisplayGroups_kindOrderingIsCanonical(t *testing.T) {
-	out := []db.ListEdgesFromNodeRow{
+	out := []db.ListEdgesFromNodeForViewerRow{
 		makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "rel"),
 		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeEvidence, "cite"),
 		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeReasoning, "sup"),

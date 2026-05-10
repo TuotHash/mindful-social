@@ -1,0 +1,121 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
+
+// ListSummary is one row on the lists index: a list plus its current
+// member count, used for the "Trusted — 4 members" line.
+type ListSummary struct {
+	List        db.AudienceList
+	MemberCount int64
+}
+
+func memberCountLabel(n int64) string {
+	if n == 1 {
+		return "1 member"
+	}
+	return fmt.Sprintf("%d members", n)
+}
+
+templ ListsIndex(viewer *Viewer, flash string, lists []ListSummary) {
+	@Layout("Audience lists", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Sharing</span>
+				<h1 class="h-1">Audience lists</h1>
+				<p class="muted" style="margin: 0;">Curate groups of people you can share with. Each node you create can be limited to a specific list. The built-in <strong>Trusted</strong> list can't be deleted; add as many custom lists as you like.</p>
+			</div>
+			@Flash(flash)
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Your lists</h2>
+				if len(lists) == 0 {
+					<p class="muted">You don't have any lists yet.</p>
+				} else {
+					<ul class="list-rows">
+						for _, l := range lists {
+							<li class="list-row">
+								<a href={ templ.SafeURL("/lists/" + l.List.ID.String()) } class="list-row-main">
+									<span class="list-name">{ l.List.Name }</span>
+									if l.List.IsTrusted {
+										<span class="badge accent">built-in</span>
+									}
+									<span class="muted">{ memberCountLabel(l.MemberCount) }</span>
+								</a>
+								if !l.List.IsTrusted {
+									<form method="post" action={ templ.SafeURL("/lists/" + l.List.ID.String() + "/delete") } class="inline">
+										<button type="submit" class="btn ghost sm" onclick="return confirm('Delete this list?')">Delete</button>
+									</form>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">New list</h2>
+				<form method="post" action="/lists" class="form">
+					<label>
+						Name
+						<input type="text" name="name" required maxlength="60" placeholder="Colleagues, Reading group, …"/>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Create list</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	}
+}
+
+templ ListDetail(viewer *Viewer, flash string, list db.AudienceList, members []db.ListListMembersRow) {
+	@Layout(list.Name+" — list", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<a href="/lists" class="muted" style="font-size: 13px;">← All lists</a>
+				<h1 class="h-1">{ list.Name }</h1>
+				if list.IsTrusted {
+					<p class="muted" style="margin: 0;">The built-in Trusted list. Add people whose judgement you rely on; you can't delete this list.</p>
+				} else {
+					<p class="muted" style="margin: 0;">{ memberCountLabel(int64(len(members))) }.</p>
+				}
+			</div>
+			@Flash(flash)
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Members</h2>
+				if len(members) == 0 {
+					<p class="muted">No members yet.</p>
+				} else {
+					<ul class="list-rows">
+						for _, m := range members {
+							<li class="list-row">
+								<a href={ templ.SafeURL("/users/" + m.Username) } class="list-row-main">
+									@Avatar(m.Username, 28)
+									<span>{ m.Username }</span>
+								</a>
+								<form method="post" action={ templ.SafeURL("/lists/" + list.ID.String() + "/members/" + m.ID.String() + "/delete") } class="inline">
+									<button type="submit" class="btn ghost sm">Remove</button>
+								</form>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Add member</h2>
+				<form method="post" action={ templ.SafeURL("/lists/" + list.ID.String() + "/members") } class="form">
+					<label>
+						Username
+						<input type="text" name="username" required placeholder="username"/>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Add</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	}
+}

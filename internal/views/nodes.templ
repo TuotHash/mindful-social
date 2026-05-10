@@ -7,7 +7,7 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags string) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formSourceURL, formPin, formTags, formVisibility string, lists []db.AudienceList) {
 	@Layout("New node", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -43,6 +43,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formS
 					Tags <small>(comma-separated, optional)</small>
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
+				@visibilitySelect(formVisibility, lists)
 				<fieldset class="toggle-group">
 					<legend>Pin to my profile</legend>
 					<div class="toggle-btns">
@@ -311,7 +312,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags string) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList) {
 	@Layout("Edit "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -344,6 +345,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					Tags <small>(comma-separated, optional)</small>
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
+				@visibilitySelect(formVisibility, lists)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">save</span>Save changes</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -351,6 +353,33 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 			</form>
 		</div>
 	}
+}
+
+// visibilitySelect renders the per-node audience picker shared by NodeNew
+// and NodeEdit. Values: "public", "connections", "list:<uuid>", "private".
+// The "list:<uuid>" format keeps the form a single field while still
+// identifying which list governs visibility.
+templ visibilitySelect(selected string, lists []db.AudienceList) {
+	<label>
+		Visibility
+		<select name="visibility">
+			<option value="public" selected?={ selected == "public" || selected == "" }>Public — anyone, including logged-out visitors</option>
+			<option value="connections" selected?={ selected == "connections" }>Connections — people you mutually follow</option>
+			for _, l := range lists {
+				<option value={ "list:" + l.ID.String() } selected?={ selected == "list:"+l.ID.String() }>
+					if l.IsTrusted {
+						List · Trusted
+					} else {
+						List · { l.Name }
+					}
+				</option>
+			}
+			<option value="private" selected?={ selected == "private" }>Private — only you</option>
+		</select>
+		<small>
+			Connections only work if both of you follow each other. Manage lists in <a href="/lists">Lists</a>.
+		</small>
+	</label>
 }
 
 templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID string, reasonings []ReasoningOption) {

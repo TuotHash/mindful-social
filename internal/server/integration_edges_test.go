@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func TestEdgeCreate_AndDisconnect(t *testing.T) {
@@ -146,7 +148,7 @@ func TestEdgePicker_InfixMatch(t *testing.T) {
 
 func singleEdge(t *testing.T, from, to uuid.UUID) uuid.UUID {
 	t.Helper()
-	rows, err := testServer.queries.ListEdgesFromNode(context.Background(), from)
+	rows, err := testServer.queries.ListEdgesFromNodeForViewer(context.Background(), db.ListEdgesFromNodeForViewerParams{FromNode: from})
 	if err != nil {
 		t.Fatalf("list edges: %v", err)
 	}

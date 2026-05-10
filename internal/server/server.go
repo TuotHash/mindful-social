@@ -143,6 +143,14 @@ func (s *Server) routes() {
 		r.Get("/nodes/{id}/pin", s.handlePinForm)
 		r.Post("/nodes/{id}/pin", s.handlePinSet)
 		r.Post("/nodes/{id}/unpin", s.handlePinDelete)
+		r.Post("/users/{username}/follow", s.handleFollow)
+		r.Post("/users/{username}/unfollow", s.handleUnfollow)
+		r.Get("/lists", s.handleListsIndex)
+		r.Post("/lists", s.handleListCreate)
+		r.Get("/lists/{id}", s.handleListDetail)
+		r.Post("/lists/{id}/members", s.handleListAddMember)
+		r.Post("/lists/{id}/members/{userID}/delete", s.handleListRemoveMember)
+		r.Post("/lists/{id}/delete", s.handleListDelete)
 	})
 
 	s.router = r

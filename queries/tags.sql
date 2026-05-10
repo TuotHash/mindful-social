@@ -33,10 +33,12 @@ ORDER BY node_count DESC, t.name ASC;
 -- name: GetTagByName :one
 SELECT * FROM tags WHERE name = $1;
 
--- name: ListNodesWithTag :many
+-- name: ListNodesWithTagForViewer :many
 -- Nodes that carry a given tag, most recent first — for /tags/{name}.
+-- Filtered through node_visible_to() so a viewer only sees nodes they can.
 SELECT n.* FROM nodes n
 JOIN node_tags nt ON nt.node_id = n.id
-WHERE nt.tag_id = $1
+WHERE nt.tag_id = sqlc.arg(tag_id)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY n.created_at DESC
 LIMIT 100;

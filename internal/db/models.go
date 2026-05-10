@@ -177,6 +177,75 @@ func (e PinKind) Valid() bool {
 	return false
 }
 
+type VisibilityKind string
+
+const (
+	VisibilityKindPublic      VisibilityKind = "public"
+	VisibilityKindConnections VisibilityKind = "connections"
+	VisibilityKindList        VisibilityKind = "list"
+	VisibilityKindPrivate     VisibilityKind = "private"
+)
+
+func (e *VisibilityKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = VisibilityKind(s)
+	case string:
+		*e = VisibilityKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for VisibilityKind: %T", src)
+	}
+	return nil
+}
+
+type NullVisibilityKind struct {
+	VisibilityKind VisibilityKind `json:"visibility_kind"`
+	Valid          bool           `json:"valid"` // Valid is true if VisibilityKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullVisibilityKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.VisibilityKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.VisibilityKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullVisibilityKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.VisibilityKind), nil
+}
+
+func (e VisibilityKind) Valid() bool {
+	switch e {
+	case VisibilityKindPublic,
+		VisibilityKindConnections,
+		VisibilityKindList,
+		VisibilityKindPrivate:
+		return true
+	}
+	return false
+}
+
+type AudienceList struct {
+	ID        uuid.UUID          `json:"id"`
+	OwnerID   uuid.UUID          `json:"owner_id"`
+	Name      string             `json:"name"`
+	IsTrusted bool               `json:"is_trusted"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type AudienceListMember struct {
+	ListID       uuid.UUID          `json:"list_id"`
+	MemberUserID uuid.UUID          `json:"member_user_id"`
+	AddedAt      pgtype.Timestamptz `json:"added_at"`
+}
+
 type AuthIdentity struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`
@@ -196,17 +265,25 @@ type Edge struct {
 	Position  *int16             `json:"position"`
 }
 
+type Follow struct {
+	FollowerID uuid.UUID          `json:"follower_id"`
+	FollowedID uuid.UUID          `json:"followed_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type Node struct {
-	ID        uuid.UUID          `json:"id"`
-	Type      NodeType           `json:"type"`
-	Title     string             `json:"title"`
-	Body      string             `json:"body"`
-	SourceUrl *string            `json:"source_url"`
-	CreatedBy uuid.UUID          `json:"created_by"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	SearchTsv interface{}        `json:"search_tsv"`
-	Slug      string             `json:"slug"`
+	ID               uuid.UUID          `json:"id"`
+	Type             NodeType           `json:"type"`
+	Title            string             `json:"title"`
+	Body             string             `json:"body"`
+	SourceUrl        *string            `json:"source_url"`
+	CreatedBy        uuid.UUID          `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	SearchTsv        interface{}        `json:"search_tsv"`
+	Slug             string             `json:"slug"`
+	Visibility       VisibilityKind     `json:"visibility"`
+	VisibilityListID *uuid.UUID         `json:"visibility_list_id"`
 }
 
 type NodeTag struct {

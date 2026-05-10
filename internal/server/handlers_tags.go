@@ -114,7 +114,10 @@ func (s *Server) handleTagDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	nodes, err := s.queries.ListNodesWithTag(r.Context(), tag.ID)
+	nodes, err := s.queries.ListNodesWithTagForViewer(r.Context(), db.ListNodesWithTagForViewerParams{
+		TagID:    tag.ID,
+		ViewerID: viewerID(r),
+	})
 	if err != nil {
 		s.logger.Error("tag detail: list nodes", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

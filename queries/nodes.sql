@@ -1,6 +1,6 @@
 -- name: CreateNode :one
-INSERT INTO nodes (type, title, body, source_url, created_by, slug)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO nodes (type, title, body, source_url, created_by, slug, visibility, visibility_list_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetNode :one
@@ -9,8 +9,11 @@ SELECT * FROM nodes WHERE id = $1;
 -- name: GetNodeBySlug :one
 SELECT * FROM nodes WHERE slug = $1;
 
--- name: ListRecentNodes :many
-SELECT * FROM nodes
+-- name: ListRecentNodesForViewer :many
+-- Home page feed. node_visible_to() handles the per-row visibility check;
+-- viewer_id is NULL for logged-out users (only public nodes match).
+SELECT * FROM nodes n
+WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY created_at DESC
 LIMIT $1;
 
@@ -25,6 +28,8 @@ UPDATE nodes
 SET title = $2,
     body = $3,
     source_url = $4,
+    visibility = $5,
+    visibility_list_id = $6,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -46,13 +51,15 @@ SELECT count(*) FROM edges WHERE from_node = $1 OR to_node = $1;
 -- are surfaced on the confirmation page so the author knows what cascades.
 SELECT count(*) FROM user_node_pins WHERE node_id = $1 AND user_id <> $2;
 
--- name: ListNodesAuthoredBy :many
+-- name: ListNodesAuthoredByForViewer :many
 -- Nodes a user has authored, most recent first — for the "Authored" section
--- on a profile page.
-SELECT * FROM nodes
-WHERE created_by = $1
-ORDER BY created_at DESC
-LIMIT $2;
+-- on a profile page. Filtered through node_visible_to() so a visitor only
+-- sees nodes they're entitled to.
+SELECT * FROM nodes n
+WHERE n.created_by = sqlc.arg(author_id)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+ORDER BY n.created_at DESC
+LIMIT sqlc.arg(result_limit);
 
 -- name: PickerSearchNodes :many
 -- Trigram fuzzy match against the title for the edge-creation picker.
@@ -60,11 +67,13 @@ LIMIT $2;
 -- typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
 -- uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
 -- which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
--- ($2). Raw user text is safe here — pg_trgm operators take plain text, no
--- query syntax to escape.
+-- and skips nodes the viewer can't see. Raw user text is safe here —
+-- pg_trgm operators take plain text, no query syntax to escape.
 SELECT n.id, n.type, n.title
 FROM nodes n
-WHERE n.id != sqlc.arg(source_id) AND n.title %> sqlc.arg(query)::text
+WHERE n.id != sqlc.arg(source_id)
+  AND n.title %> sqlc.arg(query)::text
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY word_similarity(sqlc.arg(query)::text, n.title) DESC, n.title ASC
 LIMIT 50;
 
@@ -81,6 +90,8 @@ LIMIT 50;
 -- ts_headline runs over the tsquery only — fuzzy-only matches get an empty
 -- excerpt because the body did not contain the searched lexemes; the title
 -- carries enough information in that case.
+--
+-- node_visible_to() filters out anything the viewer isn't entitled to.
 SELECT
     n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
@@ -91,7 +102,8 @@ SELECT
     ts_headline('english', n.body, websearch_to_tsquery('english', sqlc.arg(query)::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
 FROM nodes n
-WHERE n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
-   OR n.title %> sqlc.arg(query)::text
+WHERE (n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
+       OR n.title %> sqlc.arg(query)::text)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY rank DESC, n.created_at DESC
 LIMIT sqlc.arg(result_limit);

@@ -56,18 +56,20 @@ func (q *Queries) CountOtherUserPinsForNode(ctx context.Context, arg CountOtherU
 }
 
 const createNode = `-- name: CreateNode :one
-INSERT INTO nodes (type, title, body, source_url, created_by, slug)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug
+INSERT INTO nodes (type, title, body, source_url, created_by, slug, visibility, visibility_list_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id
 `
 
 type CreateNodeParams struct {
-	Type      NodeType  `json:"type"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	SourceUrl *string   `json:"source_url"`
-	CreatedBy uuid.UUID `json:"created_by"`
-	Slug      string    `json:"slug"`
+	Type             NodeType       `json:"type"`
+	Title            string         `json:"title"`
+	Body             string         `json:"body"`
+	SourceUrl        *string        `json:"source_url"`
+	CreatedBy        uuid.UUID      `json:"created_by"`
+	Slug             string         `json:"slug"`
+	Visibility       VisibilityKind `json:"visibility"`
+	VisibilityListID *uuid.UUID     `json:"visibility_list_id"`
 }
 
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
@@ -78,6 +80,8 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		arg.SourceUrl,
 		arg.CreatedBy,
 		arg.Slug,
+		arg.Visibility,
+		arg.VisibilityListID,
 	)
 	var i Node
 	err := row.Scan(
@@ -91,6 +95,8 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.UpdatedAt,
 		&i.SearchTsv,
 		&i.Slug,
+		&i.Visibility,
+		&i.VisibilityListID,
 	)
 	return i, err
 }
@@ -105,7 +111,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -122,12 +128,14 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.UpdatedAt,
 		&i.SearchTsv,
 		&i.Slug,
+		&i.Visibility,
+		&i.VisibilityListID,
 	)
 	return i, err
 }
 
 const getNodeBySlug = `-- name: GetNodeBySlug :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes WHERE slug = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes WHERE slug = $1
 `
 
 func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
@@ -144,26 +152,31 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 		&i.UpdatedAt,
 		&i.SearchTsv,
 		&i.Slug,
+		&i.Visibility,
+		&i.VisibilityListID,
 	)
 	return i, err
 }
 
-const listNodesAuthoredBy = `-- name: ListNodesAuthoredBy :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
-WHERE created_by = $1
-ORDER BY created_at DESC
-LIMIT $2
+const listNodesAuthoredByForViewer = `-- name: ListNodesAuthoredByForViewer :many
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes n
+WHERE n.created_by = $1
+  AND node_visible_to(n.*, $2::uuid)
+ORDER BY n.created_at DESC
+LIMIT $3
 `
 
-type ListNodesAuthoredByParams struct {
-	CreatedBy uuid.UUID `json:"created_by"`
-	Limit     int32     `json:"limit"`
+type ListNodesAuthoredByForViewerParams struct {
+	AuthorID    uuid.UUID  `json:"author_id"`
+	ViewerID    *uuid.UUID `json:"viewer_id"`
+	ResultLimit int32      `json:"result_limit"`
 }
 
 // Nodes a user has authored, most recent first — for the "Authored" section
-// on a profile page.
-func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthoredByParams) ([]Node, error) {
-	rows, err := q.db.Query(ctx, listNodesAuthoredBy, arg.CreatedBy, arg.Limit)
+// on a profile page. Filtered through node_visible_to() so a visitor only
+// sees nodes they're entitled to.
+func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listNodesAuthoredByForViewer, arg.AuthorID, arg.ViewerID, arg.ResultLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -182,6 +195,8 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 			&i.UpdatedAt,
 			&i.SearchTsv,
 			&i.Slug,
+			&i.Visibility,
+			&i.VisibilityListID,
 		); err != nil {
 			return nil, err
 		}
@@ -194,7 +209,7 @@ func (q *Queries) ListNodesAuthoredBy(ctx context.Context, arg ListNodesAuthored
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes
 WHERE type = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -225,6 +240,8 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.UpdatedAt,
 			&i.SearchTsv,
 			&i.Slug,
+			&i.Visibility,
+			&i.VisibilityListID,
 		); err != nil {
 			return nil, err
 		}
@@ -236,14 +253,22 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 	return items, nil
 }
 
-const listRecentNodes = `-- name: ListRecentNodes :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug FROM nodes
+const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes n
+WHERE node_visible_to(n.*, $2::uuid)
 ORDER BY created_at DESC
 LIMIT $1
 `
 
-func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, error) {
-	rows, err := q.db.Query(ctx, listRecentNodes, limit)
+type ListRecentNodesForViewerParams struct {
+	Limit    int32      `json:"limit"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+// Home page feed. node_visible_to() handles the per-row visibility check;
+// viewer_id is NULL for logged-out users (only public nodes match).
+func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listRecentNodesForViewer, arg.Limit, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,6 +287,8 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 			&i.UpdatedAt,
 			&i.SearchTsv,
 			&i.Slug,
+			&i.Visibility,
+			&i.VisibilityListID,
 		); err != nil {
 			return nil, err
 		}
@@ -276,14 +303,17 @@ func (q *Queries) ListRecentNodes(ctx context.Context, limit int32) ([]Node, err
 const pickerSearchNodes = `-- name: PickerSearchNodes :many
 SELECT n.id, n.type, n.title
 FROM nodes n
-WHERE n.id != $1 AND n.title %> $2::text
+WHERE n.id != $1
+  AND n.title %> $2::text
+  AND node_visible_to(n.*, $3::uuid)
 ORDER BY word_similarity($2::text, n.title) DESC, n.title ASC
 LIMIT 50
 `
 
 type PickerSearchNodesParams struct {
-	SourceID uuid.UUID `json:"source_id"`
-	Query    string    `json:"query"`
+	SourceID uuid.UUID  `json:"source_id"`
+	Query    string     `json:"query"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
 }
 
 type PickerSearchNodesRow struct {
@@ -297,10 +327,10 @@ type PickerSearchNodesRow struct {
 // typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
 // uses the GIN trigram index and respects pg_trgm.word_similarity_threshold,
 // which we set to 0.25 in pgxpool.AfterConnect. Excludes the source node
-// ($2). Raw user text is safe here — pg_trgm operators take plain text, no
-// query syntax to escape.
+// and skips nodes the viewer can't see. Raw user text is safe here —
+// pg_trgm operators take plain text, no query syntax to escape.
 func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error) {
-	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.SourceID, arg.Query)
+	rows, err := q.db.Query(ctx, pickerSearchNodes, arg.SourceID, arg.Query, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -330,15 +360,17 @@ SELECT
     ts_headline('english', n.body, websearch_to_tsquery('english', $1::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
 FROM nodes n
-WHERE n.search_tsv @@ websearch_to_tsquery('english', $1::text)
-   OR n.title %> $1::text
+WHERE (n.search_tsv @@ websearch_to_tsquery('english', $1::text)
+       OR n.title %> $1::text)
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY rank DESC, n.created_at DESC
-LIMIT $2
+LIMIT $3
 `
 
 type SearchNodesParams struct {
-	Query       string `json:"query"`
-	ResultLimit int32  `json:"result_limit"`
+	Query       string     `json:"query"`
+	ViewerID    *uuid.UUID `json:"viewer_id"`
+	ResultLimit int32      `json:"result_limit"`
 }
 
 type SearchNodesRow struct {
@@ -367,8 +399,10 @@ type SearchNodesRow struct {
 // ts_headline runs over the tsquery only — fuzzy-only matches get an empty
 // excerpt because the body did not contain the searched lexemes; the title
 // carries enough information in that case.
+//
+// node_visible_to() filters out anything the viewer isn't entitled to.
 func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error) {
-	rows, err := q.db.Query(ctx, searchNodes, arg.Query, arg.ResultLimit)
+	rows, err := q.db.Query(ctx, searchNodes, arg.Query, arg.ViewerID, arg.ResultLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -404,16 +438,20 @@ UPDATE nodes
 SET title = $2,
     body = $3,
     source_url = $4,
+    visibility = $5,
+    visibility_list_id = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id
 `
 
 type UpdateNodeParams struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	SourceUrl *string   `json:"source_url"`
+	ID               uuid.UUID      `json:"id"`
+	Title            string         `json:"title"`
+	Body             string         `json:"body"`
+	SourceUrl        *string        `json:"source_url"`
+	Visibility       VisibilityKind `json:"visibility"`
+	VisibilityListID *uuid.UUID     `json:"visibility_list_id"`
 }
 
 func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error) {
@@ -422,6 +460,8 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		arg.Title,
 		arg.Body,
 		arg.SourceUrl,
+		arg.Visibility,
+		arg.VisibilityListID,
 	)
 	var i Node
 	err := row.Scan(
@@ -435,6 +475,8 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.UpdatedAt,
 		&i.SearchTsv,
 		&i.Slug,
+		&i.Visibility,
+		&i.VisibilityListID,
 	)
 	return i, err
 }

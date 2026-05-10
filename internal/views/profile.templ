@@ -1,9 +1,22 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/TuotHash/mindful-social/internal/db"
 )
+
+func followerLabel(n int64) string {
+	if n == 1 {
+		return "1 follower"
+	}
+	return fmt.Sprintf("%d followers", n)
+}
+
+func followingLabel(n int64) string {
+	return fmt.Sprintf("%d following", n)
+}
 
 // PinRow is one entry in the "On profile" section: the pinned node and the
 // kind of pin (supports / opposes / featured), with an optional reasoning.
@@ -16,6 +29,22 @@ type PinRow struct {
 	ReasoningID    *uuid.UUID
 	ReasoningSlug  string
 	ReasoningTitle string
+}
+
+// FollowRelation captures the follow relationship between the viewer and
+// the profile being rendered. ViewerFollows / FollowsViewer are zero when
+// the viewer is logged-out or looking at their own profile.
+type FollowRelation struct {
+	Followers     int64
+	Following     int64
+	ViewerFollows bool
+	FollowsViewer bool
+}
+
+// IsConnection reports whether the viewer and the profile have a mutual
+// follow — the platform's notion of "friends".
+func (r FollowRelation) IsConnection() bool {
+	return r.ViewerFollows && r.FollowsViewer
 }
 
 // pinKindShort is the inline label rendered next to each pin row on a
@@ -32,7 +61,7 @@ func pinKindShort(k db.PinKind) string {
 	return string(k)
 }
 
-templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, identities []string) {
+templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, identities []string, relation FollowRelation) {
 	@Layout(profile.Username+" — profile", viewer) {
 		<div class="page medium">
 			<section class="profile">
@@ -45,14 +74,30 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 								<h1>{ profile.Username }</h1>
 								<div class="row gap-12 wrap muted" style="font-size: 13px; font-family: var(--mono);">
 									<span>Joined { profile.CreatedAt.Time.Format("January 2006") }</span>
+									<span>·</span>
+									<span>{ followerLabel(relation.Followers) }</span>
+									<span>·</span>
+									<span>{ followingLabel(relation.Following) }</span>
 									if isSelf {
 										<span>·</span><span>this is you</span>
+									} else if relation.IsConnection() {
+										<span>·</span><span class="badge accent">Connection</span>
+									} else if relation.FollowsViewer {
+										<span>·</span><span>follows you</span>
 									}
 								</div>
 							</div>
 							if !isSelf && viewer != nil {
 								<div class="col gap-8">
-									<button class="btn accent" type="button" disabled>+ Follow</button>
+									if relation.ViewerFollows {
+										<form method="post" action={ templ.SafeURL("/users/" + profile.Username + "/unfollow") } class="inline">
+											<button class="btn ghost" type="submit">Following</button>
+										</form>
+									} else {
+										<form method="post" action={ templ.SafeURL("/users/" + profile.Username + "/follow") } class="inline">
+											<button class="btn accent" type="submit">+ Follow</button>
+										</form>
+									}
 								</div>
 							}
 						</div>

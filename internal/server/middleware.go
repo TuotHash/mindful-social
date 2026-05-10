@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/TuotHash/mindful-social/internal/auth"
@@ -60,6 +61,17 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 func currentUser(r *http.Request) *db.User {
 	u, _ := r.Context().Value(ctxUserKey).(*db.User)
 	return u
+}
+
+// viewerID returns the current user's id as a pointer suitable for the
+// nullable viewer_id parameter on visibility-aware queries. nil when the
+// request is anonymous.
+func viewerID(r *http.Request) *uuid.UUID {
+	if u := currentUser(r); u != nil {
+		id := u.ID
+		return &id
+	}
+	return nil
 }
 
 // viewerFor turns a *db.User into the slim Viewer struct templates render.

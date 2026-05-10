@@ -79,7 +79,7 @@ func (q *Queries) FeatureEdge(ctx context.Context, arg FeatureEdgeParams) error 
 	return err
 }
 
-const listEdgesFromNode = `-- name: ListEdgesFromNode :many
+const listEdgesFromNodeForViewer = `-- name: ListEdgesFromNodeForViewer :many
 SELECT
     e.id,
     e.kind,
@@ -92,10 +92,16 @@ SELECT
 FROM edges e
 JOIN nodes n ON n.id = e.to_node
 WHERE e.from_node = $1
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY e.created_at DESC
 `
 
-type ListEdgesFromNodeRow struct {
+type ListEdgesFromNodeForViewerParams struct {
+	FromNode uuid.UUID  `json:"from_node"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+type ListEdgesFromNodeForViewerRow struct {
 	ID        uuid.UUID          `json:"id"`
 	Kind      EdgeKind           `json:"kind"`
 	Position  *int16             `json:"position"`
@@ -109,15 +115,16 @@ type ListEdgesFromNodeRow struct {
 // Outgoing edges with the destination node's title and type joined in,
 // ready to render the "this node points at..." section of the legend.
 // position is NULL for legend-only edges and an integer rank for featured ones.
-func (q *Queries) ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListEdgesFromNodeRow, error) {
-	rows, err := q.db.Query(ctx, listEdgesFromNode, fromNode)
+// node_visible_to() hides edges whose endpoint the viewer isn't entitled to.
+func (q *Queries) ListEdgesFromNodeForViewer(ctx context.Context, arg ListEdgesFromNodeForViewerParams) ([]ListEdgesFromNodeForViewerRow, error) {
+	rows, err := q.db.Query(ctx, listEdgesFromNodeForViewer, arg.FromNode, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListEdgesFromNodeRow
+	var items []ListEdgesFromNodeForViewerRow
 	for rows.Next() {
-		var i ListEdgesFromNodeRow
+		var i ListEdgesFromNodeForViewerRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
@@ -138,7 +145,7 @@ func (q *Queries) ListEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]
 	return items, nil
 }
 
-const listEdgesToNode = `-- name: ListEdgesToNode :many
+const listEdgesToNodeForViewer = `-- name: ListEdgesToNodeForViewer :many
 SELECT
     e.id,
     e.kind,
@@ -150,10 +157,16 @@ SELECT
 FROM edges e
 JOIN nodes n ON n.id = e.from_node
 WHERE e.to_node = $1
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY e.created_at DESC
 `
 
-type ListEdgesToNodeRow struct {
+type ListEdgesToNodeForViewerParams struct {
+	ToNode   uuid.UUID  `json:"to_node"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+type ListEdgesToNodeForViewerRow struct {
 	ID        uuid.UUID          `json:"id"`
 	Kind      EdgeKind           `json:"kind"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -164,15 +177,15 @@ type ListEdgesToNodeRow struct {
 }
 
 // Incoming edges, similar shape — for "what points at this node".
-func (q *Queries) ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]ListEdgesToNodeRow, error) {
-	rows, err := q.db.Query(ctx, listEdgesToNode, toNode)
+func (q *Queries) ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToNodeForViewerParams) ([]ListEdgesToNodeForViewerRow, error) {
+	rows, err := q.db.Query(ctx, listEdgesToNodeForViewer, arg.ToNode, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListEdgesToNodeRow
+	var items []ListEdgesToNodeForViewerRow
 	for rows.Next() {
-		var i ListEdgesToNodeRow
+		var i ListEdgesToNodeForViewerRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
@@ -192,7 +205,7 @@ func (q *Queries) ListEdgesToNode(ctx context.Context, toNode uuid.UUID) ([]List
 	return items, nil
 }
 
-const listFeaturedEdgesFromNode = `-- name: ListFeaturedEdgesFromNode :many
+const listFeaturedEdgesFromNodeForViewer = `-- name: ListFeaturedEdgesFromNodeForViewer :many
 SELECT
     e.id,
     e.kind,
@@ -204,11 +217,18 @@ SELECT
     n.body  AS to_body
 FROM edges e
 JOIN nodes n ON n.id = e.to_node
-WHERE e.from_node = $1 AND e.position IS NOT NULL
+WHERE e.from_node = $1
+  AND e.position IS NOT NULL
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY e.position ASC
 `
 
-type ListFeaturedEdgesFromNodeRow struct {
+type ListFeaturedEdgesFromNodeForViewerParams struct {
+	FromNode uuid.UUID  `json:"from_node"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+type ListFeaturedEdgesFromNodeForViewerRow struct {
 	ID       uuid.UUID `json:"id"`
 	Kind     EdgeKind  `json:"kind"`
 	Position *int16    `json:"position"`
@@ -221,16 +241,17 @@ type ListFeaturedEdgesFromNodeRow struct {
 
 // Outgoing edges marked as featured (position IS NOT NULL), with the
 // destination node's full body included so it can be rendered inline on the
-// source node's page. Ordered by position ascending.
-func (q *Queries) ListFeaturedEdgesFromNode(ctx context.Context, fromNode uuid.UUID) ([]ListFeaturedEdgesFromNodeRow, error) {
-	rows, err := q.db.Query(ctx, listFeaturedEdgesFromNode, fromNode)
+// source node's page. Ordered by position ascending. Filtered through
+// node_visible_to() so a hidden destination simply doesn't appear.
+func (q *Queries) ListFeaturedEdgesFromNodeForViewer(ctx context.Context, arg ListFeaturedEdgesFromNodeForViewerParams) ([]ListFeaturedEdgesFromNodeForViewerRow, error) {
+	rows, err := q.db.Query(ctx, listFeaturedEdgesFromNodeForViewer, arg.FromNode, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListFeaturedEdgesFromNodeRow
+	var items []ListFeaturedEdgesFromNodeForViewerRow
 	for rows.Next() {
-		var i ListFeaturedEdgesFromNodeRow
+		var i ListFeaturedEdgesFromNodeForViewerRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Kind,
