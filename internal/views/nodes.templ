@@ -88,6 +88,15 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		</div>
 		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views.</small>
 	</fieldset>
+	<label>
+		Title
+		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
+	</label>
+	<label>
+		Body
+		<textarea name="body" rows="5">{ formBody }</textarea>
+		<small>Optional. Describe the node in your own words.</small>
+	</label>
 	<div class="if-view topic-picker-section">
 		<label>
 			Parent topic <span style="color: var(--opposes);">*</span>
@@ -107,15 +116,6 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		</label>
 		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
 	</div>
-	<label>
-		Title
-		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
-	</label>
-	<label>
-		Body
-		<textarea name="body" rows="5">{ formBody }</textarea>
-		<small>Optional. Describe the node in your own words.</small>
-	</label>
 	<label>
 		Tags <small>(comma-separated, optional)</small>
 		<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
