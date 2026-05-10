@@ -1,0 +1,114 @@
+package views
+
+import (
+	"github.com/google/uuid"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
+
+// AccountIdentity is one row in the account page's "Sign-in methods" list.
+// Label is the human-friendly provider name; Subject is the email or oauth
+// subject shown alongside it. CanDisconnect is false on the last remaining
+// identity so the UI can disable the button.
+type AccountIdentity struct {
+	ID            uuid.UUID
+	Provider      string
+	Label         string
+	Subject       string
+	CanDisconnect bool
+}
+
+templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, flash, success string) {
+	@Layout("Account", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Settings</span>
+				<h1 class="h-1">Account</h1>
+				<p class="muted" style="margin: 0;">View your account details, change your password, and manage how you sign in.</p>
+			</div>
+			@Flash(flash)
+			if success != "" {
+				<div class="flash" role="status" style="background: color-mix(in oklch, var(--supports) 14%, var(--bg)); border-color: color-mix(in oklch, var(--supports) 40%, transparent);">{ success }</div>
+			}
+
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Details</h2>
+				<div class="account-field">
+					<div class="account-field-label">Username</div>
+					<div class="account-field-value">{ user.Username }</div>
+					<div class="account-field-note muted">Changing usernames isn't available yet — we still need rate limits to keep handle-cycling under control.</div>
+				</div>
+				<div class="account-field">
+					<div class="account-field-label">Email</div>
+					<div class="account-field-value">{ user.Email }</div>
+					<div class="account-field-note muted">Changing email isn't available yet — it needs a verified-email flow before we can let it loose.</div>
+				</div>
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Password</h2>
+				if hasPassword {
+					<form method="post" action="/account/password" class="form">
+						<label>
+							Current password
+							<input type="password" name="current_password" required autocomplete="current-password"/>
+						</label>
+						<label>
+							New password
+							<input type="password" name="new_password" required minlength="12" autocomplete="new-password" placeholder="at least 12 characters"/>
+						</label>
+						<label>
+							Confirm new password
+							<input type="password" name="confirm_password" required minlength="12" autocomplete="new-password"/>
+						</label>
+						<div class="form-row">
+							<button type="submit" class="btn accent">Change password</button>
+						</div>
+					</form>
+				} else {
+					<p class="muted" style="margin-top: 0;">You signed in with an external provider and haven't set a password yet. Add one to enable email + password sign-in as a backup.</p>
+					<form method="post" action="/account/password" class="form">
+						<label>
+							New password
+							<input type="password" name="new_password" required minlength="12" autocomplete="new-password" placeholder="at least 12 characters"/>
+						</label>
+						<label>
+							Confirm new password
+							<input type="password" name="confirm_password" required minlength="12" autocomplete="new-password"/>
+						</label>
+						<div class="form-row">
+							<button type="submit" class="btn accent">Set password</button>
+						</div>
+					</form>
+				}
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Sign-in methods</h2>
+				if len(identities) == 0 {
+					<p class="muted">No sign-in methods on file.</p>
+				} else {
+					<ul class="list-rows">
+						for _, ident := range identities {
+							<li class="list-row">
+								<div class="list-row-main" style="cursor: default;">
+									<span class="ident-label">{ ident.Label }</span>
+									if ident.Subject != "" {
+										<span class="muted" style="font-size: 13px;">{ ident.Subject }</span>
+									}
+								</div>
+								if ident.CanDisconnect {
+									<form method="post" action={ templ.SafeURL("/account/identities/" + ident.ID.String() + "/disconnect") } class="inline" onsubmit="return confirm('Disconnect this sign-in method? You can re-add it later by signing in with it again.')">
+										<button type="submit" class="btn ghost sm">Disconnect</button>
+									</form>
+								} else {
+									<span class="muted" style="font-size: 13px;">Last method — can't disconnect</span>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</section>
+		</div>
+	}
+}

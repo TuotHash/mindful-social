@@ -23,6 +23,7 @@ type Querier interface {
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
 	CountFollowers(ctx context.Context, followedID uuid.UUID) (int64, error)
 	CountFollowing(ctx context.Context, followerID uuid.UUID) (int64, error)
+	CountIdentitiesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountListMembers(ctx context.Context, listID uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
 	// Pins on this node by users other than the node's author. The author's own
@@ -44,6 +45,7 @@ type Querier interface {
 	// Trusted lists can't be deleted; the WHERE clause enforces this without
 	// the caller having to remember.
 	DeleteAudienceList(ctx context.Context, arg DeleteAudienceListParams) error
+	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
 	// Any logged-in user can delete any edge (wiki-open curation, same as
 	// feature/unfeature). Both endpoints of an edge can trigger this — the page
 	// the user is on is just where they get redirected after the delete.
@@ -67,11 +69,13 @@ type Querier interface {
 	// back (mutual = connection)?
 	GetFollowState(ctx context.Context, arg GetFollowStateParams) (GetFollowStateRow, error)
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
+	GetIdentityForUser(ctx context.Context, arg GetIdentityForUserParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	GetNodeBySlug(ctx context.Context, slug string) (Node, error)
 	// Lookup used by the password-login flow: find the user by email AND the
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
+	GetPasswordIdentityForUser(ctx context.Context, userID uuid.UUID) (AuthIdentity, error)
 	// Whether and how the viewer has pinned a given node. Attached reasonings
 	// are loaded separately via ListReasoningsForPin so the same shape covers
 	// 0, 1, or many reasonings without nested aggregation here.
@@ -174,6 +178,7 @@ type Querier interface {
 	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
 	UnfeatureEdge(ctx context.Context, arg UnfeatureEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
+	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Idempotent: returns the tag id whether it already existed or just got
 	// inserted. The DO UPDATE SET name=EXCLUDED.name is a no-op that exists
 	// only so RETURNING fires on the conflict path.

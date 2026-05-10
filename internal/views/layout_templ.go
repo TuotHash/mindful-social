@@ -155,7 +155,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" role=\"menuitem\">Profile</a> <a class=\"user-menu-item\" href=\"#\" role=\"menuitem\">Account</a> <a class=\"user-menu-item\" href=\"#\" role=\"menuitem\">Settings</a> <a class=\"user-menu-item\" href=\"/lists\" role=\"menuitem\">Audiences</a><div class=\"user-menu-divider\"></div><form method=\"post\" action=\"/logout\" class=\"user-menu-form\"><button type=\"submit\" class=\"user-menu-item\" role=\"menuitem\">Log out</button></form></div></details>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" role=\"menuitem\">Profile</a> <a class=\"user-menu-item\" href=\"/account\" role=\"menuitem\">Account</a> <a class=\"user-menu-item\" href=\"#\" role=\"menuitem\">Settings</a> <a class=\"user-menu-item\" href=\"/lists\" role=\"menuitem\">Audiences</a><div class=\"user-menu-divider\"></div><form method=\"post\" action=\"/logout\" class=\"user-menu-form\"><button type=\"submit\" class=\"user-menu-item\" role=\"menuitem\">Log out</button></form></div></details>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

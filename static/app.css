@@ -247,6 +247,32 @@ a { color: inherit; }
   background: var(--line);
 }
 
+/* ===== Account page ===== */
+.account-field {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.account-field:first-of-type { padding-top: 4px; }
+.account-field:last-of-type { padding-bottom: 4px; border-bottom: 0; }
+.account-field-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.account-field-value {
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.account-field-note {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ident-label { font-weight: 500; }
+
 /* ===== Buttons ===== */
 .btn {
   display: inline-flex;

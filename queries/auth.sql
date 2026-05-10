@@ -20,3 +20,22 @@ WHERE u.email = $1
 SELECT * FROM auth_identities
 WHERE user_id = $1
 ORDER BY created_at;
+
+-- name: GetPasswordIdentityForUser :one
+SELECT * FROM auth_identities
+WHERE user_id = $1 AND provider = 'password'
+LIMIT 1;
+
+-- name: UpdatePasswordIdentitySecret :exec
+UPDATE auth_identities
+SET secret = $2
+WHERE user_id = $1 AND provider = 'password';
+
+-- name: GetIdentityForUser :one
+SELECT * FROM auth_identities WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteAuthIdentityForUser :exec
+DELETE FROM auth_identities WHERE id = $1 AND user_id = $2;
+
+-- name: CountIdentitiesForUser :one
+SELECT COUNT(*) FROM auth_identities WHERE user_id = $1;

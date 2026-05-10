@@ -22,6 +22,10 @@ var (
 	ErrInvalidLogin     = errors.New("invalid email or password")
 	ErrLinkConflict     = errors.New("this provider account is linked to a different user")
 	ErrUsernameTaken    = errors.New("username is taken")
+	ErrLastIdentity     = errors.New("can't remove your last sign-in method")
+	ErrIdentityNotFound = errors.New("sign-in method not found")
+	ErrNoPassword       = errors.New("no password set for this account")
+	ErrPasswordExists   = errors.New("password is already set; use change instead")
 	usernameValidRegex  = regexp.MustCompile(`^[a-zA-Z0-9._-]{3,32}$`)
 	emailValidRegex     = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 )
@@ -234,6 +238,85 @@ func (s *Service) uniqueUsername(ctx context.Context, q *db.Queries, base string
 		}
 	}
 	return "", ErrUsernameTaken
+}
+
+// ChangePassword verifies the user's current password and replaces the
+// bcrypt hash on their existing password identity. Returns ErrInvalidLogin
+// when the current password doesn't match so callers can show a generic
+// error without leaking which step failed.
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword string) error {
+	ident, err := s.q.GetPasswordIdentityForUser(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNoPassword
+		}
+		return err
+	}
+	if ident.Secret == nil {
+		return ErrInvalidLogin
+	}
+	if err := CheckPassword(*ident.Secret, current); err != nil {
+		return ErrInvalidLogin
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	return s.q.UpdatePasswordIdentitySecret(ctx, db.UpdatePasswordIdentitySecretParams{
+		UserID: userID,
+		Secret: &hash,
+	})
+}
+
+// SetInitialPassword adds a password identity for a user who currently
+// has none — i.e. signed up via OAuth and now wants email-and-password as
+// a backup sign-in. The new identity's subject is the user's email so
+// the existing login lookup keeps working.
+func (s *Service) SetInitialPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
+	if _, err := s.q.GetPasswordIdentityForUser(ctx, userID); err == nil {
+		return ErrPasswordExists
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	user, err := s.q.GetUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	_, err = s.q.CreateAuthIdentity(ctx, db.CreateAuthIdentityParams{
+		UserID:   userID,
+		Provider: "password",
+		Subject:  strings.ToLower(strings.TrimSpace(user.Email)),
+		Secret:   &hash,
+	})
+	return err
+}
+
+// DisconnectIdentity removes a sign-in method from the user's account.
+// Refuses to remove the last remaining identity so the user can never
+// lock themselves out.
+func (s *Service) DisconnectIdentity(ctx context.Context, userID, identityID uuid.UUID) error {
+	if _, err := s.q.GetIdentityForUser(ctx, db.GetIdentityForUserParams{
+		ID: identityID, UserID: userID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrIdentityNotFound
+		}
+		return err
+	}
+	n, err := s.q.CountIdentitiesForUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if n <= 1 {
+		return ErrLastIdentity
+	}
+	return s.q.DeleteAuthIdentityForUser(ctx, db.DeleteAuthIdentityForUserParams{
+		ID: identityID, UserID: userID,
+	})
 }
 
 // tx runs fn inside a transaction, committing on success and rolling back on

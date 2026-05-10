@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countIdentitiesForUser = `-- name: CountIdentitiesForUser :one
+SELECT COUNT(*) FROM auth_identities WHERE user_id = $1
+`
+
+func (q *Queries) CountIdentitiesForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countIdentitiesForUser, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAuthIdentity = `-- name: CreateAuthIdentity :one
 INSERT INTO auth_identities (user_id, provider, subject, secret)
 VALUES ($1, $2, $3, $4)
@@ -44,6 +55,20 @@ func (q *Queries) CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentity
 	return i, err
 }
 
+const deleteAuthIdentityForUser = `-- name: DeleteAuthIdentityForUser :exec
+DELETE FROM auth_identities WHERE id = $1 AND user_id = $2
+`
+
+type DeleteAuthIdentityForUserParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error {
+	_, err := q.db.Exec(ctx, deleteAuthIdentityForUser, arg.ID, arg.UserID)
+	return err
+}
+
 const getIdentityByProvider = `-- name: GetIdentityByProvider :one
 SELECT id, user_id, provider, subject, secret, created_at FROM auth_identities
 WHERE provider = $1 AND subject = $2
@@ -56,6 +81,29 @@ type GetIdentityByProviderParams struct {
 
 func (q *Queries) GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByProvider, arg.Provider, arg.Subject)
+	var i AuthIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Provider,
+		&i.Subject,
+		&i.Secret,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getIdentityForUser = `-- name: GetIdentityForUser :one
+SELECT id, user_id, provider, subject, secret, created_at FROM auth_identities WHERE id = $1 AND user_id = $2
+`
+
+type GetIdentityForUserParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetIdentityForUser(ctx context.Context, arg GetIdentityForUserParams) (AuthIdentity, error) {
+	row := q.db.QueryRow(ctx, getIdentityForUser, arg.ID, arg.UserID)
 	var i AuthIdentity
 	err := row.Scan(
 		&i.ID,
@@ -101,6 +149,26 @@ func (q *Queries) GetPasswordIdentityForLogin(ctx context.Context, email string)
 	return i, err
 }
 
+const getPasswordIdentityForUser = `-- name: GetPasswordIdentityForUser :one
+SELECT id, user_id, provider, subject, secret, created_at FROM auth_identities
+WHERE user_id = $1 AND provider = 'password'
+LIMIT 1
+`
+
+func (q *Queries) GetPasswordIdentityForUser(ctx context.Context, userID uuid.UUID) (AuthIdentity, error) {
+	row := q.db.QueryRow(ctx, getPasswordIdentityForUser, userID)
+	var i AuthIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Provider,
+		&i.Subject,
+		&i.Secret,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listIdentitiesForUser = `-- name: ListIdentitiesForUser :many
 SELECT id, user_id, provider, subject, secret, created_at FROM auth_identities
 WHERE user_id = $1
@@ -132,4 +200,20 @@ func (q *Queries) ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const updatePasswordIdentitySecret = `-- name: UpdatePasswordIdentitySecret :exec
+UPDATE auth_identities
+SET secret = $2
+WHERE user_id = $1 AND provider = 'password'
+`
+
+type UpdatePasswordIdentitySecretParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Secret *string   `json:"secret"`
+}
+
+func (q *Queries) UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error {
+	_, err := q.db.Exec(ctx, updatePasswordIdentitySecret, arg.UserID, arg.Secret)
+	return err
 }
