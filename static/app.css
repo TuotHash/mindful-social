@@ -718,6 +718,29 @@ fieldset.toggle-group legend {
   border-color: color-mix(in oklch, var(--accent-deep) 30%, var(--accent));
   box-shadow: 0 1px 2px rgba(28,26,20,0.08), 0 8px 20px -8px color-mix(in oklch, var(--accent-deep) 50%, transparent);
 }
+/* edge-kind variants for the relationship-kind picker */
+.toggle-btn[data-edge-kind="supports"]:has(input:checked) {
+  background: var(--supports); color: white; border-color: var(--supports);
+}
+.toggle-btn[data-edge-kind="opposes"]:has(input:checked) {
+  background: var(--opposes); color: white; border-color: var(--opposes);
+}
+.toggle-btn[data-edge-kind="refines"]:has(input:checked) {
+  background: var(--refines); color: white; border-color: var(--refines);
+}
+.toggle-btn[data-edge-kind="cites"]:has(input:checked) {
+  background: var(--cites); color: white; border-color: var(--cites);
+}
+.toggle-btn[data-edge-kind="relates_to"]:has(input:checked) {
+  background: var(--relates); color: white; border-color: var(--relates);
+}
+
+/* Vertical stack variant: each button on its own row, full width. Used when
+   labels can be long (e.g. reasoning titles in the pin form). */
+.toggle-btns.toggle-btns-stack { flex-direction: column; }
+.toggle-btns.toggle-btns-stack .toggle-btn {
+  flex: 0 0 auto; justify-content: flex-start; text-align: left;
+}
 
 /* Conditional fields driven by the type radio in the Post form. When type
    is topic, hide options that only make sense on a view (Support / Oppose

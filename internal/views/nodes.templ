@@ -479,18 +479,26 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID str
 						</label>
 					</div>
 				</fieldset>
-				<label>
-					Reasoning <small>(optional)</small>
-					<select name="reasoning_id">
-						<option value="">— No specific reasoning —</option>
+				<fieldset class="toggle-group">
+					<legend>Reasoning <small>(optional)</small></legend>
+					<div class="toggle-btns toggle-btns-stack">
+						<label class="toggle-btn" data-reasoning="none">
+							<input type="radio" name="reasoning_id" value="" checked?={ formReasoningID == "" }/>
+							<span class="material-symbols-outlined">block</span>
+							No specific reasoning
+						</label>
 						for _, r := range reasonings {
-							<option value={ r.ID.String() } selected?={ r.ID.String() == formReasoningID }>{ r.Title }</option>
+							<label class="toggle-btn" data-reasoning="node">
+								<input type="radio" name="reasoning_id" value={ r.ID.String() } checked?={ r.ID.String() == formReasoningID }/>
+								<span class="material-symbols-outlined">psychology</span>
+								{ r.Title }
+							</label>
 						}
-					</select>
+					</div>
 					if len(reasonings) == 0 {
-						<small>You haven't authored any reasoning nodes yet. You can still pin without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
+						<small class="muted" style="font-size: 12px;">You haven't authored any reasoning nodes yet. You can still pin without one, or <a href="/nodes/new">create a reasoning node</a> first.</small>
 					}
-				</label>
+				</fieldset>
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">push_pin</span>Save pin</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -571,16 +579,37 @@ templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []
 }
 
 templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeCandidate) {
-	<label>
-		Relationship kind
-		<select name="kind" required>
-			<option value="supports" selected?={ formKind == "supports" || formKind == "" }>Supports — the source backs the target</option>
-			<option value="opposes" selected?={ formKind == "opposes" }>Opposes — the source argues against the target</option>
-			<option value="refines" selected?={ formKind == "refines" }>Refines — the source clarifies or narrows the target</option>
-			<option value="cites" selected?={ formKind == "cites" }>Cites — the source references the target as evidence</option>
-			<option value="relates_to" selected?={ formKind == "relates_to" }>Relates to — loosely connected</option>
-		</select>
-	</label>
+	<fieldset class="toggle-group">
+		<legend>Relationship kind</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-edge-kind="supports">
+				<input type="radio" name="kind" value="supports" required checked?={ formKind == "supports" || formKind == "" }/>
+				<span class="material-symbols-outlined">thumb_up</span>
+				Supports
+			</label>
+			<label class="toggle-btn" data-edge-kind="opposes">
+				<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
+				<span class="material-symbols-outlined">thumb_down</span>
+				Opposes
+			</label>
+			<label class="toggle-btn" data-edge-kind="refines">
+				<input type="radio" name="kind" value="refines" checked?={ formKind == "refines" }/>
+				<span class="material-symbols-outlined">tune</span>
+				Refines
+			</label>
+			<label class="toggle-btn" data-edge-kind="cites">
+				<input type="radio" name="kind" value="cites" checked?={ formKind == "cites" }/>
+				<span class="material-symbols-outlined">format_quote</span>
+				Cites
+			</label>
+			<label class="toggle-btn" data-edge-kind="relates_to">
+				<input type="radio" name="kind" value="relates_to" checked?={ formKind == "relates_to" }/>
+				<span class="material-symbols-outlined">link</span>
+				Relates to
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">How the source relates to the target — supports backs it, opposes argues against, refines clarifies, cites references, relates_to is a loose link.</small>
+	</fieldset>
 	<label>
 		Find target node
 		<input

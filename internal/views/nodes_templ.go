@@ -1476,76 +1476,86 @@ func PinForm(viewer *Viewer, node db.Node, flash, formKind, formReasoningID stri
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "> <span class=\"material-symbols-outlined\">keep</span> Just feature</label></div></fieldset><label>Reasoning <small>(optional)</small> <select name=\"reasoning_id\"><option value=\"\">— No specific reasoning —</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "> <span class=\"material-symbols-outlined\">keep</span> Just feature</label></div></fieldset><fieldset class=\"toggle-group\"><legend>Reasoning <small>(optional)</small></legend><div class=\"toggle-btns toggle-btns-stack\"><label class=\"toggle-btn\" data-reasoning=\"none\"><input type=\"radio\" name=\"reasoning_id\" value=\"\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if formReasoningID == "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, " checked")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "> <span class=\"material-symbols-outlined\">block</span> No specific reasoning</label> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, r := range reasonings {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "<option value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "<label class=\"toggle-btn\" data-reasoning=\"node\"><input type=\"radio\" name=\"reasoning_id\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var63 string
 				templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(r.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 487, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 492, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if r.ID.String() == formReasoningID {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, " selected")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, " checked")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, ">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "> <span class=\"material-symbols-outlined\">psychology</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var64 string
 				templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(r.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 487, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 494, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "</option>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "</label>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "</select> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if len(reasonings) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "<small>You haven't authored any reasoning nodes yet. You can still pin without one, or <a href=\"/nodes/new\">create a reasoning node</a> first.</small>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "<small class=\"muted\" style=\"font-size: 12px;\">You haven't authored any reasoning nodes yet. You can still pin without one, or <a href=\"/nodes/new\">create a reasoning node</a> first.</small>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "</label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">push_pin</span>Save pin</button> <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "</fieldset><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">push_pin</span>Save pin</button> <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var65 templ.SafeURL
 			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + node.Slug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 496, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 504, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1600,7 +1610,7 @@ func EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, can
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "<div class=\"page narrow\"><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 18px;\"><span class=\"eyebrow\">Connect from</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "<div class=\"page narrow\"><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 18px;\"><span class=\"eyebrow\">Connect from</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1608,20 +1618,20 @@ func EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, can
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "</div><h1 class=\"h-1\" style=\"margin-bottom: 12px; font-size: 36px;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "</div><h1 class=\"h-1\" style=\"margin-bottom: 12px; font-size: 36px;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var68 string
 			templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(fromNode.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 518, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 526, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "</h1><p class=\"muted\" style=\"margin: 0 0 24px;\">You are creating a directed connection <strong>from</strong> this node <strong>to</strong> another. The kind describes how the source relates to the target.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "</h1><p class=\"muted\" style=\"margin: 0 0 24px;\">You are creating a directed connection <strong>from</strong> this node <strong>to</strong> another. The kind describes how the source relates to the target.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1629,20 +1639,20 @@ func EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, can
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var69 templ.SafeURL
 			templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + fromNode.Slug + "/edges"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 524, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 532, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "\" class=\"form\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "\" class=\"form\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1650,20 +1660,20 @@ func EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, can
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "<div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">conversion_path</span>Add connection</button> <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "<div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">conversion_path</span>Add connection</button> <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var70 templ.SafeURL
 			templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + fromNode.Slug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 528, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 536, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1703,7 +1713,7 @@ func EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []E
 			templ_7745c5c3_Var71 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "<div class=\"modal-backdrop\" onclick=\"if(event.target===this)document.getElementById('modal').innerHTML=''\"><div class=\"modal-dialog\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\"><button type=\"button\" class=\"modal-close\" aria-label=\"Close\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span></button><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 10px;\"><span class=\"eyebrow\">Connect from</span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "<div class=\"modal-backdrop\" onclick=\"if(event.target===this)document.getElementById('modal').innerHTML=''\"><div class=\"modal-dialog\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\"><button type=\"button\" class=\"modal-close\" aria-label=\"Close\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span></button><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 10px;\"><span class=\"eyebrow\">Connect from</span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1711,20 +1721,20 @@ func EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []E
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "</div><h2 id=\"modal-title\" style=\"margin: 0 0 6px; font-size: 22px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "</div><h2 id=\"modal-title\" style=\"margin: 0 0 6px; font-size: 22px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var72 string
 		templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(fromNode.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 550, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 558, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "</h2><p class=\"muted\" style=\"margin: 0 0 18px; font-size: 13px;\">Create a directed connection from this node to another.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "</h2><p class=\"muted\" style=\"margin: 0 0 18px; font-size: 13px;\">Create a directed connection from this node to another.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1732,33 +1742,33 @@ func EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []E
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "<form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "<form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var73 templ.SafeURL
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + fromNode.Slug + "/edges"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 557, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 565, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "\" class=\"form\" hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "\" class=\"form\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs("/nodes/" + fromNode.Slug + "/edges")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 559, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 567, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "\" hx-target=\"#modal\" hx-swap=\"innerHTML\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, "\" hx-target=\"#modal\" hx-swap=\"innerHTML\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1766,7 +1776,7 @@ func EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []E
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "<div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">conversion_path</span>Add connection</button> <button type=\"button\" class=\"btn ghost\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span>Cancel</button></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, "<div class=\"form-row\"><button type=\"submit\" class=\"btn accent\"><span class=\"material-symbols-outlined\">conversion_path</span>Add connection</button> <button type=\"button\" class=\"btn ghost\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span>Cancel</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1795,83 +1805,83 @@ func edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeCa
 			templ_7745c5c3_Var75 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, "<label>Relationship kind <select name=\"kind\" required><option value=\"supports\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, "<fieldset class=\"toggle-group\"><legend>Relationship kind</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\" data-edge-kind=\"supports\"><input type=\"radio\" name=\"kind\" value=\"supports\" required")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formKind == "supports" || formKind == "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, ">Supports — the source backs the target</option> <option value=\"opposes\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, "> <span class=\"material-symbols-outlined\">thumb_up</span> Supports</label> <label class=\"toggle-btn\" data-edge-kind=\"opposes\"><input type=\"radio\" name=\"kind\" value=\"opposes\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formKind == "opposes" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, ">Opposes — the source argues against the target</option> <option value=\"refines\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, "> <span class=\"material-symbols-outlined\">thumb_down</span> Opposes</label> <label class=\"toggle-btn\" data-edge-kind=\"refines\"><input type=\"radio\" name=\"kind\" value=\"refines\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formKind == "refines" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, ">Refines — the source clarifies or narrows the target</option> <option value=\"cites\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, "> <span class=\"material-symbols-outlined\">tune</span> Refines</label> <label class=\"toggle-btn\" data-edge-kind=\"cites\"><input type=\"radio\" name=\"kind\" value=\"cites\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formKind == "cites" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, ">Cites — the source references the target as evidence</option> <option value=\"relates_to\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "> <span class=\"material-symbols-outlined\">format_quote</span> Cites</label> <label class=\"toggle-btn\" data-edge-kind=\"relates_to\"><input type=\"radio\" name=\"kind\" value=\"relates_to\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formKind == "relates_to" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, ">Relates to — loosely connected</option></select></label> <label>Find target node <input type=\"search\" name=\"find\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "> <span class=\"material-symbols-outlined\">link</span> Relates to</label></div><small class=\"muted\" style=\"font-size: 12px;\">How the source relates to the target — supports backs it, opposes argues against, refines clarifies, cites references, relates_to is a loose link.</small></fieldset><label>Find target node <input type=\"search\" name=\"find\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var76 string
 		templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(find)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 589, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 618, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "\" placeholder=\"search by title or body…\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "\" placeholder=\"search by title or body…\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var77 string
 		templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs("/nodes/" + fromNode.Slug + "/edges/picker")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 591, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 620, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#picker-target\" hx-swap=\"outerHTML\"> <small>Results update as you type.</small></label>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#picker-target\" hx-swap=\"outerHTML\"> <small>Results update as you type.</small></label>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1916,7 +1926,7 @@ func NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) te
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "<div class=\"page narrow\"><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 18px;\"><span class=\"eyebrow\">Delete</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "<div class=\"page narrow\"><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 18px;\"><span class=\"eyebrow\">Delete</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1924,72 +1934,72 @@ func NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) te
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "</div><h1 class=\"h-1\" style=\"margin-bottom: 12px; font-size: 36px;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "</div><h1 class=\"h-1\" style=\"margin-bottom: 12px; font-size: 36px;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(node.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 608, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 637, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "</h1><p class=\"muted\" style=\"margin: 0 0 12px;\">This permanently removes the node. The action cannot be undone.</p><ul class=\"muted\" style=\"margin: 0 0 24px; padding-left: 20px; line-height: 1.7;\"><li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "</h1><p class=\"muted\" style=\"margin: 0 0 12px;\">This permanently removes the node. The action cannot be undone.</p><ul class=\"muted\" style=\"margin: 0 0 24px; padding-left: 20px; line-height: 1.7;\"><li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(cascadeEdgeLabel(edgeCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 611, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 640, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, " will be removed.</li><li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, " will be removed.</li><li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(cascadePinLabel(otherPinCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 612, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 641, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "</li><li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li><li>Tags lose their link to this node, but the tags themselves remain.</li></ul><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "</li><li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li><li>Tags lose their link to this node, but the tags themselves remain.</li></ul><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var83 templ.SafeURL
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + node.Slug + "/delete"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 616, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 645, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "\" class=\"form\"><div class=\"form-row\"><button type=\"submit\" class=\"btn danger\"><span class=\"material-symbols-outlined\">delete_forever</span>Yes, delete this node</button> <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "\" class=\"form\"><div class=\"form-row\"><button type=\"submit\" class=\"btn danger\"><span class=\"material-symbols-outlined\">delete_forever</span>Yes, delete this node</button> <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var84 templ.SafeURL
 			templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + node.Slug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 619, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 648, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "\" class=\"btn ghost\"><span class=\"material-symbols-outlined\">close</span>Cancel</a></div></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2028,42 +2038,42 @@ func CandidatePicker(find string, candidates []EdgeCandidate) templ.Component {
 			templ_7745c5c3_Var85 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "<div id=\"picker-target\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "<div id=\"picker-target\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if find == "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "<p class=\"muted\">Start typing in the search box above to see matching nodes.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "<p class=\"muted\">Start typing in the search box above to see matching nodes.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if find != "" && len(candidates) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "<p class=\"muted\">No nodes match that query.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "<p class=\"muted\">No nodes match that query.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if find != "" && len(candidates) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "<fieldset class=\"form-fieldset candidate-list\"><legend>Pick a target</legend> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "<fieldset class=\"form-fieldset candidate-list\"><legend>Pick a target</legend> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, c := range candidates {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "<label class=\"radio\"><input type=\"radio\" name=\"to_id\" value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "<label class=\"radio\"><input type=\"radio\" name=\"to_id\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var86 string
 				templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 643, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 672, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "\" required>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "\" required>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -2071,30 +2081,30 @@ func CandidatePicker(find string, candidates []EdgeCandidate) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "<span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "<span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var87 string
 				templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(c.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 645, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 674, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "</span></label>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "</span></label>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "</fieldset>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 187, "</fieldset>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 188, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
