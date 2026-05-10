@@ -312,7 +312,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 						}
 						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="muted" style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
 						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/unpin") } class="inline">
-							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">pin_off</span>Remove</button>
+							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">keep_off</span>Remove</button>
 						</form>
 					</div>
 				}
