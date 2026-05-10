@@ -18,7 +18,20 @@ This document outlines upcoming features beyond the MVP.
 
 ### Graphs & Visualization
 
-- **Personal argument graphs** — Visualization of a user's nodes, pins (supports/opposes), and reasoning threads. Shows how their own positions connect to the broader graph.
+- **Central graph engine** — A single interactive graph viewer that renders different slices of the argument graph depending on the active view and filters. All graph modes below are powered by this shared engine.
+
+- **Personal graph view** — Shows a user's own nodes, pins (supports/opposes), and reasoning threads. Starting point for understanding one's own argument landscape.
+
+- **Friends / social bubble view** — Shows the combined graph of people you follow. Highlights where your positions overlap, conflict, or are unconnected with the people in your network.
+
+- **Trending graph view** — Shows the most-engaged nodes and edges over a recent time window (driven by votes and connections), surfacing community-wide debates without algorithmic sorting.
+
+- **Graph filters** — Once a view is selected, users can narrow the graph further by:
+  - **Topic** — filter to nodes tagged under a specific subject area
+  - **Node type** — show only View nodes, Claim nodes, Reasoning nodes, etc.
+  - **Person** — overlay or isolate the nodes of a specific user
+
+- **Graph search** — Full-text search across visible nodes and edges directly within the graph view. Matching nodes are highlighted in place so the user can see them in context rather than jumping to a list.
 
 ### Threading & Discussion
 
