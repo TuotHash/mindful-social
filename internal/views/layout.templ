@@ -56,6 +56,21 @@ templ Layout(title string, currentUser *Viewer) {
 					});
 				})();
 			</script>
+			<script>
+				(function () {
+					document.addEventListener('click', function (e) {
+						document.querySelectorAll('details.user-menu[open]').forEach(function (d) {
+							if (!d.contains(e.target)) d.removeAttribute('open');
+						});
+					});
+					document.addEventListener('keydown', function (e) {
+						if (e.key !== 'Escape') return;
+						document.querySelectorAll('details.user-menu[open]').forEach(function (d) {
+							d.removeAttribute('open');
+						});
+					});
+				})();
+			</script>
 		</body>
 	</html>
 }
@@ -82,7 +97,6 @@ templ TopNav(currentUser *Viewer) {
 						hx-target="#modal"
 						hx-swap="innerHTML"
 					>Post</a>
-					<a class="nav-link" href="/lists">Lists</a>
 				}
 			</div>
 			<span class="nav-spacer"></span>
@@ -95,13 +109,23 @@ templ TopNav(currentUser *Viewer) {
 			</form>
 			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme">☾</button>
 			if currentUser != nil {
-				<a class="btn ghost" href={ templ.SafeURL("/users/" + currentUser.Username) } style="padding: 4px 10px 4px 4px; gap: 8px;">
-					@Avatar(currentUser.Username, 28)
-					<span style="font-size: 13px; font-weight: 500;">{ currentUser.Username }</span>
-				</a>
-				<form method="post" action="/logout" class="inline">
-					<button type="submit" class="btn ghost sm">Log out</button>
-				</form>
+				<details class="user-menu">
+					<summary class="user-menu-trigger" aria-label="Account menu">
+						@Avatar(currentUser.Username, 28)
+						<span class="user-menu-name">{ currentUser.Username }</span>
+						<span class="material-symbols-outlined user-menu-caret">arrow_drop_down</span>
+					</summary>
+					<div class="user-menu-panel" role="menu">
+						<a class="user-menu-item" href={ templ.SafeURL("/users/" + currentUser.Username) } role="menuitem">Profile</a>
+						<a class="user-menu-item" href="#" role="menuitem">Account</a>
+						<a class="user-menu-item" href="#" role="menuitem">Settings</a>
+						<a class="user-menu-item" href="/lists" role="menuitem">Audiences</a>
+						<div class="user-menu-divider"></div>
+						<form method="post" action="/logout" class="user-menu-form">
+							<button type="submit" class="user-menu-item" role="menuitem">Log out</button>
+						</form>
+					</div>
+				</details>
 			} else {
 				<a class="btn ghost" href="/login">Sign in</a>
 				<a class="btn accent" href="/signup">Get started</a>

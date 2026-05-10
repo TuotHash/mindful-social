@@ -62,7 +62,7 @@ func Layout(title string, currentUser *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main></div><div id=\"modal\" class=\"modal-host\"></div><script>\n\t\t\t\t(function () {\n\t\t\t\t\tvar btn = document.getElementById('theme-toggle');\n\t\t\t\t\tif (!btn) return;\n\t\t\t\t\tvar html = document.documentElement;\n\t\t\t\t\tfunction sync() {\n\t\t\t\t\t\tvar dark = html.getAttribute('data-theme') === 'dark';\n\t\t\t\t\t\tbtn.textContent = dark ? '☀' : '☾';\n\t\t\t\t\t\tbtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');\n\t\t\t\t\t}\n\t\t\t\t\tsync();\n\t\t\t\t\tbtn.addEventListener('click', function () {\n\t\t\t\t\t\tvar dark = html.getAttribute('data-theme') === 'dark';\n\t\t\t\t\t\tvar next = dark ? 'light' : 'dark';\n\t\t\t\t\t\thtml.setAttribute('data-theme', next);\n\t\t\t\t\t\ttry { localStorage.setItem('theme', next); } catch (e) {}\n\t\t\t\t\t\tsync();\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main></div><div id=\"modal\" class=\"modal-host\"></div><script>\n\t\t\t\t(function () {\n\t\t\t\t\tvar btn = document.getElementById('theme-toggle');\n\t\t\t\t\tif (!btn) return;\n\t\t\t\t\tvar html = document.documentElement;\n\t\t\t\t\tfunction sync() {\n\t\t\t\t\t\tvar dark = html.getAttribute('data-theme') === 'dark';\n\t\t\t\t\t\tbtn.textContent = dark ? '☀' : '☾';\n\t\t\t\t\t\tbtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');\n\t\t\t\t\t}\n\t\t\t\t\tsync();\n\t\t\t\t\tbtn.addEventListener('click', function () {\n\t\t\t\t\t\tvar dark = html.getAttribute('data-theme') === 'dark';\n\t\t\t\t\t\tvar next = dark ? 'light' : 'dark';\n\t\t\t\t\t\thtml.setAttribute('data-theme', next);\n\t\t\t\t\t\ttry { localStorage.setItem('theme', next); } catch (e) {}\n\t\t\t\t\t\tsync();\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script><script>\n\t\t\t\t(function () {\n\t\t\t\t\tdocument.addEventListener('click', function (e) {\n\t\t\t\t\t\tdocument.querySelectorAll('details.user-menu[open]').forEach(function (d) {\n\t\t\t\t\t\t\tif (!d.contains(e.target)) d.removeAttribute('open');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener('keydown', function (e) {\n\t\t\t\t\t\tif (e.key !== 'Escape') return;\n\t\t\t\t\t\tdocument.querySelectorAll('details.user-menu[open]').forEach(function (d) {\n\t\t\t\t\t\t\td.removeAttribute('open');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -111,7 +111,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if currentUser != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a class=\"nav-link\" href=\"/nodes/new\" hx-get=\"/nodes/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">Post</a> <a class=\"nav-link\" href=\"/lists\">Lists</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a class=\"nav-link\" href=\"/nodes/new\" hx-get=\"/nodes/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">Post</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -121,20 +121,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if currentUser != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a class=\"btn ghost\" href=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var4 templ.SafeURL
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/users/" + currentUser.Username))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 98, Col: 79}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" style=\"padding: 4px 10px 4px 4px; gap: 8px;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<details class=\"user-menu\"><summary class=\"user-menu-trigger\" aria-label=\"Account menu\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -142,20 +129,33 @@ func TopNav(currentUser *Viewer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<span style=\"font-size: 13px; font-weight: 500;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<span class=\"user-menu-name\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(currentUser.Username)
+			var templ_7745c5c3_Var4 string
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(currentUser.Username)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 100, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 115, Col: 57}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span> <span class=\"material-symbols-outlined user-menu-caret\">arrow_drop_down</span></summary><div class=\"user-menu-panel\" role=\"menu\"><a class=\"user-menu-item\" href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 templ.SafeURL
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/users/" + currentUser.Username))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 119, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span></a><form method=\"post\" action=\"/logout\" class=\"inline\"><button type=\"submit\" class=\"btn ghost sm\">Log out</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" role=\"menuitem\">Profile</a> <a class=\"user-menu-item\" href=\"#\" role=\"menuitem\">Account</a> <a class=\"user-menu-item\" href=\"#\" role=\"menuitem\">Settings</a> <a class=\"user-menu-item\" href=\"/lists\" role=\"menuitem\">Audiences</a><div class=\"user-menu-divider\"></div><form method=\"post\" action=\"/logout\" class=\"user-menu-form\"><button type=\"submit\" class=\"user-menu-item\" role=\"menuitem\">Log out</button></form></div></details>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -204,7 +204,7 @@ func Avatar(username string, size int) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(avatarStyle(username, size))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 119, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 143, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -217,7 +217,7 @@ func Avatar(username string, size int) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(avatarInitials(username))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 120, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 144, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -295,7 +295,7 @@ func Flash(msg string) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 160, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 184, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
