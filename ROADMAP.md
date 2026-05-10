@@ -4,6 +4,20 @@ This document outlines upcoming features beyond the MVP.
 
 ## Planned Features
 
+### Node Hierarchy & Connection Enforcement
+
+Topics are the centre of the graph — the source around which nodes and discussions flow. All other node types must be anchored to one.
+
+- **Fix pin form** — Remove the reasoning-node picker from the pin/stance form. Pinning is a simple three-way stance: Support, Oppose, or Feature. No nested reasoning attachment. Topics can only be Featured (support/oppose don't apply to a grouping node).
+
+- **Enforced parent connections** — Each non-topic node type must declare a parent at creation time:
+  - **View** → must connect to a parent **Topic** (a view is a stance inside a topic's discussion)
+  - **Reasoning** → must connect to a parent **View** (reasoning argues for or against a specific view)
+  - **Evidence** → must connect to a parent **View** or **Reasoning** (evidence cites or supports a specific claim)
+  - Topics have no required parent; they are root nodes.
+
+- **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and reasoning as a single unit. Individual topics and evidence can still be featured standalone; the bundle is an additive display mode on top.
+
 ### Social Foundation
 
 - **Follow system** — One-directional follow with one button. When two users follow each other, they automatically become **connections** (mutuals). No friend requests, no private accounts.
