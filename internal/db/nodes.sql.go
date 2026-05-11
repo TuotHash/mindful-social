@@ -12,6 +12,45 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const canEditNode = `-- name: CanEditNode :one
+SELECT node_action_allowed(n.edit_policy, n.created_by, $2::uuid)::bool AS allowed
+FROM nodes n WHERE n.id = $1
+`
+
+type CanEditNodeParams struct {
+	ID       uuid.UUID  `json:"id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+// True when `viewer` is permitted to edit `node` under its edit_policy.
+// Implemented in SQL so handlers can call it without re-implementing the
+// mutual-follow logic.
+func (q *Queries) CanEditNode(ctx context.Context, arg CanEditNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, canEditNode, arg.ID, arg.ViewerID)
+	var allowed bool
+	err := row.Scan(&allowed)
+	return allowed, err
+}
+
+const canLinkToNode = `-- name: CanLinkToNode :one
+SELECT node_action_allowed(n.link_policy, n.created_by, $2::uuid)::bool AS allowed
+FROM nodes n WHERE n.id = $1
+`
+
+type CanLinkToNodeParams struct {
+	ID       uuid.UUID  `json:"id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+// True when `viewer` is permitted to create an edge touching `node` under
+// its link_policy.
+func (q *Queries) CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, canLinkToNode, arg.ID, arg.ViewerID)
+	var allowed bool
+	err := row.Scan(&allowed)
+	return allowed, err
+}
+
 const countEdgesForNode = `-- name: CountEdgesForNode :one
 SELECT count(*) FROM edges WHERE from_node = $1 OR to_node = $1
 `
@@ -58,7 +97,7 @@ func (q *Queries) CountOtherUserPinsForNode(ctx context.Context, arg CountOtherU
 const createNode = `-- name: CreateNode :one
 INSERT INTO nodes (type, title, body, source_url, created_by, slug, visibility, visibility_list_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy
 `
 
 type CreateNodeParams struct {
@@ -97,6 +136,8 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.Slug,
 		&i.Visibility,
 		&i.VisibilityListID,
+		&i.EditPolicy,
+		&i.LinkPolicy,
 	)
 	return i, err
 }
@@ -111,7 +152,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -130,12 +171,14 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.Slug,
 		&i.Visibility,
 		&i.VisibilityListID,
+		&i.EditPolicy,
+		&i.LinkPolicy,
 	)
 	return i, err
 }
 
 const getNodeBySlug = `-- name: GetNodeBySlug :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes WHERE slug = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy FROM nodes WHERE slug = $1
 `
 
 func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
@@ -154,12 +197,14 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 		&i.Slug,
 		&i.Visibility,
 		&i.VisibilityListID,
+		&i.EditPolicy,
+		&i.LinkPolicy,
 	)
 	return i, err
 }
 
 const listNodesAuthoredByForViewer = `-- name: ListNodesAuthoredByForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy FROM nodes n
 WHERE n.created_by = $1
   AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
@@ -197,6 +242,8 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 			&i.Slug,
 			&i.Visibility,
 			&i.VisibilityListID,
+			&i.EditPolicy,
+			&i.LinkPolicy,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +256,7 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy FROM nodes
 WHERE type = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -242,6 +289,8 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.Slug,
 			&i.Visibility,
 			&i.VisibilityListID,
+			&i.EditPolicy,
+			&i.LinkPolicy,
 		); err != nil {
 			return nil, err
 		}
@@ -254,7 +303,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy FROM nodes n
 WHERE node_visible_to(n.*, $2::uuid)
 ORDER BY created_at DESC
 LIMIT $1
@@ -289,6 +338,8 @@ func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNo
 			&i.Slug,
 			&i.Visibility,
 			&i.VisibilityListID,
+			&i.EditPolicy,
+			&i.LinkPolicy,
 		); err != nil {
 			return nil, err
 		}
@@ -534,18 +585,22 @@ SET title = $2,
     source_url = $4,
     visibility = $5,
     visibility_list_id = $6,
+    edit_policy = $7,
+    link_policy = $8,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy
 `
 
 type UpdateNodeParams struct {
-	ID               uuid.UUID      `json:"id"`
-	Title            string         `json:"title"`
-	Body             string         `json:"body"`
-	SourceUrl        *string        `json:"source_url"`
-	Visibility       VisibilityKind `json:"visibility"`
-	VisibilityListID *uuid.UUID     `json:"visibility_list_id"`
+	ID               uuid.UUID        `json:"id"`
+	Title            string           `json:"title"`
+	Body             string           `json:"body"`
+	SourceUrl        *string          `json:"source_url"`
+	Visibility       VisibilityKind   `json:"visibility"`
+	VisibilityListID *uuid.UUID       `json:"visibility_list_id"`
+	EditPolicy       NodeActionPolicy `json:"edit_policy"`
+	LinkPolicy       NodeActionPolicy `json:"link_policy"`
 }
 
 func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error) {
@@ -556,6 +611,8 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		arg.SourceUrl,
 		arg.Visibility,
 		arg.VisibilityListID,
+		arg.EditPolicy,
+		arg.LinkPolicy,
 	)
 	var i Node
 	err := row.Scan(
@@ -571,6 +628,8 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.Slug,
 		&i.Visibility,
 		&i.VisibilityListID,
+		&i.EditPolicy,
+		&i.LinkPolicy,
 	)
 	return i, err
 }

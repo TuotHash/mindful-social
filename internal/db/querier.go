@@ -18,6 +18,13 @@ type Querier interface {
 	// (pin, reasoning) pair is a harmless retry rather than an error.
 	AddPinReasoning(ctx context.Context, arg AddPinReasoningParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
+	// True when `viewer` is permitted to edit `node` under its edit_policy.
+	// Implemented in SQL so handlers can call it without re-implementing the
+	// mutual-follow logic.
+	CanEditNode(ctx context.Context, arg CanEditNodeParams) (bool, error)
+	// True when `viewer` is permitted to create an edge touching `node` under
+	// its link_policy.
+	CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error)
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)

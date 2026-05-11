@@ -30,9 +30,24 @@ SET title = $2,
     source_url = $4,
     visibility = $5,
     visibility_list_id = $6,
+    edit_policy = $7,
+    link_policy = $8,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: CanEditNode :one
+-- True when `viewer` is permitted to edit `node` under its edit_policy.
+-- Implemented in SQL so handlers can call it without re-implementing the
+-- mutual-follow logic.
+SELECT node_action_allowed(n.edit_policy, n.created_by, sqlc.narg(viewer_id)::uuid)::bool AS allowed
+FROM nodes n WHERE n.id = $1;
+
+-- name: CanLinkToNode :one
+-- True when `viewer` is permitted to create an edge touching `node` under
+-- its link_policy.
+SELECT node_action_allowed(n.link_policy, n.created_by, sqlc.narg(viewer_id)::uuid)::bool AS allowed
+FROM nodes n WHERE n.id = $1;
 
 -- name: CountNodes :one
 SELECT count(*) FROM nodes;

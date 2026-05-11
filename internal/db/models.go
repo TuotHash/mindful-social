@@ -69,6 +69,59 @@ func (e EdgeKind) Valid() bool {
 	return false
 }
 
+type NodeActionPolicy string
+
+const (
+	NodeActionPolicyAuthor      NodeActionPolicy = "author"
+	NodeActionPolicyConnections NodeActionPolicy = "connections"
+	NodeActionPolicyPublic      NodeActionPolicy = "public"
+)
+
+func (e *NodeActionPolicy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = NodeActionPolicy(s)
+	case string:
+		*e = NodeActionPolicy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for NodeActionPolicy: %T", src)
+	}
+	return nil
+}
+
+type NullNodeActionPolicy struct {
+	NodeActionPolicy NodeActionPolicy `json:"node_action_policy"`
+	Valid            bool             `json:"valid"` // Valid is true if NodeActionPolicy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullNodeActionPolicy) Scan(value interface{}) error {
+	if value == nil {
+		ns.NodeActionPolicy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.NodeActionPolicy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullNodeActionPolicy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.NodeActionPolicy), nil
+}
+
+func (e NodeActionPolicy) Valid() bool {
+	switch e {
+	case NodeActionPolicyAuthor,
+		NodeActionPolicyConnections,
+		NodeActionPolicyPublic:
+		return true
+	}
+	return false
+}
+
 type NodeType string
 
 const (
@@ -285,6 +338,8 @@ type Node struct {
 	Slug             string             `json:"slug"`
 	Visibility       VisibilityKind     `json:"visibility"`
 	VisibilityListID *uuid.UUID         `json:"visibility_list_id"`
+	EditPolicy       NodeActionPolicy   `json:"edit_policy"`
+	LinkPolicy       NodeActionPolicy   `json:"link_policy"`
 }
 
 type NodeTag struct {

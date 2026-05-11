@@ -200,10 +200,19 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 				flash = "Invalid parent topic selection."
 			} else {
 				parentNode, err := s.queries.GetNode(r.Context(), tid)
-				if err != nil || parentNode.Type != db.NodeTypeTopic {
+				switch {
+				case err != nil || parentNode.Type != db.NodeTypeTopic:
 					flash = "The selected parent must be a topic."
-				} else {
-					parentTopicID = tid
+				default:
+					vid := user.ID
+					if ok, perr := s.canLinkToNode(r.Context(), parentNode, &vid); perr != nil {
+						s.logger.Error("create node: parent link policy", "err", perr)
+						flash = "Could not check parent topic permissions. Please try again."
+					} else if !ok {
+						flash = "That topic doesn't accept new linked views from you."
+					} else {
+						parentTopicID = tid
+					}
 				}
 			}
 		}
@@ -345,6 +354,19 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	canEdit, err := s.canEditNode(r.Context(), node, vid)
+	if err != nil {
+		s.logger.Error("node detail: edit policy", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	canLink, err := s.canLinkToNode(r.Context(), node, vid)
+	if err != nil {
+		s.logger.Error("node detail: link policy", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	render(w, r, views.NodeDetail(
 		viewerFor(user),
 		node,
@@ -352,12 +374,17 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		displayGroups(out, in),
 		pin,
 		tags,
+		canEdit,
+		canLink,
 	))
 }
 
 func (s *Server) handleEdgeHighlight(w http.ResponseWriter, r *http.Request) {
 	povNode, ok := s.resolveNode(w, r)
 	if !ok {
+		return
+	}
+	if !s.requireEditPermission(w, r, povNode) {
 		return
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
@@ -381,6 +408,9 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.requireEditPermission(w, r, povNode) {
+		return
+	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
 	if err != nil {
 		http.NotFound(w, r)
@@ -395,6 +425,24 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
+}
+
+// requireEditPermission writes a 403 and returns false if the current
+// viewer isn't allowed to edit `node`. Bundled so edge-curation handlers
+// (highlight/unhighlight/disconnect from a page's POV) can early-return
+// cleanly.
+func (s *Server) requireEditPermission(w http.ResponseWriter, r *http.Request, node db.Node) bool {
+	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	if err != nil {
+		s.logger.Error("policy check", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return false
+	}
+	if !allowed {
+		http.Error(w, "You don't have permission to curate this node.", http.StatusForbidden)
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request) {
@@ -453,11 +501,14 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
-	// pageNode is the node whose page hosted the form — used for the redirect
-	// only. Edges can be deleted from either endpoint, so we don't constrain
-	// the delete to from_node.
+	// pageNode is the node whose page hosted the form. Disconnect is treated
+	// as an edit action on that page node: if the viewer can curate this
+	// node, they can also detach edges that touch it.
 	pageNode, ok := s.resolveNode(w, r)
 	if !ok {
+		return
+	}
+	if !s.requireEditPermission(w, r, pageNode) {
 		return
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
@@ -479,6 +530,16 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	if err != nil {
+		s.logger.Error("node edit: policy check", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		http.Error(w, "You don't have permission to edit this node.", http.StatusForbidden)
+		return
+	}
 	id := node.ID
 	src := ""
 	if node.SourceUrl != nil {
@@ -496,7 +557,8 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatVisibility(node.Visibility, node.VisibilityListID), lists))
+	isAuthor := node.CreatedBy == user.ID
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatVisibility(node.Visibility, node.VisibilityListID), lists, isAuthor, string(node.EditPolicy), string(node.LinkPolicy)))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -519,6 +581,17 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	if err != nil {
+		s.logger.Error("node update: policy check", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		http.Error(w, "You don't have permission to edit this node.", http.StatusForbidden)
+		return
+	}
+	isAuthor := node.CreatedBy == user.ID
 	id := node.ID
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
@@ -530,9 +603,12 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawTags := r.PostFormValue("tags")
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
-	if rawVisibility == "" {
+	if rawVisibility == "" || !isAuthor {
+		// Visibility is author-only; non-author edits keep the existing setting.
 		rawVisibility = formatVisibility(node.Visibility, node.VisibilityListID)
 	}
+	rawEditPolicy := strings.TrimSpace(r.PostFormValue("edit_policy"))
+	rawLinkPolicy := strings.TrimSpace(r.PostFormValue("link_policy"))
 
 	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
 	if listsErr != nil {
@@ -550,12 +626,25 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	case node.Type == db.NodeTypeEvidence && sourceURL == "":
 		flash = "Evidence needs a source URL."
 	}
-	visKind, visListID, visErr := parseVisibility(rawVisibility, user.ID, lists)
+	visKind, visListID, visErr := parseVisibility(rawVisibility, node.CreatedBy, lists)
 	if flash == "" && visErr != "" {
 		flash = visErr
 	}
+	// Policies are author-only: non-author edits silently keep the existing
+	// values, so the form re-renders with the author's settings even after
+	// a no-op submission from an editor.
+	editPolicy := node.EditPolicy
+	linkPolicy := node.LinkPolicy
+	if isAuthor {
+		if v, ok := parseActionPolicy(rawEditPolicy, node.EditPolicy); ok || rawEditPolicy == "" {
+			editPolicy = v
+		}
+		if v, ok := parseActionPolicy(rawLinkPolicy, node.LinkPolicy); ok || rawLinkPolicy == "" {
+			linkPolicy = v
+		}
+	}
 	if flash != "" {
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists, isAuthor, string(editPolicy), string(linkPolicy)))
 		return
 	}
 
@@ -564,17 +653,19 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		srcPtr = &sourceURL
 	}
 
-	_, err := s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
+	_, err = s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
 		ID:               id,
 		Title:            title,
 		Body:             body,
 		SourceUrl:        srcPtr,
 		Visibility:       visKind,
 		VisibilityListID: visListID,
+		EditPolicy:       editPolicy,
+		LinkPolicy:       linkPolicy,
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists, isAuthor, string(editPolicy), string(linkPolicy)))
 		return
 	}
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
@@ -699,6 +790,31 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if toID == fromID {
 		rerender("A node cannot connect to itself.")
+		return
+	}
+
+	// Both endpoints must permit links from this viewer. fromNode is
+	// already loaded; toNode needs a separate fetch.
+	vid := viewerID(r)
+	if ok, err := s.canLinkToNode(r.Context(), fromNode, vid); err != nil {
+		s.logger.Error("edge create: link policy from", "err", err)
+		rerender("Could not create connection. Please try again.")
+		return
+	} else if !ok {
+		rerender("You don't have permission to link from this node.")
+		return
+	}
+	toNode, err := s.queries.GetNode(r.Context(), toID)
+	if err != nil {
+		rerender("Target node not found.")
+		return
+	}
+	if ok, err := s.canLinkToNode(r.Context(), toNode, vid); err != nil {
+		s.logger.Error("edge create: link policy to", "err", err)
+		rerender("Could not create connection. Please try again.")
+		return
+	} else if !ok {
+		rerender("That target doesn't accept new links from you.")
 		return
 	}
 

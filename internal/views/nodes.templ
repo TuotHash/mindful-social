@@ -248,7 +248,7 @@ templ nodeTypeChip(t db.NodeType) {
 	</span>
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag) {
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -276,14 +276,18 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 				}
 				if viewer != nil {
 					<div class="node-actions" style="margin-top: 22px;">
-						<a
-							href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
-							class="btn"
-							hx-get={ "/nodes/" + node.Slug + "/edges/new" }
-							hx-target="#modal"
-							hx-swap="innerHTML"
-						><span class="material-symbols-outlined">conversion_path</span>Connect</a>
-						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
+						if canLink {
+							<a
+								href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
+								class="btn"
+								hx-get={ "/nodes/" + node.Slug + "/edges/new" }
+								hx-target="#modal"
+								hx-swap="innerHTML"
+							><span class="material-symbols-outlined">conversion_path</span>Connect</a>
+						}
+						if canEdit {
+							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
+						}
 						if pin == nil {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="btn accent">
 								if node.Type == db.NodeTypeView {
@@ -332,7 +336,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							if f.Body != "" {
 								<p>{ f.Body }</p>
 							}
-							if viewer != nil {
+							if canEdit {
 								<div class="row gap-8 wrap" style="margin-top: 12px;">
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/unhighlight") } class="inline">
 										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star</span>Unhighlight</button>
@@ -362,7 +366,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 											@nodeTypeChip(r.Type)
 											<span class="title">{ r.Title }</span>
 										</a>
-										if viewer != nil {
+										if canEdit {
 											<div class="edge-actions">
 												if r.Type == db.NodeTypeReasoning {
 													<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/highlight") } class="inline">
@@ -385,7 +389,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList, isAuthor bool, formEditPolicy, formLinkPolicy string) {
 	@Layout("Edit "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -415,7 +419,13 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					Tags <small>(comma-separated, optional)</small>
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
-				@visibilitySelect(formVisibility, lists)
+				if isAuthor {
+					@visibilitySelect(formVisibility, lists)
+					@actionPolicySelect("edit_policy", "Who can edit this node", formEditPolicy)
+					@actionPolicySelect("link_policy", "Who can connect to this node", formLinkPolicy)
+				} else {
+					<p class="muted" style="font-size: 12px; margin: 0;">Visibility and permissions can only be changed by the node's author.</p>
+				}
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">save</span>Save changes</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -423,6 +433,32 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 			</form>
 		</div>
 	}
+}
+
+// actionPolicySelect renders the three-level author/connections/public
+// toggle for edit_policy and link_policy. fieldName is the form input
+// name so one template renders both policies.
+templ actionPolicySelect(fieldName, legend, selected string) {
+	<fieldset class="toggle-group">
+		<legend>{ legend }</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-policy="author">
+				<input type="radio" name={ fieldName } value="author" checked?={ selected == "author" || selected == "" }/>
+				<span class="material-symbols-outlined">person</span>
+				Only me
+			</label>
+			<label class="toggle-btn" data-policy="connections">
+				<input type="radio" name={ fieldName } value="connections" checked?={ selected == "connections" }/>
+				<span class="material-symbols-outlined">handshake</span>
+				Connections
+			</label>
+			<label class="toggle-btn" data-policy="public">
+				<input type="radio" name={ fieldName } value="public" checked?={ selected == "public" }/>
+				<span class="material-symbols-outlined">public</span>
+				Anyone
+			</label>
+		</div>
+	</fieldset>
 }
 
 // visibilitySelect renders the per-node audience picker as a toggle-button
