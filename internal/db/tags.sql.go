@@ -48,31 +48,36 @@ func (q *Queries) GetTagByName(ctx context.Context, name string) (Tag, error) {
 	return i, err
 }
 
-const listAllTags = `-- name: ListAllTags :many
-SELECT t.id, t.name, count(nt.node_id) AS node_count
+const listAllTagsForViewer = `-- name: ListAllTagsForViewer :many
+SELECT t.id, t.name, count(n.id) AS node_count
 FROM tags t
-LEFT JOIN node_tags nt ON nt.tag_id = t.id
+JOIN node_tags nt ON nt.tag_id = t.id
+JOIN nodes n ON n.id = nt.node_id
+WHERE node_visible_to(n.*, $1::uuid)
 GROUP BY t.id, t.name
 ORDER BY node_count DESC, t.name ASC
 `
 
-type ListAllTagsRow struct {
+type ListAllTagsForViewerRow struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
 	NodeCount int64     `json:"node_count"`
 }
 
 // Tag list with how many nodes carry each tag — for the /tags index page.
-// Tags with zero nodes (orphans from previous edits) come last.
-func (q *Queries) ListAllTags(ctx context.Context) ([]ListAllTagsRow, error) {
-	rows, err := q.db.Query(ctx, listAllTags)
+// Counts only nodes the viewer is allowed to see (public, plus connections-
+// /list-/private-scoped nodes the viewer has access to). Tags whose visible
+// node count is zero are dropped so we don't leak the existence of tags that
+// only live on private nodes.
+func (q *Queries) ListAllTagsForViewer(ctx context.Context, viewerID *uuid.UUID) ([]ListAllTagsForViewerRow, error) {
+	rows, err := q.db.Query(ctx, listAllTagsForViewer, viewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListAllTagsRow
+	var items []ListAllTagsForViewerRow
 	for rows.Next() {
-		var i ListAllTagsRow
+		var i ListAllTagsForViewerRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.NodeCount); err != nil {
 			return nil, err
 		}

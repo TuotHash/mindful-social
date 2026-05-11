@@ -6,7 +6,7 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-templ TagsIndex(viewer *Viewer, tags []db.ListAllTagsRow) {
+templ TagsIndex(viewer *Viewer, tags []db.ListAllTagsForViewerRow) {
 	@Layout("Tags", viewer) {
 		<div class="page medium">
 			<div class="col gap-12" style="margin-bottom: 24px;">

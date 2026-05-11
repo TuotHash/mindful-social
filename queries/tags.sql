@@ -21,12 +21,17 @@ JOIN node_tags nt ON nt.tag_id = t.id
 WHERE nt.node_id = $1
 ORDER BY t.name ASC;
 
--- name: ListAllTags :many
+-- name: ListAllTagsForViewer :many
 -- Tag list with how many nodes carry each tag — for the /tags index page.
--- Tags with zero nodes (orphans from previous edits) come last.
-SELECT t.id, t.name, count(nt.node_id) AS node_count
+-- Counts only nodes the viewer is allowed to see (public, plus connections-
+-- /list-/private-scoped nodes the viewer has access to). Tags whose visible
+-- node count is zero are dropped so we don't leak the existence of tags that
+-- only live on private nodes.
+SELECT t.id, t.name, count(n.id) AS node_count
 FROM tags t
-LEFT JOIN node_tags nt ON nt.tag_id = t.id
+JOIN node_tags nt ON nt.tag_id = t.id
+JOIN nodes n ON n.id = nt.node_id
+WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 GROUP BY t.id, t.name
 ORDER BY node_count DESC, t.name ASC;
 

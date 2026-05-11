@@ -99,8 +99,11 @@ type Querier interface {
 	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error
 	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
-	// Tags with zero nodes (orphans from previous edits) come last.
-	ListAllTags(ctx context.Context) ([]ListAllTagsRow, error)
+	// Counts only nodes the viewer is allowed to see (public, plus connections-
+	// /list-/private-scoped nodes the viewer has access to). Tags whose visible
+	// node count is zero are dropped so we don't leak the existence of tags that
+	// only live on private nodes.
+	ListAllTagsForViewer(ctx context.Context, viewerID *uuid.UUID) ([]ListAllTagsForViewerRow, error)
 	// Trusted list first, then custom lists alphabetically — order the visibility
 	// selector and the lists-management page both rely on.
 	ListAudienceLists(ctx context.Context, ownerID uuid.UUID) ([]AudienceList, error)

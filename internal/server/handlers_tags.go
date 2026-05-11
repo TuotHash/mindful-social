@@ -87,8 +87,11 @@ func (s *Server) setTagsForNode(r *http.Request, nodeID uuid.UUID, names []strin
 }
 
 // handleTagsIndex renders /tags: every tag with the count of nodes carrying it.
+// Counts are filtered through node_visible_to() so a viewer only sees tags
+// (and counts) backed by nodes they're permitted to read — a tag that only
+// lives on private nodes is hidden entirely from non-authors.
 func (s *Server) handleTagsIndex(w http.ResponseWriter, r *http.Request) {
-	tags, err := s.queries.ListAllTags(r.Context())
+	tags, err := s.queries.ListAllTagsForViewer(r.Context(), viewerID(r))
 	if err != nil {
 		s.logger.Error("tags index", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
