@@ -184,6 +184,7 @@ func (s *Server) routes() {
 		r.Use(s.requireUser)
 		r.Get("/home", s.handleHome)
 		r.Get("/account", s.handleAccount)
+		r.Post("/account/preferences", s.handleAccountPreferences)
 		r.Post("/account/password", s.handleAccountPasswordSet)
 		r.Post("/account/identities/{id}/disconnect", s.handleAccountIdentityDisconnect)
 		r.Get("/nodes/new", s.handleNodeNew)

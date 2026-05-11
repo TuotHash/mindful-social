@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -52,21 +53,61 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefVisibility := encodePrefVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
+	prefVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 
 	flash := s.sessions.PopString(r.Context(), accountFlashKey)
 	success := s.sessions.PopString(r.Context(), accountSuccessKey)
 	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, lists, prefVisibility, user.Timezone, flash, success))
 }
 
-// encodePrefVisibility renders the user's stored default visibility in the
-// same "public|connections|list:<uuid>|private" form the composer uses, so
-// the same toggle-button helper can render both screens.
-func encodePrefVisibility(v db.VisibilityKind, listID *uuid.UUID) string {
-	if v == db.VisibilityKindList && listID != nil {
-		return "list:" + listID.String()
+// handleAccountPreferences persists the user's default node visibility,
+// optional audience list, and timezone. Visibility uses the same encoding
+// as the composer ("public|connections|list:<uuid>|private"). Timezone is
+// validated against the IANA database; the empty string is allowed and
+// means "fall back to UTC".
+func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
 	}
-	return string(v)
+
+	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("account prefs: list audience lists", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	visKind, visListID, visErr := parseVisibility(r.PostFormValue("visibility"), user.ID, lists)
+	if visErr != "" {
+		s.flashAccount(r, visErr)
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
+	tz := strings.TrimSpace(r.PostFormValue("timezone"))
+	if tz != "" {
+		if _, err := time.LoadLocation(tz); err != nil {
+			s.flashAccount(r, "That timezone isn't recognised. Pick one from the list.")
+			http.Redirect(w, r, "/account", http.StatusSeeOther)
+			return
+		}
+	}
+
+	if err := s.queries.UpdateUserPreferences(r.Context(), db.UpdateUserPreferencesParams{
+		ID:                     user.ID,
+		DefaultNodeVisibility:  visKind,
+		DefaultAudienceListID:  visListID,
+		Timezone:               tz,
+	}); err != nil {
+		s.logger.Error("account prefs: update", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	s.successAccount(r, "Preferences saved.")
+	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
 
 // handleAccountPasswordSet handles both setting an initial password
