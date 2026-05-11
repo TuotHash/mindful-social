@@ -120,6 +120,10 @@ templ TopNav(currentUser *Viewer) {
 						<a class="user-menu-item" href="/account" role="menuitem">Account</a>
 						<a class="user-menu-item" href="#" role="menuitem">Settings</a>
 						<a class="user-menu-item" href="/lists" role="menuitem">Audiences</a>
+						if currentUser.IsAdmin {
+							<div class="user-menu-divider"></div>
+							<a class="user-menu-item" href="/admin" role="menuitem">Admin</a>
+						}
 						<div class="user-menu-divider"></div>
 						<form method="post" action="/logout" class="user-menu-form">
 							<button type="submit" class="user-menu-item" role="menuitem">Log out</button>
@@ -178,6 +182,8 @@ func avatarStyle(username string, size int) string {
 type Viewer struct {
 	ID       string
 	Username string
+	IsAdmin  bool
+	IsStaff  bool // admins or moderators — used to flag curation UI
 }
 
 // Flash is a one-shot banner message rendered above forms.

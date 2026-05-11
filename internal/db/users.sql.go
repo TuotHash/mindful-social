@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)
-RETURNING id, username, email, created_at
+RETURNING id, username, email, created_at, role
 `
 
 type CreateUserParams struct {
@@ -30,12 +30,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Username,
 		&i.Email,
 		&i.CreatedAt,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, created_at FROM users WHERE id = $1
+SELECT id, username, email, created_at, role FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -46,12 +47,13 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Username,
 		&i.Email,
 		&i.CreatedAt,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, created_at FROM users WHERE email = $1
+SELECT id, username, email, created_at, role FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -62,12 +64,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Username,
 		&i.Email,
 		&i.CreatedAt,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, created_at FROM users WHERE username = $1
+SELECT id, username, email, created_at, role FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -78,6 +81,60 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Username,
 		&i.Email,
 		&i.CreatedAt,
+		&i.Role,
 	)
 	return i, err
+}
+
+const listUsersForAdmin = `-- name: ListUsersForAdmin :many
+SELECT id, username, email, created_at, role FROM users
+ORDER BY
+    CASE role
+        WHEN 'admin' THEN 0
+        WHEN 'moderator' THEN 1
+        ELSE 2
+    END,
+    created_at DESC
+`
+
+// Roster for the admin /users page. Recent signups first; staff bubble to
+// the top so they're easy to find.
+func (q *Queries) ListUsersForAdmin(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersForAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Email,
+			&i.CreatedAt,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users SET role = $2 WHERE id = $1
+`
+
+type UpdateUserRoleParams struct {
+	ID   uuid.UUID `json:"id"`
+	Role UserRole  `json:"role"`
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
+	return err
 }

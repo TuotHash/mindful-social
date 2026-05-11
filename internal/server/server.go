@@ -82,8 +82,36 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		oauth:    registry,
 	}
 	views.SetSignupEnabled(cfg.SignupEnabled)
+	if err := s.bootstrapAdmins(ctx); err != nil {
+		// Don't fail boot if admin reconcile fails — just log it. A
+		// transient DB error shouldn't keep the whole server down.
+		logger.Warn("admin bootstrap", "err", err)
+	}
 	s.routes()
 	return s, nil
+}
+
+// bootstrapAdmins reconciles cfg.AdminUsers with the role column. Listed
+// usernames that exist get promoted to admin if they aren't already;
+// unknown usernames are logged and skipped. This runs at every startup,
+// so demoting a username through the UI sticks (the env var only ever
+// *grants* admin, it doesn't enforce the set).
+func (s *Server) bootstrapAdmins(ctx context.Context) error {
+	for _, username := range s.cfg.AdminUsers {
+		u, err := s.queries.GetUserByUsername(ctx, username)
+		if err != nil {
+			s.logger.Warn("admin bootstrap: user not found", "username", username, "err", err)
+			continue
+		}
+		if u.Role == db.UserRoleAdmin {
+			continue
+		}
+		if err := s.queries.UpdateUserRole(ctx, db.UpdateUserRoleParams{ID: u.ID, Role: db.UserRoleAdmin}); err != nil {
+			return err
+		}
+		s.logger.Info("admin bootstrap: promoted", "username", username)
+	}
+	return nil
 }
 
 func (s *Server) Handler() http.Handler { return s.router }
@@ -159,6 +187,15 @@ func (s *Server) routes() {
 		r.Post("/lists/{id}/members", s.handleListAddMember)
 		r.Post("/lists/{id}/members/{userID}/delete", s.handleListRemoveMember)
 		r.Post("/lists/{id}/delete", s.handleListDelete)
+	})
+
+	// Admin-only routes. requireAdmin returns 404 for non-admins so the
+	// route surface is invisible.
+	r.Group(func(r chi.Router) {
+		r.Use(s.requireUser)
+		r.Use(s.requireAdmin)
+		r.Get("/admin", s.handleAdminIndex)
+		r.Post("/admin/users/{id}/role", s.handleAdminSetRole)
 	})
 
 	s.router = r

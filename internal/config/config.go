@@ -20,6 +20,13 @@ type Config struct {
 	// page that still offers OAuth/SSO. OAuth callbacks continue to create
 	// users — SSO is the intended fallback for closed instances.
 	SignupEnabled bool
+
+	// AdminUsers is the list of usernames that get the 'admin' role
+	// granted on startup, reconciled idempotently. The intended use is
+	// bootstrapping the first admin on a fresh install; subsequent role
+	// changes happen through the admin UI. Unknown usernames are logged
+	// and skipped.
+	AdminUsers []string
 }
 
 // Load reads configuration from environment variables.
@@ -30,6 +37,7 @@ func Load() (Config, error) {
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
 		SignupEnabled: envBool("SIGNUP_ENABLED", true),
+		AdminUsers:    envList("ADMIN_USERS"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -42,6 +50,24 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// envList splits a comma-separated env var, trims whitespace, and drops
+// empty entries. Returns nil when the var is unset so callers can
+// distinguish "no list configured" from "empty list".
+func envList(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // envBool parses common true/false spellings; anything unrecognised falls

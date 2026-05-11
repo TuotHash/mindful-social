@@ -248,7 +248,7 @@ templ nodeTypeChip(t db.NodeType) {
 	</span>
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink bool) {
+templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -297,7 +297,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 								}
 							</a>
 						}
-						if viewer.ID == node.CreatedBy.String() {
+						if canDelete {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="btn danger"><span class="material-symbols-outlined">delete</span>Delete</a>
 						}
 					</div>

@@ -69,7 +69,14 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 						<div class="row gap-24 wrap" style="align-items: flex-start;">
 							@Avatar(profile.Username, 88)
 							<div class="col gap-8 grow" style="min-width: 240px;">
-								<h1>{ profile.Username }</h1>
+								<div class="row gap-12 wrap" style="align-items: center;">
+									<h1 style="margin: 0;">{ profile.Username }</h1>
+									if profile.Role == db.UserRoleAdmin {
+										<span class="badge danger">Admin</span>
+									} else if profile.Role == db.UserRoleModerator {
+										<span class="badge accent">Moderator</span>
+									}
+								</div>
 								<div class="row gap-12 wrap muted" style="font-size: 13px; font-family: var(--mono);">
 									<span>Joined { profile.CreatedAt.Time.Format("January 2006") }</span>
 									<span>·</span>

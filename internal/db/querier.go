@@ -153,6 +153,9 @@ type Querier interface {
 	// viewer_id is NULL for logged-out users (only public nodes match).
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
+	// Roster for the admin /users page. Recent signups first; staff bubble to
+	// the top so they're easy to find.
+	ListUsersForAdmin(ctx context.Context) ([]User, error)
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
 	// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
@@ -196,6 +199,7 @@ type Querier interface {
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
+	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	// Idempotent: returns the tag id whether it already existed or just got
 	// inserted. The DO UPDATE SET name=EXCLUDED.name is a no-op that exists
 	// only so RETURNING fires on the conflict path.

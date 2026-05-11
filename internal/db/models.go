@@ -230,6 +230,59 @@ func (e PinKind) Valid() bool {
 	return false
 }
 
+type UserRole string
+
+const (
+	UserRoleUser      UserRole = "user"
+	UserRoleModerator UserRole = "moderator"
+	UserRoleAdmin     UserRole = "admin"
+)
+
+func (e *UserRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserRole(s)
+	case string:
+		*e = UserRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
+	}
+	return nil
+}
+
+type NullUserRole struct {
+	UserRole UserRole `json:"user_role"`
+	Valid    bool     `json:"valid"` // Valid is true if UserRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserRole), nil
+}
+
+func (e UserRole) Valid() bool {
+	switch e {
+	case UserRoleUser,
+		UserRoleModerator,
+		UserRoleAdmin:
+		return true
+	}
+	return false
+}
+
 type VisibilityKind string
 
 const (
@@ -369,6 +422,7 @@ type User struct {
 	Username  string             `json:"username"`
 	Email     string             `json:"email"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Role      UserRole           `json:"role"`
 }
 
 type UserNodePin struct {

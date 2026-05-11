@@ -382,6 +382,16 @@ button.link:hover { color: var(--ink); }
 .chip.view,      .badge-view      { background: var(--view-bg); color: var(--view-ink); border-color: transparent; }
 .chip.reasoning, .badge-reasoning { background: var(--reasoning-bg); color: var(--reasoning-ink); border-color: transparent; }
 .chip.evidence,  .badge-evidence  { background: var(--evidence-bg); color: var(--evidence-ink); border-color: transparent; }
+.badge.accent {
+  background: color-mix(in oklch, var(--accent) 24%, var(--bg));
+  color: var(--accent-ink);
+  border-color: color-mix(in oklch, var(--accent-deep) 35%, transparent);
+}
+.badge.danger {
+  background: color-mix(in oklch, var(--opposes) 16%, var(--bg));
+  color: var(--opposes);
+  border-color: color-mix(in oklch, var(--opposes) 35%, transparent);
+}
 
 .tag, .tag-chip {
   display: inline-flex;

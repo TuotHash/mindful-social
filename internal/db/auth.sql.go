@@ -117,7 +117,7 @@ func (q *Queries) GetIdentityForUser(ctx context.Context, arg GetIdentityForUser
 }
 
 const getPasswordIdentityForLogin = `-- name: GetPasswordIdentityForLogin :one
-SELECT u.id, u.username, u.email, u.created_at, ai.secret AS password_hash, ai.id AS identity_id
+SELECT u.id, u.username, u.email, u.created_at, u.role, ai.secret AS password_hash, ai.id AS identity_id
 FROM users u
 JOIN auth_identities ai ON ai.user_id = u.id
 WHERE u.email = $1
@@ -129,6 +129,7 @@ type GetPasswordIdentityForLoginRow struct {
 	Username     string             `json:"username"`
 	Email        string             `json:"email"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	Role         UserRole           `json:"role"`
 	PasswordHash *string            `json:"password_hash"`
 	IdentityID   uuid.UUID          `json:"identity_id"`
 }
@@ -143,6 +144,7 @@ func (q *Queries) GetPasswordIdentityForLogin(ctx context.Context, email string)
 		&i.Username,
 		&i.Email,
 		&i.CreatedAt,
+		&i.Role,
 		&i.PasswordHash,
 		&i.IdentityID,
 	)

@@ -204,8 +204,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 				case err != nil || parentNode.Type != db.NodeTypeTopic:
 					flash = "The selected parent must be a topic."
 				default:
-					vid := user.ID
-					if ok, perr := s.canLinkToNode(r.Context(), parentNode, &vid); perr != nil {
+					if ok, perr := s.canLinkToNode(r.Context(), parentNode, user); perr != nil {
 						s.logger.Error("create node: parent link policy", "err", perr)
 						flash = "Could not check parent topic permissions. Please try again."
 					} else if !ok {
@@ -354,13 +353,13 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	canEdit, err := s.canEditNode(r.Context(), node, vid)
+	canEdit, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: edit policy", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	canLink, err := s.canLinkToNode(r.Context(), node, vid)
+	canLink, err := s.canLinkToNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: link policy", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -376,6 +375,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		tags,
 		canEdit,
 		canLink,
+		canDeleteNode(node, user),
 	))
 }
 
@@ -432,7 +432,7 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 // (highlight/unhighlight/disconnect from a page's POV) can early-return
 // cleanly.
 func (s *Server) requireEditPermission(w http.ResponseWriter, r *http.Request, node db.Node) bool {
-	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	allowed, err := s.canEditNode(r.Context(), node, currentUser(r))
 	if err != nil {
 		s.logger.Error("policy check", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -456,7 +456,7 @@ func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	id := node.ID
-	if node.CreatedBy != user.ID {
+	if !canDeleteNode(node, user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -488,7 +488,7 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if node.CreatedBy != user.ID {
+	if !canDeleteNode(node, user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -530,7 +530,7 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	allowed, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node edit: policy check", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -581,7 +581,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	allowed, err := s.canEditNode(r.Context(), node, viewerID(r))
+	allowed, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node update: policy check", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -795,8 +795,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Both endpoints must permit links from this viewer. fromNode is
 	// already loaded; toNode needs a separate fetch.
-	vid := viewerID(r)
-	if ok, err := s.canLinkToNode(r.Context(), fromNode, vid); err != nil {
+	if ok, err := s.canLinkToNode(r.Context(), fromNode, user); err != nil {
 		s.logger.Error("edge create: link policy from", "err", err)
 		rerender("Could not create connection. Please try again.")
 		return
@@ -809,7 +808,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		rerender("Target node not found.")
 		return
 	}
-	if ok, err := s.canLinkToNode(r.Context(), toNode, vid); err != nil {
+	if ok, err := s.canLinkToNode(r.Context(), toNode, user); err != nil {
 		s.logger.Error("edge create: link policy to", "err", err)
 		rerender("Could not create connection. Please try again.")
 		return

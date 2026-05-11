@@ -58,6 +58,19 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 	})
 }
 
+// requireAdmin gates admin-only routes. Returns 404 (not 403) so the route
+// is invisible to non-admins — they can't tell whether the path exists.
+func (s *Server) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := currentUser(r)
+		if u == nil || u.Role != db.UserRoleAdmin {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func currentUser(r *http.Request) *db.User {
 	u, _ := r.Context().Value(ctxUserKey).(*db.User)
 	return u
@@ -80,6 +93,11 @@ func viewerFor(u *db.User) *views.Viewer {
 	if u == nil {
 		return nil
 	}
-	return &views.Viewer{ID: u.ID.String(), Username: u.Username}
+	return &views.Viewer{
+		ID:       u.ID.String(),
+		Username: u.Username,
+		IsAdmin:  u.Role == db.UserRoleAdmin,
+		IsStaff:  u.Role == db.UserRoleAdmin || u.Role == db.UserRoleModerator,
+	}
 }
 

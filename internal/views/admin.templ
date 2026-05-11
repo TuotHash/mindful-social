@@ -1,0 +1,123 @@
+package views
+
+import (
+	"github.com/google/uuid"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
+
+// AdminUserRow is one row in the admin user roster. IsSelf is true when
+// this is the viewing admin's own account so the template can disable
+// self-demotion (a guard also enforced server-side).
+type AdminUserRow struct {
+	ID       uuid.UUID
+	Username string
+	Email    string
+	Role     db.UserRole
+	IsSelf   bool
+}
+
+func roleLabel(r db.UserRole) string {
+	switch r {
+	case db.UserRoleAdmin:
+		return "Admin"
+	case db.UserRoleModerator:
+		return "Moderator"
+	}
+	return "User"
+}
+
+func roleBadgeClass(r db.UserRole) string {
+	switch r {
+	case db.UserRoleAdmin:
+		return "badge danger"
+	case db.UserRoleModerator:
+		return "badge accent"
+	}
+	return "badge"
+}
+
+templ AdminUsers(viewer *Viewer, users []AdminUserRow, flash, success string) {
+	@Layout("Admin — users", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Admin</span>
+				<h1 class="h-1">Users & roles</h1>
+				<p class="muted" style="margin: 0;">Promote moderators to help curate the graph, or grant another admin so you're not the only one with the keys. Moderators can edit and delete any node; admins additionally manage roles.</p>
+			</div>
+			@Flash(flash)
+			if success != "" {
+				<div class="flash" role="status" style="background: color-mix(in oklch, var(--supports) 14%, var(--bg)); border-color: color-mix(in oklch, var(--supports) 40%, transparent);">{ success }</div>
+			}
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Roster</h2>
+				if len(users) == 0 {
+					<p class="muted">No users yet.</p>
+				} else {
+					<ul class="list-rows">
+						for _, u := range users {
+							<li class="list-row">
+								<a href={ templ.SafeURL("/users/" + u.Username) } class="list-row-main">
+									@Avatar(u.Username, 32)
+									<div class="col gap-4">
+										<div class="row gap-8 wrap" style="align-items: center;">
+											<span style="font-weight: 500;">{ u.Username }</span>
+											<span class={ roleBadgeClass(u.Role) }>{ roleLabel(u.Role) }</span>
+											if u.IsSelf {
+												<span class="muted" style="font-size: 12px;">(you)</span>
+											}
+										</div>
+										<span class="muted" style="font-size: 12px;">{ u.Email }</span>
+									</div>
+								</a>
+								<div class="row gap-8 wrap">
+									for _, target := range otherRoles(u.Role) {
+										if !(u.IsSelf && target != db.UserRoleAdmin) {
+											<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID.String() + "/role") } class="inline">
+												<input type="hidden" name="role" value={ string(target) }/>
+												<button type="submit" class="btn ghost sm">{ roleActionLabel(u.Role, target) }</button>
+											</form>
+										}
+									}
+								</div>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+		</div>
+	}
+}
+
+// otherRoles returns the role values different from `current` so the UI
+// can render one button per change-target instead of a radio group.
+func otherRoles(current db.UserRole) []db.UserRole {
+	all := []db.UserRole{db.UserRoleUser, db.UserRoleModerator, db.UserRoleAdmin}
+	out := make([]db.UserRole, 0, 2)
+	for _, r := range all {
+		if r != current {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// roleActionLabel verbalises the change so the button reads as an action
+// ("Promote to admin", "Demote to user"). Direction is purely cosmetic;
+// the server doesn't care.
+func roleActionLabel(from, to db.UserRole) string {
+	if roleRank(to) > roleRank(from) {
+		return "Promote to " + string(to)
+	}
+	return "Demote to " + string(to)
+}
+
+func roleRank(r db.UserRole) int {
+	switch r {
+	case db.UserRoleAdmin:
+		return 2
+	case db.UserRoleModerator:
+		return 1
+	}
+	return 0
+}
