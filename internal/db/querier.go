@@ -208,6 +208,10 @@ type Querier interface {
 	// sync to avoid future surprises.
 	UpdatePasswordIdentitySubject(ctx context.Context, arg UpdatePasswordIdentitySubjectParams) error
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error
+	// Updates all three composer/display defaults at once. The audience-list FK
+	// is nullable; pass NULL whenever default_node_visibility is anything other
+	// than 'list'. Timezone is an IANA name (empty string = fall back to UTC).
+	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) error
 	// Idempotent: returns the tag id whether it already existed or just got

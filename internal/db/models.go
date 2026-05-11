@@ -418,11 +418,14 @@ type Tag struct {
 }
 
 type User struct {
-	ID        uuid.UUID          `json:"id"`
-	Username  string             `json:"username"`
-	Email     string             `json:"email"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	Role      UserRole           `json:"role"`
+	ID                    uuid.UUID          `json:"id"`
+	Username              string             `json:"username"`
+	Email                 string             `json:"email"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	Role                  UserRole           `json:"role"`
+	DefaultNodeVisibility VisibilityKind     `json:"default_node_visibility"`
+	DefaultAudienceListID *uuid.UUID         `json:"default_audience_list_id"`
+	Timezone              string             `json:"timezone"`
 }
 
 type UserNodePin struct {
