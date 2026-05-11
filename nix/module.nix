@@ -111,7 +111,7 @@ in {
 
       user = lib.mkOption {
         type = lib.types.str;
-        default = "mindful-social";
+        default = "mindful_social";
         description = "Local database role and matching system user. Only used when createLocally is true.";
       };
     };
