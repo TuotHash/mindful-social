@@ -289,13 +289,13 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						}
 						if pin == nil {
-							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="btn accent">
-								if node.Type == db.NodeTypeView {
-									<span class="material-symbols-outlined">push_pin</span>Pin to my profile
-								} else {
-									<span class="material-symbols-outlined">keep</span>Feature on my profile
-								}
-							</a>
+							<a
+								href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }
+								class="btn accent"
+								hx-get={ "/nodes/" + node.Slug + "/pin" }
+								hx-target="#modal"
+								hx-swap="innerHTML"
+							><span class="material-symbols-outlined">graphic_eq</span>Resonate</a>
 						}
 						if canDelete {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="btn danger"><span class="material-symbols-outlined">delete</span>Delete</a>
@@ -314,7 +314,14 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 								<a href={ templ.SafeURL("/nodes/" + rs.Slug) }>{ rs.Title }</a>
 							}
 						}
-						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="muted" style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
+						<a
+							href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }
+							class="muted"
+							style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"
+							hx-get={ "/nodes/" + node.Slug + "/pin" }
+							hx-target="#modal"
+							hx-swap="innerHTML"
+						><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
 						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/unpin") } class="inline">
 							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">keep_off</span>Remove</button>
 						</form>
@@ -510,84 +517,132 @@ type ReasoningCandidate struct {
 }
 
 templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
-	@Layout("Pin "+node.Title, viewer) {
+	@Layout("Resonate · "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
-				<span class="eyebrow">Pin</span>
+				<span class="eyebrow">Resonate</span>
 				@nodeTypeChip(node.Type)
 			</div>
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
-				Pin this node to your profile.
 				if node.Type == db.NodeTypeView {
 					Take a stance — support or oppose — or just feature it. Optionally attach reasonings that explain your thinking.
 				} else {
-					Topics and other node types can be featured.
+					Feature this on your profile.
 				}
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="form">
-				<fieldset class="toggle-group">
-					<legend>Stance</legend>
-					<div class="toggle-btns">
-						if node.Type == db.NodeTypeView {
-							<label class="toggle-btn" data-kind="supports">
-								<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" || formKind == "" }/>
-								<span class="material-symbols-outlined">heart_plus</span>
-								Support
-							</label>
-							<label class="toggle-btn" data-kind="opposes">
-								<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
-								<span class="material-symbols-outlined">heart_minus</span>
-								Oppose
-							</label>
-						}
-						<label class="toggle-btn" data-kind="featured">
-							<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (node.Type != db.NodeTypeView && formKind == "") }/>
-							<span class="material-symbols-outlined">keep</span>
-							Just feature
-						</label>
-					</div>
-				</fieldset>
-				if node.Type == db.NodeTypeView {
-					<fieldset class="toggle-group">
-						<legend>Reasonings <small>(optional, multiple allowed)</small></legend>
-						if len(attached) > 0 {
-							<div class="toggle-btns toggle-btns-stack">
-								for _, a := range attached {
-									<label class="toggle-btn" data-reasoning="attached">
-										<input type="checkbox" name="reasoning_ids" value={ a.ID.String() } checked/>
-										<span class="material-symbols-outlined">psychology</span>
-										{ a.Title }
-									</label>
-								}
-							</div>
-							<small class="muted" style="font-size: 12px;">Currently attached. Untick to remove.</small>
-						}
-						<label>
-							Find more reasonings to attach
-							<input
-								type="search"
-								name="find_reasoning"
-								value={ findReasoning }
-								placeholder="search reasoning titles…"
-								autocomplete="off"
-								hx-get={ "/nodes/" + node.Slug + "/reasoning-picker" }
-								hx-trigger="input changed delay:200ms, search"
-								hx-target="#reasoning-picker-target"
-								hx-swap="outerHTML"
-								hx-include="[name='find_reasoning'],[name='reasoning_ids']"
-							/>
-						</label>
-						@ReasoningCandidatePicker(findReasoning, selectedReasoningIDs, attached, candidates)
-					</fieldset>
-				}
+				@pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates)
 				<div class="form-row">
-					<button type="submit" class="btn accent"><span class="material-symbols-outlined">push_pin</span>Save pin</button>
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">graphic_eq</span>Resonate</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
 				</div>
 			</form>
 		</div>
+	}
+}
+
+// PinModal renders the same form inside a modal frame. Returned when
+// GET /nodes/{slug}/pin arrives with HX-Request: true (the node page's
+// Resonate button opens it in-place). Form submit posts via htmx; on
+// validation error the server re-renders this fragment, on success the
+// handler sets HX-Redirect so htmx does a full page navigation.
+templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
+			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
+				<span class="material-symbols-outlined">close</span>
+			</button>
+			<div class="row gap-12 wrap center" style="margin-bottom: 10px;">
+				<span class="eyebrow">Resonate</span>
+				@nodeTypeChip(node.Type)
+			</div>
+			<h2 id="pin-modal-title" style="margin: 0 0 6px; font-size: 22px;">{ node.Title }</h2>
+			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
+				if node.Type == db.NodeTypeView {
+					Take a stance — or just feature it. Optionally attach reasonings.
+				} else {
+					Feature this on your profile.
+				}
+			</p>
+			@Flash(flash)
+			<form
+				method="post"
+				action={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }
+				class="form"
+				hx-post={ "/nodes/" + node.Slug + "/pin" }
+				hx-target="#modal"
+				hx-swap="innerHTML"
+			>
+				@pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates)
+				<div class="form-row">
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">graphic_eq</span>Resonate</button>
+					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// pinFormFields is the shared body of PinForm (standalone page) and
+// PinModal (htmx modal). For views it offers support / oppose / feature
+// plus a reasoning picker; for other node types only "feature" applies.
+templ pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+	<fieldset class="toggle-group">
+		<legend>Stance</legend>
+		<div class="toggle-btns">
+			if node.Type == db.NodeTypeView {
+				<label class="toggle-btn" data-kind="supports">
+					<input type="radio" name="kind" value="supports" checked?={ formKind == "supports" || formKind == "" }/>
+					<span class="material-symbols-outlined">heart_plus</span>
+					Support
+				</label>
+				<label class="toggle-btn" data-kind="opposes">
+					<input type="radio" name="kind" value="opposes" checked?={ formKind == "opposes" }/>
+					<span class="material-symbols-outlined">heart_minus</span>
+					Oppose
+				</label>
+			}
+			<label class="toggle-btn" data-kind="featured">
+				<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (node.Type != db.NodeTypeView && formKind == "") }/>
+				<span class="material-symbols-outlined">keep</span>
+				Just feature
+			</label>
+		</div>
+	</fieldset>
+	if node.Type == db.NodeTypeView {
+		<fieldset class="toggle-group">
+			<legend>Reasonings <small>(optional, multiple allowed)</small></legend>
+			if len(attached) > 0 {
+				<div class="toggle-btns toggle-btns-stack">
+					for _, a := range attached {
+						<label class="toggle-btn" data-reasoning="attached">
+							<input type="checkbox" name="reasoning_ids" value={ a.ID.String() } checked/>
+							<span class="material-symbols-outlined">psychology</span>
+							{ a.Title }
+						</label>
+					}
+				</div>
+				<small class="muted" style="font-size: 12px;">Currently attached. Untick to remove.</small>
+			}
+			<label>
+				Find more reasonings to attach
+				<input
+					type="search"
+					name="find_reasoning"
+					value={ findReasoning }
+					placeholder="search reasoning titles…"
+					autocomplete="off"
+					hx-get={ "/nodes/" + node.Slug + "/reasoning-picker" }
+					hx-trigger="input changed delay:200ms, search"
+					hx-target="#reasoning-picker-target"
+					hx-swap="outerHTML"
+					hx-include="[name='find_reasoning'],[name='reasoning_ids']"
+				/>
+			</label>
+			@ReasoningCandidatePicker(findReasoning, selectedReasoningIDs, attached, candidates)
+		</fieldset>
 	}
 }
 

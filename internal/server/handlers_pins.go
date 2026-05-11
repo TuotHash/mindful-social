@@ -44,6 +44,10 @@ func (s *Server) handlePinForm(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("pin form: search reasonings", "err", err)
 		candidates = nil
 	}
+	if isHTMX(r) {
+		render(w, r, views.PinModal(node, "", formKind, "", nil, attached, candidates))
+		return
+	}
 	render(w, r, views.PinForm(viewerFor(user), node, "", formKind, "", nil, attached, candidates))
 }
 
@@ -100,6 +104,13 @@ func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 	if err := s.replacePinReasonings(r, pinID, reasoningUUIDs); err != nil {
 		s.logger.Error("pin set: replace reasonings", "err", err)
 		s.rerenderPinForm(w, r, user, node, "Saved the stance but could not update reasonings. Please try again.", rawKind, rawFindReasoning, rawReasoningIDs)
+		return
+	}
+	// htmx submits get a full-page navigation back to the node, which closes
+	// the modal and shows the new banner. Non-htmx submits get the usual 303.
+	if isHTMX(r) {
+		w.Header().Set("HX-Redirect", "/nodes/"+node.Slug)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
@@ -214,6 +225,10 @@ func (s *Server) rerenderPinForm(w http.ResponseWriter, r *http.Request, user *d
 		}
 	}
 	candidates, _ := s.searchReasoningCandidates(r, findReasoning)
+	if isHTMX(r) {
+		render(w, r, views.PinModal(node, flash, formKind, findReasoning, selectedIDs, attached, candidates))
+		return
+	}
 	render(w, r, views.PinForm(viewerFor(user), node, flash, formKind, findReasoning, selectedIDs, attached, candidates))
 }
 
