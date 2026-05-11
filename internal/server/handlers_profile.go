@@ -14,8 +14,9 @@ import (
 const profileNodesLimit = 25
 
 // handleProfile renders /users/{username}: a public profile showing the
-// user's authored nodes and commitments. Sign-in identities are only
-// included when the viewer is looking at their own profile.
+// user's authored nodes and pinned commitments. Sign-in methods live on
+// the account page now — this view is for what the user is publicly
+// committed to, nothing private.
 func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	username := chiURLParam(r, "username")
 	if username == "" {
@@ -52,15 +53,6 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 
 	viewer := currentUser(r)
 	isSelf := viewer != nil && viewer.ID == user.ID
-	var identities []db.AuthIdentity
-	if isSelf {
-		identities, err = s.queries.ListIdentitiesForUser(r.Context(), user.ID)
-		if err != nil {
-			s.logger.Error("profile: list identities", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-	}
 
 	followers, err := s.queries.CountFollowers(r.Context(), user.ID)
 	if err != nil {
@@ -103,7 +95,6 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		isSelf,
 		authored,
 		pinRowsOut,
-		identityLabels(identities),
 		relation,
 	))
 }
@@ -142,18 +133,9 @@ func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.
 	return out, nil
 }
 
-// identityLabels turns auth-identity rows into the short, user-friendly
-// provider names shown on the profile (e.g. "password" → "Password",
-// "oidc:work" → "Work via OIDC"). The row's secret/subject is never
-// exposed to the template.
-func identityLabels(rows []db.AuthIdentity) []string {
-	out := make([]string, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, identityLabel(row.Provider))
-	}
-	return out
-}
-
+// identityLabel turns a provider key into the short, user-friendly name
+// shown on the account page (e.g. "password" → "Password", "oidc:work"
+// → "Work via OIDC"). Never exposes the raw secret/subject.
 func identityLabel(provider string) string {
 	switch provider {
 	case "password":

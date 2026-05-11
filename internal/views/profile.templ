@@ -59,7 +59,7 @@ func pinKindShort(k db.PinKind) string {
 	return string(k)
 }
 
-templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, identities []string, relation FollowRelation) {
+templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, pins []PinRow, relation FollowRelation) {
 	@Layout(profile.Username+" — profile", viewer) {
 		<div class="page medium">
 			<section class="profile">
@@ -108,17 +108,6 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 						</div>
 					</div>
 				</div>
-
-				if isSelf && len(identities) > 0 {
-					<section>
-						<h2>Sign-in methods</h2>
-						<ul class="identity-list">
-							for _, label := range identities {
-								<li>{ label }</li>
-							}
-						</ul>
-					</section>
-				}
 
 				<section>
 					<h2>On profile</h2>
