@@ -105,13 +105,13 @@ in {
 
       name = lib.mkOption {
         type = lib.types.str;
-        default = "mindful_social";
+        default = "mindful-social";
         description = "Local database name. Only used when createLocally is true.";
       };
 
       user = lib.mkOption {
         type = lib.types.str;
-        default = "mindful_social";
+        default = "mindful-social";
         description = "Local database role and matching system user. Only used when createLocally is true.";
       };
     };
