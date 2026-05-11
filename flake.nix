@@ -7,6 +7,19 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
+    # nixosModules is not per-system; it's a single entry point users
+    # import from their NixOS configuration. The module wires in the
+    # default package built for the host's system so a typical user
+    # only has to flip enable = true.
+    {
+      nixosModules.default = { pkgs, lib, ... }: {
+        imports = [ ./nix/module.nix ];
+        services.mindful-social.package =
+          lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      };
+      nixosModules.mindful-social = self.nixosModules.default;
+    }
+    //
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
