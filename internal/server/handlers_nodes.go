@@ -91,11 +91,12 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		initialTopics = nil
 	}
 	topicCandidates := topicCandidateRows(initialTopics)
+	defaultVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", "public", lists, "", "", topicCandidates))
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, "", "", topicCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", "public", lists, "", "", topicCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, "", "", topicCandidates))
 }
 
 func (s *Server) handleTopicPicker(w http.ResponseWriter, r *http.Request) {
