@@ -565,6 +565,20 @@ main.wide { max-width: var(--container-wide); }
 .page.narrow { max-width: var(--container-narrow); margin: 0 auto; }
 .page.medium { max-width: 880px; margin: 0 auto; }
 
+/* On the landing page the .section-paper / .section-cream / .hero / standalone
+   .page bands have their own backgrounds and span the full main width — so
+   the .page wrapper inside them needs horizontal gutters of its own, plus a
+   centered max-width to keep line lengths readable. */
+section.section-paper > .page,
+section.section-cream > .page,
+section.hero > .page,
+section.page {
+  padding-left: var(--s-8);
+  padding-right: var(--s-8);
+  max-width: var(--container);
+  margin: 0 auto;
+}
+
 /* Footer — supports `.foot` (new) and `.site-footer` (legacy). */
 .foot,
 .site-footer {
