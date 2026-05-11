@@ -60,7 +60,10 @@ internal/           private application code
 migrations/         goose .sql migrations (numbered)
 queries/            SQL files consumed by sqlc to generate Go code
 scripts/            dev helpers (db-init, migrate-up, …)
-flake.nix           reproducible dev shell
+flake.nix           reproducible dev shell + Nix package (flake users)
+default.nix         channels entrypoint (non-flake `nix-build`)
+nix/package.nix     buildGoModule recipe, shared by both
+nix/module.nix      NixOS module (systemd service + optional Postgres)
 ```
 
 ## Tech stack

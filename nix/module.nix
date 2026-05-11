@@ -15,7 +15,13 @@ in {
 
     package = lib.mkOption {
       type = lib.types.package;
-      description = "Mindful Social package to run.";
+      default = pkgs.callPackage ./package.nix {};
+      defaultText = lib.literalExpression "pkgs.callPackage ./package.nix {}";
+      description = ''
+        Mindful Social package to run. Defaults to building from the
+        sibling package.nix, so the module works standalone on channels
+        without the flake.
+      '';
     };
 
     listenAddr = lib.mkOption {
