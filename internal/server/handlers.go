@@ -6,6 +6,8 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
+
+	mindfulsocial "github.com/TuotHash/mindful-social"
 )
 
 const oauthExchangeTimeout = 10 * time.Second
@@ -17,7 +19,19 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("ok\n"))
+	_, _ = w.Write([]byte("ok " + mindfulsocial.Version + "\n"))
+}
+
+// cacheStatic stamps a Cache-Control header on responses from the
+// embedded static handler. One day of public caching is safe today
+// because the asset surface (app.css, htmx.min.js) only changes on
+// release. When content-hashed filenames land, the max-age can move to
+// a year with immutable.
+func cacheStatic(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		h.ServeHTTP(w, r)
+	})
 }
 
 // render is a stateless helper for handlers that need to write a templ

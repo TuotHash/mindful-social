@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
@@ -14,9 +15,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	mindfulsocial "github.com/TuotHash/mindful-social"
 	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/config"
 	"github.com/TuotHash/mindful-social/internal/db"
+	"github.com/TuotHash/mindful-social/internal/migrate"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
 
@@ -60,6 +63,17 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 
 	// scs/postgresstore is built against database/sql; bridge from pgxpool.
 	sqlDB := stdlib.OpenDBFromPool(pool)
+
+	// Apply pending migrations from the embedded MigrationsFS before
+	// anything touches the schema. Idempotent — goose only runs what's
+	// missing. Failing here aborts startup; a stale schema is worse than
+	// a non-responsive server.
+	if err := migrate.Up(sqlDB); err != nil {
+		pool.Close()
+		_ = sqlDB.Close()
+		return nil, err
+	}
+
 	sm := auth.NewSessionManager(sqlDB)
 
 	oauthCtx, oauthCancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -134,10 +148,20 @@ func (s *Server) routes() {
 
 	r.Get("/healthz", s.handleHealth)
 
-	// Static assets are served from ./static. Cached lightly so dev edits
-	// take effect on reload without a hard refresh.
-	staticFS := http.FileServer(http.Dir("static"))
-	r.Handle("/static/*", http.StripPrefix("/static/", staticFS))
+	// Static assets are served from the embedded FS so the binary is
+	// self-contained. Cache-Control lets the reverse proxy (and the
+	// browser, and any CDN) hold them for a day; filenames will move to
+	// content-hashed paths in a later release for true immutable
+	// caching.
+	staticSub, err := fs.Sub(mindfulsocial.StaticFS, "static")
+	if err != nil {
+		// Sub only fails on a malformed path. The embed directive is a
+		// compile-time constant, so this panic flags a programmer bug
+		// rather than a runtime configuration problem.
+		panic(err)
+	}
+	staticFS := http.FileServer(http.FS(staticSub))
+	r.Handle("/static/*", http.StripPrefix("/static/", cacheStatic(staticFS)))
 
 	r.Get("/", s.handleLanding)
 

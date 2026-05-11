@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	mindfulsocial "github.com/TuotHash/mindful-social"
 	"github.com/TuotHash/mindful-social/internal/config"
 	"github.com/TuotHash/mindful-social/internal/server"
 )
@@ -17,6 +18,7 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
+	logger.Info("mindful-social starting", "version", mindfulsocial.Version)
 
 	cfg, err := config.Load()
 	if err != nil {
