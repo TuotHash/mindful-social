@@ -13,17 +13,17 @@ templ Layout(title string, currentUser *Viewer) {
 			<title>{ title } — Mindful Social</title>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+			<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
 			<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/app.css"/>
 			<script>
 				(function () {
+					var t = 'dark';
 					try {
-						var t = localStorage.getItem('theme');
-						if (t === 'dark' || t === 'light') {
-							document.documentElement.setAttribute('data-theme', t);
-						}
+						var s = localStorage.getItem('theme');
+						if (s === 'light') t = 'light';
 					} catch (e) {}
+					document.documentElement.setAttribute('data-theme', t);
 				})();
 			</script>
 			<script src="/static/htmx.min.js" defer></script>
@@ -107,7 +107,7 @@ templ TopNav(currentUser *Viewer) {
 				</svg>
 				<input type="search" name="q" placeholder="Search topics, views, evidence…" aria-label="Search"/>
 			</form>
-			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme">☾</button>
+			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle theme">☀</button>
 			if currentUser != nil {
 				<details class="user-menu">
 					<summary class="user-menu-trigger" aria-label="Account menu">
