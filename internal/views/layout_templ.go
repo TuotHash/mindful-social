@@ -8,7 +8,10 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Layout is the shared chrome around every page. Title is set per-page.
 // CurrentUser is rendered in the header when set; nil means logged-out.
@@ -40,7 +43,7 @@ func Layout(title string, currentUser *Viewer) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 13, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 16, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -116,7 +119,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><span class=\"nav-spacer\"></span><form method=\"get\" action=\"/search\" class=\"nav-search\" role=\"search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"4.2\" stroke=\"currentColor\" stroke-width=\"1.4\" fill=\"none\"></circle> <path d=\"M9.2 9.2L12 12\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"></path></svg> <input type=\"search\" name=\"q\" placeholder=\"Search topics, views, evidence…\" aria-label=\"Search\"></form><button id=\"theme-toggle\" class=\"theme-toggle\" type=\"button\" title=\"Toggle theme\" aria-label=\"Toggle theme\">☀</button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><span class=\"nav-spacer\"></span><form method=\"get\" action=\"/search\" class=\"nav-search\" role=\"search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"4.2\" stroke=\"currentColor\" stroke-width=\"1.4\" fill=\"none\"></circle> <path d=\"M9.2 9.2L12 12\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"></path></svg> <input type=\"search\" name=\"q\" placeholder=\"Search topics, views, evidence…\" aria-label=\"Search\"></form><button id=\"theme-toggle\" class=\"theme-toggle\" type=\"button\" title=\"Toggle theme\" aria-label=\"Toggle theme\">☀</button> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -136,7 +139,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(currentUser.Username)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 115, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 118, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -149,7 +152,7 @@ func TopNav(currentUser *Viewer) templ.Component {
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/users/" + currentUser.Username))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 119, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 122, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -220,7 +223,7 @@ func Avatar(username string, size int) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(avatarStyle(username, size))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 149, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 152, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -233,7 +236,7 @@ func Avatar(username string, size int) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(avatarInitials(username))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 150, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 153, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -280,7 +283,23 @@ type Viewer struct {
 	ID       string
 	Username string
 	IsAdmin  bool
-	IsStaff  bool // admins or moderators — used to flag curation UI
+	IsStaff  bool   // admins or moderators — used to flag curation UI
+	Timezone string // IANA name; empty = UTC fallback
+}
+
+// Location returns the viewer's preferred IANA location, falling back to
+// UTC when the viewer is nil, has no preference set, or the stored name
+// can't be loaded (e.g. tzdata changed). Used wherever a timestamp is
+// rendered for a logged-in user.
+func (v *Viewer) Location() *time.Location {
+	if v == nil || v.Timezone == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(v.Timezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 // Flash is a one-shot banner message rendered above forms.
@@ -313,7 +332,7 @@ func Flash(msg string) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 192, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 211, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {

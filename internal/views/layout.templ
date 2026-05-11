@@ -1,6 +1,9 @@
 package views
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Layout is the shared chrome around every page. Title is set per-page.
 // CurrentUser is rendered in the header when set; nil means logged-out.
@@ -183,7 +186,23 @@ type Viewer struct {
 	ID       string
 	Username string
 	IsAdmin  bool
-	IsStaff  bool // admins or moderators — used to flag curation UI
+	IsStaff  bool   // admins or moderators — used to flag curation UI
+	Timezone string // IANA name; empty = UTC fallback
+}
+
+// Location returns the viewer's preferred IANA location, falling back to
+// UTC when the viewer is nil, has no preference set, or the stored name
+// can't be loaded (e.g. tzdata changed). Used wherever a timestamp is
+// rendered for a logged-in user.
+func (v *Viewer) Location() *time.Location {
+	if v == nil || v.Timezone == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(v.Timezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 // Flash is a one-shot banner message rendered above forms.

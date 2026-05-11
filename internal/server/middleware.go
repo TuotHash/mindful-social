@@ -98,6 +98,7 @@ func viewerFor(u *db.User) *views.Viewer {
 		Username: u.Username,
 		IsAdmin:  u.Role == db.UserRoleAdmin,
 		IsStaff:  u.Role == db.UserRoleAdmin || u.Role == db.UserRoleModerator,
+		Timezone: u.Timezone,
 	}
 }
 

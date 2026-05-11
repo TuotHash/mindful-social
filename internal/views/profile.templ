@@ -78,7 +78,7 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 									}
 								</div>
 								<div class="row gap-12 wrap muted" style="font-size: 13px; font-family: var(--mono);">
-									<span>Joined { profile.CreatedAt.Time.Format("January 2006") }</span>
+									<span>Joined { profile.CreatedAt.Time.In(viewer.Location()).Format("January 2006") }</span>
 									<span>·</span>
 									<span>{ followerLabel(relation.Followers) }</span>
 									<span>·</span>
