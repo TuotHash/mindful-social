@@ -48,7 +48,8 @@ ORDER BY e.created_at DESC;
 -- the edge as highlighted (position when from_node, to_position when
 -- to_node). Returns the "other" endpoint regardless of direction so the
 -- highlight card can render uniformly. direction tells the UI which
--- active/passive label to apply.
+-- active/passive label to apply. Restricted to reasoning targets so the
+-- "Key reasoning" section semantically matches its name.
 SELECT
     e.id,
     e.kind,
@@ -64,6 +65,7 @@ JOIN nodes other ON other.id = CASE WHEN e.from_node = sqlc.arg(node_id) THEN e.
 WHERE (e.from_node = sqlc.arg(node_id) OR e.to_node = sqlc.arg(node_id))
   AND ((e.from_node = sqlc.arg(node_id) AND e.position IS NOT NULL)
        OR (e.to_node = sqlc.arg(node_id) AND e.to_position IS NOT NULL))
+  AND other.type = 'reasoning'
   AND node_visible_to(other.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY pos ASC;
 
@@ -71,8 +73,9 @@ ORDER BY pos ASC;
 -- Promote an edge into the highlights section from the perspective of
 -- `pov_node`, which must be one of the edge's endpoints. The rank is the
 -- next-highest across the existing highlights on that side, so the new
--- card lands at the bottom by default. If pov_node is not an endpoint
--- the WHERE clause filters it out and nothing changes.
+-- card lands at the bottom by default. The "other" endpoint must be a
+-- reasoning — the highlights section is for reasonings only. If either
+-- check fails the WHERE clause filters the row out and nothing changes.
 UPDATE edges AS e
 SET
     position = CASE
@@ -90,7 +93,12 @@ SET
         ELSE e.to_position
     END
 WHERE e.id = sqlc.arg(edge_id)
-  AND sqlc.arg(pov_node) IN (e.from_node, e.to_node);
+  AND sqlc.arg(pov_node) IN (e.from_node, e.to_node)
+  AND EXISTS (
+      SELECT 1 FROM nodes other
+      WHERE other.id = CASE WHEN e.from_node = sqlc.arg(pov_node) THEN e.to_node ELSE e.from_node END
+        AND other.type = 'reasoning'
+  );
 
 -- name: UnhighlightEdge :exec
 -- Reverse of HighlightEdge: clears the rank on whichever side matches

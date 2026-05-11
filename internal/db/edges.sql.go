@@ -77,6 +77,11 @@ SET
     END
 WHERE e.id = $2
   AND $1 IN (e.from_node, e.to_node)
+  AND EXISTS (
+      SELECT 1 FROM nodes other
+      WHERE other.id = CASE WHEN e.from_node = $1 THEN e.to_node ELSE e.from_node END
+        AND other.type = 'reasoning'
+  )
 `
 
 type HighlightEdgeParams struct {
@@ -87,8 +92,9 @@ type HighlightEdgeParams struct {
 // Promote an edge into the highlights section from the perspective of
 // `pov_node`, which must be one of the edge's endpoints. The rank is the
 // next-highest across the existing highlights on that side, so the new
-// card lands at the bottom by default. If pov_node is not an endpoint
-// the WHERE clause filters it out and nothing changes.
+// card lands at the bottom by default. The "other" endpoint must be a
+// reasoning — the highlights section is for reasonings only. If either
+// check fails the WHERE clause filters the row out and nothing changes.
 func (q *Queries) HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error {
 	_, err := q.db.Exec(ctx, highlightEdge, arg.PovNode, arg.EdgeID)
 	return err
@@ -242,6 +248,7 @@ JOIN nodes other ON other.id = CASE WHEN e.from_node = $1 THEN e.to_node ELSE e.
 WHERE (e.from_node = $1 OR e.to_node = $1)
   AND ((e.from_node = $1 AND e.position IS NOT NULL)
        OR (e.to_node = $1 AND e.to_position IS NOT NULL))
+  AND other.type = 'reasoning'
   AND node_visible_to(other.*, $2::uuid)
 ORDER BY pos ASC
 `
@@ -267,7 +274,8 @@ type ListHighlightedEdgesForNodeRow struct {
 // the edge as highlighted (position when from_node, to_position when
 // to_node). Returns the "other" endpoint regardless of direction so the
 // highlight card can render uniformly. direction tells the UI which
-// active/passive label to apply.
+// active/passive label to apply. Restricted to reasoning targets so the
+// "Key reasoning" section semantically matches its name.
 func (q *Queries) ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error) {
 	rows, err := q.db.Query(ctx, listHighlightedEdgesForNode, arg.NodeID, arg.ViewerID)
 	if err != nil {

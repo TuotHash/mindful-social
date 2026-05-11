@@ -86,8 +86,9 @@ type Querier interface {
 	// Promote an edge into the highlights section from the perspective of
 	// `pov_node`, which must be one of the edge's endpoints. The rank is the
 	// next-highest across the existing highlights on that side, so the new
-	// card lands at the bottom by default. If pov_node is not an endpoint
-	// the WHERE clause filters it out and nothing changes.
+	// card lands at the bottom by default. The "other" endpoint must be a
+	// reasoning — the highlights section is for reasonings only. If either
+	// check fails the WHERE clause filters the row out and nothing changes.
 	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error
 	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
@@ -117,7 +118,8 @@ type Querier interface {
 	// the edge as highlighted (position when from_node, to_position when
 	// to_node). Returns the "other" endpoint regardless of direction so the
 	// highlight card can render uniformly. direction tells the UI which
-	// active/passive label to apply.
+	// active/passive label to apply. Restricted to reasoning targets so the
+	// "Key reasoning" section semantically matches its name.
 	ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
