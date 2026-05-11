@@ -311,7 +311,7 @@ button { font: inherit; color: inherit; }
 .nav-inner {
   max-width: var(--container-wide);
   margin: 0 auto;
-  padding: var(--s-3) var(--s-5);
+  padding: var(--s-3) var(--s-8);
   display: flex;
   align-items: center;
   gap: var(--s-3);
@@ -551,7 +551,7 @@ main {
   display: block;
   max-width: var(--container);
   margin: 0 auto;
-  padding: var(--s-10) var(--s-5) var(--s-16);
+  padding: var(--s-10) var(--s-8) var(--s-16);
 }
 main.wide { max-width: var(--container-wide); }
 

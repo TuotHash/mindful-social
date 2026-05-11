@@ -414,7 +414,44 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</section></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = argumentGraphPromo().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func argumentGraphPromo() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var100 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var100 == nil {
+			templ_7745c5c3_Var100 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, `<section class="promo" aria-label="Coming soon: Argument graph" style="margin-top: 56px;"><div class="promo-inner"><span class="badge">Coming soon</span><h2>The argument graph</h2><p>See how topics, views, reasonings and sources connect — and trace any claim back to what supports or opposes it.</p></div><div class="promo-graph" aria-hidden="true"><svg viewBox="0 0 360 280" preserveAspectRatio="xMaxYMid meet"><defs><radialGradient id="bubble-topic" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 60)"></stop><stop offset="18%" stop-color="oklch(88% 0.14 60)"></stop><stop offset="55%" stop-color="oklch(68% 0.18 50)"></stop><stop offset="100%" stop-color="oklch(42% 0.12 45)"></stop></radialGradient><radialGradient id="bubble-view" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 250)"></stop><stop offset="18%" stop-color="oklch(86% 0.13 250)"></stop><stop offset="55%" stop-color="oklch(64% 0.17 260)"></stop><stop offset="100%" stop-color="oklch(40% 0.12 265)"></stop></radialGradient><radialGradient id="bubble-reasoning" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 168)"></stop><stop offset="18%" stop-color="oklch(86% 0.14 168)"></stop><stop offset="55%" stop-color="oklch(60% 0.16 168)"></stop><stop offset="100%" stop-color="oklch(38% 0.10 168)"></stop></radialGradient><radialGradient id="bubble-fact" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 332)"></stop><stop offset="18%" stop-color="oklch(86% 0.14 332)"></stop><stop offset="55%" stop-color="oklch(64% 0.18 340)"></stop><stop offset="100%" stop-color="oklch(40% 0.13 340)"></stop></radialGradient><radialGradient id="bubble-small" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(96% 0.02 250)"></stop><stop offset="55%" stop-color="oklch(72% 0.05 250)"></stop><stop offset="100%" stop-color="oklch(48% 0.04 250)"></stop></radialGradient><linearGradient id="hi-shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="oklch(100% 0 0 / 0.95)"></stop><stop offset="60%" stop-color="oklch(100% 0 0 / 0.15)"></stop><stop offset="100%" stop-color="oklch(100% 0 0 / 0)"></stop></linearGradient><radialGradient id="rim-soft" cx="50%" cy="95%" r="60%"><stop offset="0%" stop-color="oklch(100% 0 0 / 0.30)"></stop><stop offset="100%" stop-color="oklch(100% 0 0 / 0)"></stop></radialGradient><filter id="ball-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="3"></feGaussianBlur><feOffset dx="0" dy="3" result="off"></feOffset><feComponentTransfer><feFuncA type="linear" slope="0.55"></feFuncA></feComponentTransfer><feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g stroke-width="1.2" fill="none" opacity="0.45" stroke-linecap="round"><path d="M180 140 C 220 100 240 90 260 80" stroke="oklch(75% 0.14 250)"></path><path d="M180 140 C 220 170 250 195 270 200" stroke="oklch(70% 0.14 168)"></path><path d="M180 140 C 140 120 110 100 90 90" stroke="oklch(70% 0.16 50)"></path><path d="M180 140 C 140 170 110 195 80 200" stroke="oklch(72% 0.15 332)"></path><path d="M260 80 C 290 110 310 130 320 150" stroke="oklch(72% 0.10 200)"></path></g><g filter="url(#ball-shadow)"><g><circle cx="180" cy="140" r="40" fill="url(#bubble-topic)"></circle><circle cx="180" cy="140" r="40" fill="url(#rim-soft)"></circle><ellipse cx="170" cy="120" rx="22" ry="13" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="260" cy="80" r="28" fill="url(#bubble-view)"></circle><circle cx="260" cy="80" r="28" fill="url(#rim-soft)"></circle><ellipse cx="253" cy="66" rx="15" ry="9" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="270" cy="200" r="26" fill="url(#bubble-reasoning)"></circle><circle cx="270" cy="200" r="26" fill="url(#rim-soft)"></circle><ellipse cx="263" cy="187" rx="14" ry="8" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="92" cy="90" r="24" fill="url(#bubble-fact)"></circle><circle cx="92" cy="90" r="24" fill="url(#rim-soft)"></circle><ellipse cx="86" cy="78" rx="12" ry="7" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="82" cy="202" r="22" fill="url(#bubble-view)"></circle><circle cx="82" cy="202" r="22" fill="url(#rim-soft)"></circle><ellipse cx="76" cy="191" rx="11" ry="6" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="324" cy="148" r="10" fill="url(#bubble-small)"></circle><ellipse cx="321" cy="144" rx="5" ry="3" fill="url(#hi-shine)" opacity="0.85"></ellipse></g></g></svg></div></section>`)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
