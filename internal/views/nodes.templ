@@ -253,7 +253,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
 				<header class="node-header">
-					<h1 style="margin: 0; flex: 1 1 auto; min-width: 0;">{ node.Title }</h1>
+					<h1 style="margin: 0; min-width: 0;">{ node.Title }</h1>
 					@nodeTypeChip(node.Type)
 				</header>
 				if node.Body != "" {
