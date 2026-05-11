@@ -23,7 +23,9 @@ import (
 //   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
 //   OIDC_PROVIDERS = "work,community"      (comma-separated keys)
 //   OIDC_<KEY>_ISSUER, OIDC_<KEY>_CLIENT_ID, OIDC_<KEY>_CLIENT_SECRET,
-//     OIDC_<KEY>_LABEL (optional, defaults to the key, title-cased)
+//     OIDC_<KEY>_LABEL (optional, defaults to the key, title-cased),
+//     OIDC_<KEY>_USERNAME_CLAIM (optional, defaults to "preferred_username";
+//       the ID-token claim used to seed the username on first sign-in)
 func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*Registry, error) {
 	if baseURL == "" {
 		return &Registry{providers: map[string]Provider{}}, nil
@@ -39,7 +41,7 @@ func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*R
 			"https://accounts.google.com",
 			id, secret,
 			callbackURL(baseURL, "google"),
-			nil)
+			"", nil)
 		if err != nil {
 			logger.Warn("oauth: google init failed", "err", err)
 		} else {
@@ -63,6 +65,7 @@ func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*R
 		id := os.Getenv("OIDC_" + envKey + "_CLIENT_ID")
 		secret := os.Getenv("OIDC_" + envKey + "_CLIENT_SECRET")
 		label := os.Getenv("OIDC_" + envKey + "_LABEL")
+		usernameClaim := os.Getenv("OIDC_" + envKey + "_USERNAME_CLAIM")
 		if label == "" {
 			label = strings.Title(key) //nolint:staticcheck
 		}
@@ -71,7 +74,7 @@ func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*R
 			continue
 		}
 		p, err := newOIDCProvider(ctx, "oidc:"+key, label, issuer, id, secret,
-			callbackURL(baseURL, "oidc:"+key), nil)
+			callbackURL(baseURL, "oidc:"+key), usernameClaim, nil)
 		if err != nil {
 			logger.Warn("oauth: OIDC init failed", "key", key, "err", err)
 			continue

@@ -46,6 +46,11 @@ type oidcProvider struct {
 	label    string
 	verifier *oidc.IDTokenVerifier
 	oauth    *oauth2.Config
+	// usernameClaim is the ID-token claim used to seed the new user's
+	// username on first sign-in. Defaults to "preferred_username"; can
+	// be set to "name", "nickname", "email", "sub", or any custom
+	// string claim the IdP issues.
+	usernameClaim string
 }
 
 func (p *oidcProvider) Key() string   { return p.key }
@@ -73,14 +78,20 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"`
 		Name          string `json:"name"`
-		PreferredName string `json:"preferred_username"`
 	}
 	if err := idTok.Claims(&claims); err != nil {
 		return Identity{}, fmt.Errorf("oidc: parse claims: %w", err)
 	}
-	display := claims.Name
+	// Read the configured username claim out of the raw claim set so
+	// it can be any string-valued field the IdP issues (not just one
+	// of the standard names).
+	var raw map[string]any
+	if err := idTok.Claims(&raw); err != nil {
+		return Identity{}, fmt.Errorf("oidc: parse claims: %w", err)
+	}
+	display, _ := raw[p.usernameClaim].(string)
 	if display == "" {
-		display = claims.PreferredName
+		display = claims.Name
 	}
 	return Identity{
 		Subject:     claims.Sub,
@@ -89,13 +100,16 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 	}, nil
 }
 
-func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSecret, redirectURL string, scopes []string) (Provider, error) {
+func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSecret, redirectURL, usernameClaim string, scopes []string) (Provider, error) {
 	prov, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: discover %s: %w", issuer, err)
 	}
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, "email", "profile"}
+	}
+	if usernameClaim == "" {
+		usernameClaim = "preferred_username"
 	}
 	return &oidcProvider{
 		key:      key,
@@ -108,6 +122,7 @@ func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSe
 			RedirectURL:  redirectURL,
 			Scopes:       scopes,
 		},
+		usernameClaim: usernameClaim,
 	}, nil
 }
 
