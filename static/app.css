@@ -862,7 +862,6 @@ label.field {
   text-decoration: none;
   transition: background .12s, color .12s, border-color .12s;
 }
-.tag-chip::before { content: "#"; color: var(--text-subtle); margin-right: 2px; }
 .tag-chip:hover,
 .tag:hover { color: var(--text); background: var(--bg-elev-3); border-color: var(--border-strong); text-decoration: none; }
 .tag-chip-large { font-size: var(--fs-lg); padding: 6px 14px; }
