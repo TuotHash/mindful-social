@@ -1139,7 +1139,9 @@ label.field {
   font-size: 12px;
 }
 .node-header { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.node-header > .chip { flex: 0 0 auto; }
+.node-header > h1 { line-height: 1.15; }
+.node-header > .chip { flex: 0 0 auto; font-size: 13px; padding: 6px 14px; }
+.node-header > .chip .dot { width: 7px; height: 7px; }
 .node-tags {
   display: flex;
   flex-wrap: wrap;
