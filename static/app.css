@@ -1139,6 +1139,7 @@ label.field {
   font-size: 12px;
 }
 .node-header { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.node-header > .chip { flex: 0 0 auto; margin-left: auto; }
 .node-tags {
   display: flex;
   flex-wrap: wrap;

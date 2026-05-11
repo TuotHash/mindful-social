@@ -253,10 +253,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
 				<header class="node-header">
+					<h1 style="margin: 0; flex: 1 1 auto; min-width: 0;">{ node.Title }</h1>
 					@nodeTypeChip(node.Type)
-					<span class="grow"></span>
 				</header>
-				<h1 style="margin-top: 18px;">{ node.Title }</h1>
 				if node.Body != "" {
 					<section class="body" style="margin-top: 14px;">
 						<p>{ node.Body }</p>
