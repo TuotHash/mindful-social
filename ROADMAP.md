@@ -89,9 +89,21 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Vouching** — Tier 2+ users can vouch for a newcomer, giving them an accelerated path to Tier 1. Vouches are recorded and factor into the voucher's own trust score to discourage abuse.
 
+### Groups & Communities
+
+- **Shared spaces** — A group is a multi-member home for views, discussions, and reasoning that members share with each other rather than with the wider public. Friends, study groups, research teams, or any cluster of people who want a shared canvas can have one. Distinct from audience lists: a list is a *recipient set* you control privately; a group is a *collaborative space* every member sees.
+
+- **Membership & visibility** — Each group has an owner (or co-owners), a roster of members, and per-group visibility for the group itself (public, invite-only, closed). Nodes posted into a group default to group-scope visibility — visible to members only — but a member can also publish a node beyond the group if they choose.
+
+- **Group-scoped permissions** — Group owners can pick per-group defaults for the edit/link policies on nodes posted into the group (e.g. "members can edit any group node", "only the author can edit"). Individual nodes can override the default.
+
+- **Discovery vs. privacy** — Public groups appear in browse/search and anyone can join (or request to join, if invite-only). Closed groups are completely hidden from non-members.
+
+- **Open questions** — how groups interact with the topic graph (is a group's discussion a slice of the global graph or its own subgraph?); whether group-only topics can later be promoted public; moderation scoping (group owners as local moderators of their space).
+
 ## Future Considerations
 
 - AI helpers (link suggestion, compaction, thread→graph promotion)
 - Graph editor UI (Svelte + svelte-flow)
 - Mobile polish
-- Advanced permission models (named groups, invites, org-wide graphs)
+- Org-wide graphs / multi-tenant deployments
