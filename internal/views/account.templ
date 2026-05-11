@@ -18,13 +18,49 @@ type AccountIdentity struct {
 	CanDisconnect bool
 }
 
-templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, flash, success string) {
+// AccountTimezones is the curated list of IANA zones shown in the timezone
+// dropdown. Empty string = fall back to UTC. Kept short on purpose: a full
+// IANA list is ~600 entries and overwhelms the form.
+var AccountTimezones = []string{
+	"Pacific/Honolulu",
+	"America/Anchorage",
+	"America/Los_Angeles",
+	"America/Denver",
+	"America/Chicago",
+	"America/New_York",
+	"America/Halifax",
+	"America/Sao_Paulo",
+	"Atlantic/Azores",
+	"Europe/London",
+	"Europe/Berlin",
+	"Europe/Paris",
+	"Europe/Madrid",
+	"Europe/Rome",
+	"Europe/Amsterdam",
+	"Europe/Stockholm",
+	"Europe/Athens",
+	"Europe/Istanbul",
+	"Africa/Cairo",
+	"Africa/Lagos",
+	"Africa/Johannesburg",
+	"Asia/Dubai",
+	"Asia/Karachi",
+	"Asia/Kolkata",
+	"Asia/Bangkok",
+	"Asia/Singapore",
+	"Asia/Shanghai",
+	"Asia/Tokyo",
+	"Australia/Sydney",
+	"Pacific/Auckland",
+}
+
+templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, lists []db.AudienceList, prefVisibility, prefTimezone, flash, success string) {
 	@Layout("Account", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
-				<span class="eyebrow">Settings</span>
+				<span class="eyebrow">Preferences</span>
 				<h1 class="h-1">Account</h1>
-				<p class="muted" style="margin: 0;">View your account details, change your password, and manage how you sign in.</p>
+				<p class="muted" style="margin: 0;">Set defaults for new nodes, pick your timezone, and manage how you sign in.</p>
 			</div>
 			@Flash(flash)
 			if success != "" {
@@ -32,6 +68,27 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 			}
 
 			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Preferences</h2>
+				<p class="muted" style="margin-top: 0;">Defaults applied when you create a new node and when timestamps are displayed.</p>
+				<form method="post" action="/account/preferences" class="form">
+					@visibilitySelect(prefVisibility, lists)
+					<label>
+						Timezone
+						<select name="timezone">
+							<option value="" selected?={ prefTimezone == "" }>UTC (default)</option>
+							for _, tz := range AccountTimezones {
+								<option value={ tz } selected?={ prefTimezone == tz }>{ tz }</option>
+							}
+						</select>
+						<small class="muted" style="font-size: 12px;">Used when timestamps are shown on the site. Empty falls back to UTC.</small>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Save preferences</button>
+					</div>
+				</form>
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">Details</h2>
 				<div class="account-field">
 					<div class="account-field-label">Username</div>

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/TuotHash/mindful-social/internal/auth"
+	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
 
@@ -17,8 +18,8 @@ const (
 	accountSuccessKey = "account_success"
 )
 
-// handleAccount renders /account: read-only details, password change form,
-// and the list of sign-in methods with disconnect controls.
+// handleAccount renders /account: preferences, read-only details, password
+// change form, and the list of sign-in methods with disconnect controls.
 func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 
@@ -44,9 +45,28 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("account: list audience lists", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	prefVisibility := encodePrefVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
+
 	flash := s.sessions.PopString(r.Context(), accountFlashKey)
 	success := s.sessions.PopString(r.Context(), accountSuccessKey)
-	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, flash, success))
+	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, lists, prefVisibility, user.Timezone, flash, success))
+}
+
+// encodePrefVisibility renders the user's stored default visibility in the
+// same "public|connections|list:<uuid>|private" form the composer uses, so
+// the same toggle-button helper can render both screens.
+func encodePrefVisibility(v db.VisibilityKind, listID *uuid.UUID) string {
+	if v == db.VisibilityKindList && listID != nil {
+		return "list:" + listID.String()
+	}
+	return string(v)
 }
 
 // handleAccountPasswordSet handles both setting an initial password

@@ -26,7 +26,43 @@ type AccountIdentity struct {
 	CanDisconnect bool
 }
 
-func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, flash, success string) templ.Component {
+// AccountTimezones is the curated list of IANA zones shown in the timezone
+// dropdown. Empty string = fall back to UTC. Kept short on purpose: a full
+// IANA list is ~600 entries and overwhelms the form.
+var AccountTimezones = []string{
+	"Pacific/Honolulu",
+	"America/Anchorage",
+	"America/Los_Angeles",
+	"America/Denver",
+	"America/Chicago",
+	"America/New_York",
+	"America/Halifax",
+	"America/Sao_Paulo",
+	"Atlantic/Azores",
+	"Europe/London",
+	"Europe/Berlin",
+	"Europe/Paris",
+	"Europe/Madrid",
+	"Europe/Rome",
+	"Europe/Amsterdam",
+	"Europe/Stockholm",
+	"Europe/Athens",
+	"Europe/Istanbul",
+	"Africa/Cairo",
+	"Africa/Lagos",
+	"Africa/Johannesburg",
+	"Asia/Dubai",
+	"Asia/Karachi",
+	"Asia/Kolkata",
+	"Asia/Bangkok",
+	"Asia/Singapore",
+	"Asia/Shanghai",
+	"Asia/Tokyo",
+	"Australia/Sydney",
+	"Pacific/Auckland",
+}
+
+func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, lists []db.AudienceList, prefVisibility, prefTimezone, flash, success string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -59,7 +95,7 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"page narrow\"><div class=\"col gap-12\" style=\"margin-bottom: 24px;\"><span class=\"eyebrow\">Settings</span><h1 class=\"h-1\">Account</h1><p class=\"muted\" style=\"margin: 0;\">View your account details, change your password, and manage how you sign in.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"page narrow\"><div class=\"col gap-12\" style=\"margin-bottom: 24px;\"><span class=\"eyebrow\">Preferences</span><h1 class=\"h-1\">Account</h1><p class=\"muted\" style=\"margin: 0;\">Set defaults for new nodes, pick your timezone, and manage how you sign in.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -75,7 +111,7 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(success)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 31, Col: 188}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 67, Col: 188}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -86,137 +122,201 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<section class=\"card\" style=\"padding: 20px;\"><h2 style=\"margin-top: 0;\">Details</h2><div class=\"account-field\"><div class=\"account-field-label\">Username</div><div class=\"account-field-value\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<section class=\"card\" style=\"padding: 20px;\"><h2 style=\"margin-top: 0;\">Preferences</h2><p class=\"muted\" style=\"margin-top: 0;\">Defaults applied when you create a new node and when timestamps are displayed.</p><form method=\"post\" action=\"/account/preferences\" class=\"form\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(user.Username)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 38, Col: 53}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+			templ_7745c5c3_Err = visibilitySelect(prefVisibility, lists).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"account-field-note muted\">Changing usernames isn't available yet — we still need rate limits to keep handle-cycling under control.</div></div><div class=\"account-field\"><div class=\"account-field-label\">Email</div><div class=\"account-field-value\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<label>Timezone <select name=\"timezone\"><option value=\"\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 43, Col: 50}
+			if prefTimezone == "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ">UTC (default)</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div class=\"account-field-note muted\">Changing email isn't available yet — it needs a verified-email flow before we can let it loose.</div></div></section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Password</h2>")
+			for _, tz := range AccountTimezones {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<option value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var4 string
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tz)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 80, Col: 26}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if prefTimezone == tz {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " selected")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, ">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var5 string
+				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tz)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 80, Col: 66}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</select> <small class=\"muted\" style=\"font-size: 12px;\">Used when timestamps are shown on the site. Empty falls back to UTC.</small></label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Save preferences</button></div></form></section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Details</h2><div class=\"account-field\"><div class=\"account-field-label\">Username</div><div class=\"account-field-value\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(user.Username)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 95, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><div class=\"account-field-note muted\">Changing usernames isn't available yet — we still need rate limits to keep handle-cycling under control.</div></div><div class=\"account-field\"><div class=\"account-field-label\">Email</div><div class=\"account-field-value\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 100, Col: 50}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"account-field-note muted\">Changing email isn't available yet — it needs a verified-email flow before we can let it loose.</div></div></section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Password</h2>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if hasPassword {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<form method=\"post\" action=\"/account/password\" class=\"form\"><label>Current password <input type=\"password\" name=\"current_password\" required autocomplete=\"current-password\"></label> <label>New password <input type=\"password\" name=\"new_password\" required minlength=\"12\" autocomplete=\"new-password\" placeholder=\"at least 12 characters\"></label> <label>Confirm new password <input type=\"password\" name=\"confirm_password\" required minlength=\"12\" autocomplete=\"new-password\"></label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Change password</button></div></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<form method=\"post\" action=\"/account/password\" class=\"form\"><label>Current password <input type=\"password\" name=\"current_password\" required autocomplete=\"current-password\"></label> <label>New password <input type=\"password\" name=\"new_password\" required minlength=\"12\" autocomplete=\"new-password\" placeholder=\"at least 12 characters\"></label> <label>Confirm new password <input type=\"password\" name=\"confirm_password\" required minlength=\"12\" autocomplete=\"new-password\"></label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Change password</button></div></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p class=\"muted\" style=\"margin-top: 0;\">You signed in with an external provider and haven't set a password yet. Add one to enable email + password sign-in as a backup.</p><form method=\"post\" action=\"/account/password\" class=\"form\"><label>New password <input type=\"password\" name=\"new_password\" required minlength=\"12\" autocomplete=\"new-password\" placeholder=\"at least 12 characters\"></label> <label>Confirm new password <input type=\"password\" name=\"confirm_password\" required minlength=\"12\" autocomplete=\"new-password\"></label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Set password</button></div></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"muted\" style=\"margin-top: 0;\">You signed in with an external provider and haven't set a password yet. Add one to enable email + password sign-in as a backup.</p><form method=\"post\" action=\"/account/password\" class=\"form\"><label>New password <input type=\"password\" name=\"new_password\" required minlength=\"12\" autocomplete=\"new-password\" placeholder=\"at least 12 characters\"></label> <label>Confirm new password <input type=\"password\" name=\"confirm_password\" required minlength=\"12\" autocomplete=\"new-password\"></label><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Set password</button></div></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Sign-in methods</h2>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Sign-in methods</h2>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if len(identities) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<p class=\"muted\">No sign-in methods on file.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<p class=\"muted\">No sign-in methods on file.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<ul class=\"list-rows\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<ul class=\"list-rows\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, ident := range identities {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<li class=\"list-row\"><div class=\"list-row-main\" style=\"cursor: default;\"><span class=\"ident-label\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<li class=\"list-row\"><div class=\"list-row-main\" style=\"cursor: default;\"><span class=\"ident-label\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var6 string
-					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(ident.Label)
+					var templ_7745c5c3_Var8 string
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(ident.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 95, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 152, Col: 48}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					if ident.Subject != "" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<span class=\"muted\" style=\"font-size: 13px;\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<span class=\"muted\" style=\"font-size: 13px;\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var7 string
-						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(ident.Subject)
+						var templ_7745c5c3_Var9 string
+						templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(ident.Subject)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 97, Col: 70}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 154, Col: 70}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</span>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					if ident.CanDisconnect {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<form method=\"post\" action=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<form method=\"post\" action=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var8 templ.SafeURL
-						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/identities/" + ident.ID.String() + "/disconnect"))
+						var templ_7745c5c3_Var10 templ.SafeURL
+						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/identities/" + ident.ID.String() + "/disconnect"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 101, Col: 111}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/account.templ`, Line: 158, Col: 111}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"inline\" onsubmit=\"return confirm('Disconnect this sign-in method? You can re-add it later by signing in with it again.')\"><button type=\"submit\" class=\"btn ghost sm\">Disconnect</button></form>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" class=\"inline\" onsubmit=\"return confirm('Disconnect this sign-in method? You can re-add it later by signing in with it again.')\"><button type=\"submit\" class=\"btn ghost sm\">Disconnect</button></form>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"muted\" style=\"font-size: 13px;\">Last method — can't disconnect</span>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<span class=\"muted\" style=\"font-size: 13px;\">Last method — can't disconnect</span>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</section></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</section></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
