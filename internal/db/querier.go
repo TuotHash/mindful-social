@@ -199,7 +199,14 @@ type Querier interface {
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
+	// Keeps the password identity's subject (an email mirror) aligned with the
+	// user's current email when admins change it. Login itself looks up by
+	// users.email, so the subject is essentially metadata — but we keep it in
+	// sync to avoid future surprises.
+	UpdatePasswordIdentitySubject(ctx context.Context, arg UpdatePasswordIdentitySubjectParams) error
+	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
+	UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) error
 	// Idempotent: returns the tag id whether it already existed or just got
 	// inserted. The DO UPDATE SET name=EXCLUDED.name is a no-op that exists
 	// only so RETURNING fires on the conflict path.

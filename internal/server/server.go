@@ -220,6 +220,10 @@ func (s *Server) routes() {
 		r.Use(s.requireAdmin)
 		r.Get("/admin", s.handleAdminIndex)
 		r.Post("/admin/users/{id}/role", s.handleAdminSetRole)
+		r.Get("/admin/users/{id}/edit", s.handleAdminUserEdit)
+		r.Post("/admin/users/{id}/username", s.handleAdminUpdateUsername)
+		r.Post("/admin/users/{id}/email", s.handleAdminUpdateEmail)
+		r.Post("/admin/users/{id}/password", s.handleAdminResetPassword)
 	})
 
 	s.router = r

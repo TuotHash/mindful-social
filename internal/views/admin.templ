@@ -71,6 +71,7 @@ templ AdminUsers(viewer *Viewer, users []AdminUserRow, flash, success string) {
 									</div>
 								</a>
 								<div class="row gap-8 wrap">
+									<a class="btn ghost sm" href={ templ.SafeURL("/admin/users/" + u.ID.String() + "/edit") }>Edit</a>
 									for _, target := range otherRoles(u.Role) {
 										if !(u.IsSelf && target != db.UserRoleAdmin) {
 											<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID.String() + "/role") } class="inline">
@@ -120,4 +121,68 @@ func roleRank(r db.UserRole) int {
 		return 1
 	}
 	return 0
+}
+
+// AdminUserEdit is the per-user admin page with three independent forms:
+// username, email, password. Each form posts to its own endpoint so a
+// validation failure on one doesn't blow away unsaved input on another.
+templ AdminUserEdit(viewer *Viewer, target db.User, flash, success string) {
+	@Layout("Admin — edit " + target.Username, viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Admin</span>
+				<h1 class="h-1">Edit { target.Username }</h1>
+				<p class="muted" style="margin: 0;">Change this user's username, email, or password. These actions bypass the usual self-service checks (current password, email verification) — use carefully.</p>
+				<p class="muted" style="margin: 0;"><a href="/admin">← Back to roster</a></p>
+			</div>
+			@Flash(flash)
+			if success != "" {
+				<div class="flash" role="status" style="background: color-mix(in oklch, var(--supports) 14%, var(--bg)); border-color: color-mix(in oklch, var(--supports) 40%, transparent);">{ success }</div>
+			}
+
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Username</h2>
+				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/username") } class="form">
+					<label>
+						Username
+						<input type="text" name="username" value={ target.Username } required minlength="3" maxlength="32" pattern="[A-Za-z0-9._\\-]+" autocomplete="off"/>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Update username</button>
+					</div>
+				</form>
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Email</h2>
+				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/email") } class="form">
+					<label>
+						Email
+						<input type="email" name="email" value={ target.Email } required autocomplete="off"/>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Update email</button>
+					</div>
+				</form>
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Password</h2>
+				<p class="muted" style="margin-top: 0;">Sets a new password without needing the current one. If this user signed up via OAuth and has no password yet, this creates one — they can then sign in by email + password as a fallback.</p>
+				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/password") } class="form">
+					<label>
+						New password
+						<input type="password" name="new_password" required minlength="12" autocomplete="new-password" placeholder="at least 12 characters"/>
+					</label>
+					<label>
+						Confirm new password
+						<input type="password" name="confirm_password" required minlength="12" autocomplete="new-password"/>
+					</label>
+					<div class="form-row">
+						<button type="submit" class="btn accent">Reset password</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	}
 }

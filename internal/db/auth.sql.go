@@ -219,3 +219,23 @@ func (q *Queries) UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePa
 	_, err := q.db.Exec(ctx, updatePasswordIdentitySecret, arg.UserID, arg.Secret)
 	return err
 }
+
+const updatePasswordIdentitySubject = `-- name: UpdatePasswordIdentitySubject :exec
+UPDATE auth_identities
+SET subject = $2
+WHERE user_id = $1 AND provider = 'password'
+`
+
+type UpdatePasswordIdentitySubjectParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Subject string    `json:"subject"`
+}
+
+// Keeps the password identity's subject (an email mirror) aligned with the
+// user's current email when admins change it. Login itself looks up by
+// users.email, so the subject is essentially metadata — but we keep it in
+// sync to avoid future surprises.
+func (q *Queries) UpdatePasswordIdentitySubject(ctx context.Context, arg UpdatePasswordIdentitySubjectParams) error {
+	_, err := q.db.Exec(ctx, updatePasswordIdentitySubject, arg.UserID, arg.Subject)
+	return err
+}

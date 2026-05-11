@@ -125,6 +125,20 @@ func (q *Queries) ListUsersForAdmin(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const updateUserEmail = `-- name: UpdateUserEmail :exec
+UPDATE users SET email = $2 WHERE id = $1
+`
+
+type UpdateUserEmailParams struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.ID, arg.Email)
+	return err
+}
+
 const updateUserRole = `-- name: UpdateUserRole :exec
 UPDATE users SET role = $2 WHERE id = $1
 `
@@ -136,5 +150,19 @@ type UpdateUserRoleParams struct {
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
 	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
+	return err
+}
+
+const updateUserUsername = `-- name: UpdateUserUsername :exec
+UPDATE users SET username = $2 WHERE id = $1
+`
+
+type UpdateUserUsernameParams struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+}
+
+func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) error {
+	_, err := q.db.Exec(ctx, updateUserUsername, arg.ID, arg.Username)
 	return err
 }

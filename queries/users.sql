@@ -26,3 +26,9 @@ ORDER BY
 
 -- name: UpdateUserRole :exec
 UPDATE users SET role = $2 WHERE id = $1;
+
+-- name: UpdateUserUsername :exec
+UPDATE users SET username = $2 WHERE id = $1;
+
+-- name: UpdateUserEmail :exec
+UPDATE users SET email = $2 WHERE id = $1;

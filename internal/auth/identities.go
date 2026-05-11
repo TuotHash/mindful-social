@@ -295,6 +295,82 @@ func (s *Service) SetInitialPassword(ctx context.Context, userID uuid.UUID, newP
 	return err
 }
 
+// AdminUpdateUsername changes a user's username with the same validation as
+// signup. No self-check or current-password — admins are trusted; the audit
+// trail comes from the surrounding handler's logs.
+func (s *Service) AdminUpdateUsername(ctx context.Context, userID uuid.UUID, username string) error {
+	username = strings.TrimSpace(username)
+	if !usernameValidRegex.MatchString(username) {
+		return ErrInvalidUsername
+	}
+	if err := s.q.UpdateUserUsername(ctx, db.UpdateUserUsernameParams{
+		ID:       userID,
+		Username: username,
+	}); err != nil {
+		return mapUserConflict(err)
+	}
+	return nil
+}
+
+// AdminUpdateEmail changes a user's email with the same validation as signup
+// and keeps the password identity's subject in sync so it never drifts from
+// the user's current email. The login lookup uses users.email, so a stale
+// subject wouldn't break sign-in — but it's a footgun for anything else that
+// might join on (provider, subject) in the future.
+func (s *Service) AdminUpdateEmail(ctx context.Context, userID uuid.UUID, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if !emailValidRegex.MatchString(email) {
+		return ErrInvalidEmail
+	}
+	return s.tx(ctx, func(q *db.Queries) error {
+		if err := q.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
+			ID:    userID,
+			Email: email,
+		}); err != nil {
+			return mapUserConflict(err)
+		}
+		// Best-effort subject sync. The query is a no-op when the user has
+		// no password identity, so there's nothing to branch on.
+		return q.UpdatePasswordIdentitySubject(ctx, db.UpdatePasswordIdentitySubjectParams{
+			UserID:  userID,
+			Subject: email,
+		})
+	})
+}
+
+// AdminResetPassword sets a user's password without knowing the previous one.
+// Creates a password identity when the user is OAuth-only — i.e. the admin
+// effectively "issues" a password so the user can sign in by email as a
+// fallback (and then change it themselves on /account).
+func (s *Service) AdminResetPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	_, err = s.q.GetPasswordIdentityForUser(ctx, userID)
+	switch {
+	case err == nil:
+		return s.q.UpdatePasswordIdentitySecret(ctx, db.UpdatePasswordIdentitySecretParams{
+			UserID: userID,
+			Secret: &hash,
+		})
+	case errors.Is(err, pgx.ErrNoRows):
+		user, err := s.q.GetUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		_, err = s.q.CreateAuthIdentity(ctx, db.CreateAuthIdentityParams{
+			UserID:   userID,
+			Provider: "password",
+			Subject:  strings.ToLower(strings.TrimSpace(user.Email)),
+			Secret:   &hash,
+		})
+		return err
+	default:
+		return err
+	}
+}
+
 // DisconnectIdentity removes a sign-in method from the user's account.
 // Refuses to remove the last remaining identity so the user can never
 // lock themselves out.

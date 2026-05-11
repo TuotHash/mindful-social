@@ -31,6 +31,15 @@ UPDATE auth_identities
 SET secret = $2
 WHERE user_id = $1 AND provider = 'password';
 
+-- name: UpdatePasswordIdentitySubject :exec
+-- Keeps the password identity's subject (an email mirror) aligned with the
+-- user's current email when admins change it. Login itself looks up by
+-- users.email, so the subject is essentially metadata — but we keep it in
+-- sync to avoid future surprises.
+UPDATE auth_identities
+SET subject = $2
+WHERE user_id = $1 AND provider = 'password';
+
 -- name: GetIdentityForUser :one
 SELECT * FROM auth_identities WHERE id = $1 AND user_id = $2;
 
