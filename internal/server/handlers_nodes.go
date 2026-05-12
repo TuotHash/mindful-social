@@ -93,10 +93,10 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 	topicCandidates := topicCandidateRows(initialTopics)
 	defaultVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, "", "", topicCandidates))
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, "", "", "root", topicCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, "", "", topicCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, "", "", "root", topicCandidates))
 }
 
 func (s *Server) handleTopicPicker(w http.ResponseWriter, r *http.Request) {
@@ -139,6 +139,10 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
 	rawParentTopicID := strings.TrimSpace(r.PostFormValue("parent_topic_id"))
 	rawFindTopic := strings.TrimSpace(r.PostFormValue("find_topic"))
+	rawTopicParentMode := strings.TrimSpace(r.PostFormValue("topic_parent_mode")) // "root" | "sub"
+	if rawTopicParentMode != "sub" {
+		rawTopicParentMode = "root"
+	}
 	if rawVisibility == "" {
 		rawVisibility = "public"
 	}
@@ -171,10 +175,10 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rerender := func(flash string) {
 		tc := topicCandidatesForRerender()
 		if isHTMX(r) {
-			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, tc))
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
 			return
 		}
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, tc))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
 	}
 
 	flash := ""
@@ -191,10 +195,18 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
 	}
-	// Views must be anchored to a topic.
-	if flash == "" && nt == db.NodeTypeView {
+	// Views always need a parent topic; topics need one only when the user
+	// chose "sub-topic". Root topics ignore any parent selection.
+	needsParent := nt == db.NodeTypeView || (nt == db.NodeTypeTopic && rawTopicParentMode == "sub")
+	if flash == "" && needsParent {
+		missingMsg := "A view must be connected to a parent topic. Search and select one above."
+		rejectMsg := "That topic doesn't accept new linked views from you."
+		if nt == db.NodeTypeTopic {
+			missingMsg = "A sub-topic must be connected to a parent topic. Search and select one above."
+			rejectMsg = "That topic doesn't accept new sub-topics from you."
+		}
 		if rawParentTopicID == "" {
-			flash = "A view must be connected to a parent topic. Search and select one above."
+			flash = missingMsg
 		} else {
 			tid, err := uuid.Parse(rawParentTopicID)
 			if err != nil {
@@ -209,7 +221,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 						s.logger.Error("create node: parent link policy", "err", perr)
 						flash = "Could not check parent topic permissions. Please try again."
 					} else if !ok {
-						flash = "That topic doesn't accept new linked views from you."
+						flash = rejectMsg
 					} else {
 						parentTopicID = tid
 					}
@@ -255,8 +267,8 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		rerender("Could not create post. Please try again.")
 		return
 	}
-	// Connect the view to its parent topic automatically.
-	if nt == db.NodeTypeView && parentTopicID != uuid.Nil {
+	// Connect the new node (view or sub-topic) to its parent topic automatically.
+	if parentTopicID != uuid.Nil {
 		if _, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
 			FromNode:  node.ID,
 			ToNode:    parentTopicID,

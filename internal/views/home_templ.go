@@ -422,7 +422,7 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -430,6 +430,10 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 	})
 }
 
+// argumentGraphPromo is the "coming soon: argument graph" callout used on the
+// logged-in home feed and (eventually) the landing page. Markup mirrors the
+// redesign prototype: a card-like surface with copy on the left and an
+// illustrative SVG cluster of glossy nodes on the right.
 func argumentGraphPromo() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -446,12 +450,12 @@ func argumentGraphPromo() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var100 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var100 == nil {
-			templ_7745c5c3_Var100 = templ.NopComponent
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, `<section class="promo" aria-label="Coming soon: Argument graph" style="margin-top: 56px;"><div class="promo-inner"><span class="badge">Coming soon</span><h2>The argument graph</h2><p>See how topics, views, reasonings and sources connect — and trace any claim back to what supports or opposes it.</p></div><div class="promo-graph" aria-hidden="true"><svg viewBox="0 0 360 280" preserveAspectRatio="xMaxYMid meet"><defs><radialGradient id="bubble-topic" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 60)"></stop><stop offset="18%" stop-color="oklch(88% 0.14 60)"></stop><stop offset="55%" stop-color="oklch(68% 0.18 50)"></stop><stop offset="100%" stop-color="oklch(42% 0.12 45)"></stop></radialGradient><radialGradient id="bubble-view" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 250)"></stop><stop offset="18%" stop-color="oklch(86% 0.13 250)"></stop><stop offset="55%" stop-color="oklch(64% 0.17 260)"></stop><stop offset="100%" stop-color="oklch(40% 0.12 265)"></stop></radialGradient><radialGradient id="bubble-reasoning" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 168)"></stop><stop offset="18%" stop-color="oklch(86% 0.14 168)"></stop><stop offset="55%" stop-color="oklch(60% 0.16 168)"></stop><stop offset="100%" stop-color="oklch(38% 0.10 168)"></stop></radialGradient><radialGradient id="bubble-fact" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(98% 0.04 332)"></stop><stop offset="18%" stop-color="oklch(86% 0.14 332)"></stop><stop offset="55%" stop-color="oklch(64% 0.18 340)"></stop><stop offset="100%" stop-color="oklch(40% 0.13 340)"></stop></radialGradient><radialGradient id="bubble-small" cx="35%" cy="28%" r="75%"><stop offset="0%" stop-color="oklch(96% 0.02 250)"></stop><stop offset="55%" stop-color="oklch(72% 0.05 250)"></stop><stop offset="100%" stop-color="oklch(48% 0.04 250)"></stop></radialGradient><linearGradient id="hi-shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="oklch(100% 0 0 / 0.95)"></stop><stop offset="60%" stop-color="oklch(100% 0 0 / 0.15)"></stop><stop offset="100%" stop-color="oklch(100% 0 0 / 0)"></stop></linearGradient><radialGradient id="rim-soft" cx="50%" cy="95%" r="60%"><stop offset="0%" stop-color="oklch(100% 0 0 / 0.30)"></stop><stop offset="100%" stop-color="oklch(100% 0 0 / 0)"></stop></radialGradient><filter id="ball-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="3"></feGaussianBlur><feOffset dx="0" dy="3" result="off"></feOffset><feComponentTransfer><feFuncA type="linear" slope="0.55"></feFuncA></feComponentTransfer><feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g stroke-width="1.2" fill="none" opacity="0.45" stroke-linecap="round"><path d="M180 140 C 220 100 240 90 260 80" stroke="oklch(75% 0.14 250)"></path><path d="M180 140 C 220 170 250 195 270 200" stroke="oklch(70% 0.14 168)"></path><path d="M180 140 C 140 120 110 100 90 90" stroke="oklch(70% 0.16 50)"></path><path d="M180 140 C 140 170 110 195 80 200" stroke="oklch(72% 0.15 332)"></path><path d="M260 80 C 290 110 310 130 320 150" stroke="oklch(72% 0.10 200)"></path></g><g filter="url(#ball-shadow)"><g><circle cx="180" cy="140" r="40" fill="url(#bubble-topic)"></circle><circle cx="180" cy="140" r="40" fill="url(#rim-soft)"></circle><ellipse cx="170" cy="120" rx="22" ry="13" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="260" cy="80" r="28" fill="url(#bubble-view)"></circle><circle cx="260" cy="80" r="28" fill="url(#rim-soft)"></circle><ellipse cx="253" cy="66" rx="15" ry="9" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="270" cy="200" r="26" fill="url(#bubble-reasoning)"></circle><circle cx="270" cy="200" r="26" fill="url(#rim-soft)"></circle><ellipse cx="263" cy="187" rx="14" ry="8" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="92" cy="90" r="24" fill="url(#bubble-fact)"></circle><circle cx="92" cy="90" r="24" fill="url(#rim-soft)"></circle><ellipse cx="86" cy="78" rx="12" ry="7" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="82" cy="202" r="22" fill="url(#bubble-view)"></circle><circle cx="82" cy="202" r="22" fill="url(#rim-soft)"></circle><ellipse cx="76" cy="191" rx="11" ry="6" fill="url(#hi-shine)" opacity="0.9"></ellipse></g><g><circle cx="324" cy="148" r="10" fill="url(#bubble-small)"></circle><ellipse cx="321" cy="144" rx="5" ry="3" fill="url(#hi-shine)" opacity="0.85"></ellipse></g></g></svg></div></section>`)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<section class=\"promo\" aria-label=\"Coming soon: Argument graph\" style=\"margin-top: 56px;\"><div class=\"promo-inner\"><span class=\"badge\">Coming soon</span><h2>The argument graph</h2><p>See how topics, views, reasonings and sources connect — and trace any claim back to what supports or opposes it.</p></div><div class=\"promo-graph\" aria-hidden=\"true\"><svg viewBox=\"0 0 360 280\" preserveAspectRatio=\"xMaxYMid meet\"><defs><radialGradient id=\"bubble-topic\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 60)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(88% 0.14 60)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(68% 0.18 50)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(42% 0.12 45)\"></stop></radialGradient> <radialGradient id=\"bubble-view\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 250)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.13 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.17 260)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.12 265)\"></stop></radialGradient> <radialGradient id=\"bubble-reasoning\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 168)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 168)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(60% 0.16 168)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(38% 0.10 168)\"></stop></radialGradient> <radialGradient id=\"bubble-fact\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 332)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 332)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.18 340)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.13 340)\"></stop></radialGradient> <radialGradient id=\"bubble-small\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(96% 0.02 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(72% 0.05 250)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(48% 0.04 250)\"></stop></radialGradient> <linearGradient id=\"hi-shine\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.95)\"></stop> <stop offset=\"60%\" stop-color=\"oklch(100% 0 0 / 0.15)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></linearGradient> <radialGradient id=\"rim-soft\" cx=\"50%\" cy=\"95%\" r=\"60%\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.30)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></radialGradient> <filter id=\"ball-shadow\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"160%\"><feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"3\"></feGaussianBlur> <feOffset dx=\"0\" dy=\"3\" result=\"off\"></feOffset> <feComponentTransfer><feFuncA type=\"linear\" slope=\"0.55\"></feFuncA></feComponentTransfer> <feMerge><feMergeNode></feMergeNode><feMergeNode in=\"SourceGraphic\"></feMergeNode></feMerge></filter></defs> <g stroke-width=\"1.2\" fill=\"none\" opacity=\"0.45\" stroke-linecap=\"round\"><path d=\"M180 140 C 220 100 240 90 260 80\" stroke=\"oklch(75% 0.14 250)\"></path> <path d=\"M180 140 C 220 170 250 195 270 200\" stroke=\"oklch(70% 0.14 168)\"></path> <path d=\"M180 140 C 140 120 110 100 90 90\" stroke=\"oklch(70% 0.16 50)\"></path> <path d=\"M180 140 C 140 170 110 195 80 200\" stroke=\"oklch(72% 0.15 332)\"></path> <path d=\"M260 80 C 290 110 310 130 320 150\" stroke=\"oklch(72% 0.10 200)\"></path></g> <g filter=\"url(#ball-shadow)\"><g><circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#bubble-topic)\"></circle> <circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"170\" cy=\"120\" rx=\"22\" ry=\"13\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"253\" cy=\"66\" rx=\"15\" ry=\"9\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#bubble-reasoning)\"></circle> <circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"263\" cy=\"187\" rx=\"14\" ry=\"8\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#bubble-fact)\"></circle> <circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"86\" cy=\"78\" rx=\"12\" ry=\"7\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"76\" cy=\"191\" rx=\"11\" ry=\"6\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"324\" cy=\"148\" r=\"10\" fill=\"url(#bubble-small)\"></circle> <ellipse cx=\"321\" cy=\"144\" rx=\"5\" ry=\"3\" fill=\"url(#hi-shine)\" opacity=\"0.85\"></ellipse></g></g></svg></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -475,12 +479,12 @@ func checkIcon() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var13 == nil {
-			templ_7745c5c3_Var13 = templ.NopComponent
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 7l3 3 7-7\" stroke=\"var(--supports)\" stroke-width=\"1.8\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path></svg>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" aria-hidden=\"true\"><path d=\"M2 7l3 3 7-7\" stroke=\"var(--supports)\" stroke-width=\"1.8\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path></svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -504,25 +508,25 @@ func bloom(size int, hue int, style string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var14 == nil {
-			templ_7745c5c3_Var14 = templ.NopComponent
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div aria-hidden=\"true\" class=\"bloom\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div aria-hidden=\"true\" class=\"bloom\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(bloomStyle(size, hue, style))
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(bloomStyle(size, hue, style))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 202, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 305, Col: 75}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -553,73 +557,73 @@ func primitiveCard(typ, label, blurb string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var16 == nil {
-			templ_7745c5c3_Var16 = templ.NopComponent
+		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var17 == nil {
+			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"card\" style=\"display: flex; flex-direction: column; gap: 16px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"card\" style=\"display: flex; flex-direction: column; gap: 16px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var17 = []any{"chip", typ}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var17...)
+		var templ_7745c5c3_Var18 = []any{"chip", typ}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var18...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var17).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" style=\"padding: 6px 14px; font-size: 13px; align-self: flex-start;\"><span class=\"dot\"></span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(label)
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var18).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 216, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span><div class=\"h-3\" style=\"font-size: 22px; font-family: var(--serif); font-weight: 400;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" style=\"padding: 6px 14px; font-size: 13px; align-self: flex-start;\"><span class=\"dot\"></span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 218, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 319, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div><p class=\"muted\" style=\"margin: 0; font-size: 14px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</span><div class=\"h-3\" style=\"font-size: 22px; font-family: var(--serif); font-weight: 400;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 219, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 321, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div><p class=\"muted\" style=\"margin: 0; font-size: 14px;\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var22 string
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 322, Col: 62}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -643,56 +647,56 @@ func edgeCard(kind, label, blurb string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var23 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var23 == nil {
+			templ_7745c5c3_Var23 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var23 = []any{"edge-" + kind}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
+		var templ_7745c5c3_Var24 = []any{"edge-" + kind}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var24...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var23).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" style=\"display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);\"><span class=\"edge-dot\" style=\"width: 10px; height: 10px;\"></span><div class=\"col gap-4\"><div style=\"font-family: var(--mono); font-size: 13px; color: var(--edge);\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(label)
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var24).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 227, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div><div class=\"muted\" style=\"font-size: 12px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" style=\"display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg);\"><span class=\"edge-dot\" style=\"width: 10px; height: 10px;\"></span><div class=\"col gap-4\"><div style=\"font-family: var(--mono); font-size: 13px; color: var(--edge);\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 228, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 330, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div><div class=\"muted\" style=\"font-size: 12px;\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var27 string
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 331, Col: 54}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -716,51 +720,51 @@ func stepCard(num, title, body string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var27 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var27 == nil {
-			templ_7745c5c3_Var27 = templ.NopComponent
+		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var28 == nil {
+			templ_7745c5c3_Var28 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"card\" style=\"background: var(--paper);\"><div class=\"eyebrow\" style=\"color: var(--accent-deep); margin-bottom: 16px;\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(num)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 235, Col: 84}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div><div class=\"h-3\" style=\"margin-bottom: 8px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<div class=\"card\" style=\"background: var(--paper);\"><div class=\"eyebrow\" style=\"color: var(--accent-deep); margin-bottom: 16px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(num)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 236, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 338, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</div><p class=\"muted\" style=\"margin: 0; font-size: 14px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div><div class=\"h-3\" style=\"margin-bottom: 8px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(body)
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 237, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 339, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div><p class=\"muted\" style=\"margin: 0; font-size: 14px;\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(body)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 340, Col: 61}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -784,27 +788,27 @@ func siteFooter(viewer *Viewer) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var31 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var31 == nil {
-			templ_7745c5c3_Var31 = templ.NopComponent
+		templ_7745c5c3_Var32 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var32 == nil {
+			templ_7745c5c3_Var32 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<footer class=\"site-footer\"><div class=\"page\" style=\"padding-top: 48px; padding-bottom: 48px;\"><div class=\"row between wrap gap-16\"><div class=\"row gap-12 center\"><span class=\"brand-mark\" style=\"width: 22px; height: 22px;\"></span> <span style=\"font-family: var(--serif); font-size: 18px;\">Mindful Social</span> <span class=\"muted\" style=\"font-size: 12px; font-family: var(--mono);\">v0.4 · early development</span></div><div class=\"row gap-24 wrap\" style=\"font-size: 13px; color: var(--ink-3);\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<footer class=\"site-footer\"><div class=\"page\" style=\"padding-top: 48px; padding-bottom: 48px;\"><div class=\"row between wrap gap-16\"><div class=\"row gap-12 center\"><span class=\"brand-mark\" style=\"width: 22px; height: 22px;\"></span> <span style=\"font-family: var(--serif); font-size: 18px;\">Mindful Social</span> <span class=\"muted\" style=\"font-size: 12px; font-family: var(--mono);\">v0.4 · early development</span></div><div class=\"row gap-24 wrap\" style=\"font-size: 13px; color: var(--ink-3);\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if viewer != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<a href=\"/home\" style=\"text-decoration: none;\">Home</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<a href=\"/home\" style=\"text-decoration: none;\">Home</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<a href=\"/\" style=\"text-decoration: none;\">Home</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<a href=\"/\" style=\"text-decoration: none;\">Home</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<a href=\"/tags\" style=\"text-decoration: none;\">Tags</a> <a href=\"/search\" style=\"text-decoration: none;\">Search</a></div></div></div></footer>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<a href=\"/tags\" style=\"text-decoration: none;\">Tags</a> <a href=\"/search\" style=\"text-decoration: none;\">Search</a></div></div></div></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

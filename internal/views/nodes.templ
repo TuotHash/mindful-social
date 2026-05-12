@@ -12,7 +12,7 @@ import (
 // Source URL is intentionally absent — only Topic and View are creatable
 // from the Post path; reasoning and evidence are created by attachment to
 // an existing topic or view.
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -22,7 +22,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/home" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -36,7 +36,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -58,7 +58,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -70,8 +70,10 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 
 // postFormFields are the shared body of NodeNew and NodeNewModal. The outer
 // .post-form class enables CSS :has() rules in app.css to hide
-// view-specific options (topic picker, Support / Oppose pin) when Topic is selected.
-templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID string, topicCandidates []TopicCandidate) {
+// view-specific options (Support / Oppose pin) when Topic is selected, the
+// Position toggle when View is selected, and the topic picker when a root
+// topic is being created.
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
 		<div class="toggle-btns">
@@ -88,6 +90,22 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		</div>
 		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views.</small>
 	</fieldset>
+	<fieldset class="toggle-group if-topic">
+		<legend>Position</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-position="root">
+				<input type="radio" name="topic_parent_mode" value="root" checked?={ formTopicParentMode != "sub" }/>
+				<span class="material-symbols-outlined">flag</span>
+				Root topic
+			</label>
+			<label class="toggle-btn" data-position="sub">
+				<input type="radio" name="topic_parent_mode" value="sub" checked?={ formTopicParentMode == "sub" }/>
+				<span class="material-symbols-outlined">subdirectory_arrow_right</span>
+				Sub-topic
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">A root topic stands alone. A sub-topic anchors under another topic.</small>
+	</fieldset>
 	<label>
 		Title
 		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
@@ -97,7 +115,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		<textarea name="body" rows="5">{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words.</small>
 	</label>
-	<div class="if-view topic-picker-section">
+	<div class="topic-picker-section">
 		<label>
 			Parent topic <span style="color: var(--opposes);">*</span>
 			<input
@@ -112,7 +130,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 				hx-swap="outerHTML"
 				hx-include="[name='find_topic']"
 			/>
-			<small>Views must belong to a topic.</small>
+			<small>Pick the topic this anchors under.</small>
 		</label>
 		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
 	</div>

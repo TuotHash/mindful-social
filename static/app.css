@@ -2208,6 +2208,18 @@ fieldset.toggle-group legend {
 .post-form:has(input[name="type"][value="topic"]:checked) .if-view {
   display: none;
 }
+/* Mirror: when type=view, hide topic-only opts (the Position toggle). */
+.post-form:has(input[name="type"][value="view"]:checked) .if-topic {
+  display: none;
+}
+/* Hide the parent-topic picker when creating a root topic (type=topic AND
+   position=root). It stays visible for views and for sub-topics. */
+.post-form:has(input[name="type"][value="topic"]:checked):has(
+    input[name="topic_parent_mode"][value="root"]:checked
+  )
+  .topic-picker-section {
+  display: none;
+}
 
 /* Candidate picker (edge creation) */
 .candidate-list label.radio {
