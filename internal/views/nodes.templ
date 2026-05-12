@@ -115,29 +115,6 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		<textarea name="body" rows="5">{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words.</small>
 	</label>
-	<div class="topic-picker-section">
-		<label>
-			Parent topic <span style="color: var(--opposes);">*</span>
-			<input
-				type="search"
-				name="find_topic"
-				value={ findTopic }
-				placeholder="search topics…"
-				autocomplete="off"
-				hx-get="/nodes/topic-picker"
-				hx-trigger="input changed delay:200ms, search"
-				hx-target="#topic-picker-target"
-				hx-swap="outerHTML"
-				hx-include="[name='find_topic']"
-			/>
-			<small>Pick the topic this anchors under.</small>
-		</label>
-		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
-	</div>
-	<label>
-		Tags <small>(comma-separated, optional)</small>
-		<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
-	</label>
 	@visibilitySelect(formVisibility, lists)
 	<fieldset class="toggle-group">
 		<legend>Pin to my profile</legend>
@@ -164,6 +141,29 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			</label>
 		</div>
 	</fieldset>
+	<label>
+		Tags <small>(comma-separated, optional)</small>
+		<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
+	</label>
+	<div class="topic-picker-section">
+		<label>
+			Parent topic <span style="color: var(--opposes);">*</span>
+			<input
+				type="search"
+				name="find_topic"
+				value={ findTopic }
+				placeholder="search topics…"
+				autocomplete="off"
+				hx-get="/nodes/topic-picker"
+				hx-trigger="input changed delay:200ms, search"
+				hx-target="#topic-picker-target"
+				hx-swap="outerHTML"
+				hx-include="[name='find_topic']"
+			/>
+			<small>Pick the topic this anchors under.</small>
+		</label>
+		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
+	</div>
 }
 
 // EdgeRow is one entry in a legend section. Outgoing is true when this row
