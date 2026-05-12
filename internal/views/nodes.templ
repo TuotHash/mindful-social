@@ -369,8 +369,8 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 								for _, r := range g.Rows {
 									<li>
 										<a href={ templ.SafeURL("/nodes/" + r.Slug) }>
-											@nodeTypeChip(r.Type)
 											<span class="title">{ r.Title }</span>
+											@nodeTypeChip(r.Type)
 										</a>
 										if canEdit {
 											<div class="edge-actions">
