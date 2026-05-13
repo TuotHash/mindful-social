@@ -488,24 +488,28 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
 }
 .topbar-search input,
 .nav-search input {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid var(--border-input);
-  background: var(--bg-inset);
+  border: 0;
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--fs-sm);
-  padding: 8px 12px 8px 34px;
-  border-radius: var(--radius-pill);
+  padding: 8px 0;
+  border-radius: 0;
   outline: none;
-  transition:
-    border-color 0.12s,
-    background 0.12s,
-    box-shadow 0.12s;
   min-width: 0;
 }
 .topbar-search input::placeholder,
@@ -514,10 +518,18 @@ button {
 }
 .topbar-search input:hover,
 .nav-search input:hover {
+  border-color: transparent;
+}
+.topbar-search:hover,
+.nav-search:hover {
   border-color: var(--border-strong);
 }
 .topbar-search input:focus,
 .nav-search input:focus {
+  box-shadow: none;
+}
+.topbar-search:focus-within,
+.nav-search:focus-within {
   border-color: var(--accent-border);
   background: var(--bg-elev-1);
   box-shadow: 0 0 0 3px var(--accent-bg);
@@ -531,13 +543,10 @@ button {
 
 .topbar-search svg,
 .nav-search > svg {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  transform: translateY(-50%);
   width: 14px;
   height: 14px;
   color: var(--text-subtle);
+  flex: none;
   pointer-events: none;
 }
 .topbar-search kbd,

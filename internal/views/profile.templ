@@ -67,7 +67,7 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 					@bloom(240, 105, "position: absolute; right: -40px; top: -60px; opacity: 0.5;")
 					<div style="position: relative; z-index: 2;">
 						<div class="row gap-24 wrap" style="align-items: flex-start;">
-							@Avatar(profile.Username, 88)
+							@AvatarImage(profile.Username, profile.ProfileImagePath, 88)
 							<div class="col gap-8 grow" style="min-width: 240px;">
 								<div class="row gap-12 wrap" style="align-items: center;">
 									<h1 style="margin: 0;">{ profile.Username }</h1>

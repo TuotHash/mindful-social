@@ -94,11 +94,11 @@ func viewerFor(u *db.User) *views.Viewer {
 		return nil
 	}
 	return &views.Viewer{
-		ID:       u.ID.String(),
-		Username: u.Username,
-		IsAdmin:  u.Role == db.UserRoleAdmin,
-		IsStaff:  u.Role == db.UserRoleAdmin || u.Role == db.UserRoleModerator,
-		Timezone: u.Timezone,
+		ID:               u.ID.String(),
+		Username:         u.Username,
+		ProfileImagePath: u.ProfileImagePath,
+		IsAdmin:          u.Role == db.UserRoleAdmin,
+		IsStaff:          u.Role == db.UserRoleAdmin || u.Role == db.UserRoleModerator,
+		Timezone:         u.Timezone,
 	}
 }
-

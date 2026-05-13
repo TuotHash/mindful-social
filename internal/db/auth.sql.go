@@ -117,7 +117,7 @@ func (q *Queries) GetIdentityForUser(ctx context.Context, arg GetIdentityForUser
 }
 
 const getPasswordIdentityForLogin = `-- name: GetPasswordIdentityForLogin :one
-SELECT u.id, u.username, u.email, u.created_at, u.role, u.default_node_visibility, u.default_audience_list_id, u.timezone, ai.secret AS password_hash, ai.id AS identity_id
+SELECT u.id, u.username, u.email, u.created_at, u.role, u.default_node_visibility, u.default_audience_list_id, u.timezone, u.profile_image_path, ai.secret AS password_hash, ai.id AS identity_id
 FROM users u
 JOIN auth_identities ai ON ai.user_id = u.id
 WHERE u.email = $1
@@ -133,6 +133,7 @@ type GetPasswordIdentityForLoginRow struct {
 	DefaultNodeVisibility VisibilityKind     `json:"default_node_visibility"`
 	DefaultAudienceListID *uuid.UUID         `json:"default_audience_list_id"`
 	Timezone              string             `json:"timezone"`
+	ProfileImagePath      string             `json:"profile_image_path"`
 	PasswordHash          *string            `json:"password_hash"`
 	IdentityID            uuid.UUID          `json:"identity_id"`
 }
@@ -151,6 +152,7 @@ func (q *Queries) GetPasswordIdentityForLogin(ctx context.Context, email string)
 		&i.DefaultNodeVisibility,
 		&i.DefaultAudienceListID,
 		&i.Timezone,
+		&i.ProfileImagePath,
 		&i.PasswordHash,
 		&i.IdentityID,
 	)

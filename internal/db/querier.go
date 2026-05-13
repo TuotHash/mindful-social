@@ -193,6 +193,9 @@ type Querier interface {
 	// given; falls back to recency order when empty so the picker is pre-populated.
 	// Respects node_visible_to() so viewers only see topics they can post under.
 	SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error)
+	// People search for /search. Prefix/substring matching makes exact handle
+	// discovery predictable, while trigram word similarity catches small typos.
+	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first. Returns
@@ -213,6 +216,7 @@ type Querier interface {
 	// is nullable; pass NULL whenever default_node_visibility is anything other
 	// than 'list'. Timezone is an IANA name (empty string = fall back to UTC).
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
+	UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) error
 	// Idempotent: returns the tag id whether it already existed or just got

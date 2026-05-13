@@ -27,6 +27,9 @@ type Config struct {
 	// changes happen through the admin UI. Unknown usernames are logged
 	// and skipped.
 	AdminUsers []string
+
+	// UploadDir stores user-uploaded files served from /uploads/*.
+	UploadDir string
 }
 
 // Load reads configuration from environment variables.
@@ -38,6 +41,7 @@ func Load() (Config, error) {
 		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
 		SignupEnabled: envBool("SIGNUP_ENABLED", true),
 		AdminUsers:    envList("ADMIN_USERS"),
+		UploadDir:     envOr("UPLOAD_DIR", "uploads"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

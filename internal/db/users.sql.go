@@ -9,12 +9,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)
-RETURNING id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone
+RETURNING id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path
 `
 
 type CreateUserParams struct {
@@ -34,12 +35,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.DefaultNodeVisibility,
 		&i.DefaultAudienceListID,
 		&i.Timezone,
+		&i.ProfileImagePath,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone FROM users WHERE id = $1
+SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -54,12 +56,13 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.DefaultNodeVisibility,
 		&i.DefaultAudienceListID,
 		&i.Timezone,
+		&i.ProfileImagePath,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone FROM users WHERE email = $1
+SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -74,12 +77,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.DefaultNodeVisibility,
 		&i.DefaultAudienceListID,
 		&i.Timezone,
+		&i.ProfileImagePath,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone FROM users WHERE username = $1
+SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -94,12 +98,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.DefaultNodeVisibility,
 		&i.DefaultAudienceListID,
 		&i.Timezone,
+		&i.ProfileImagePath,
 	)
 	return i, err
 }
 
 const listUsersForAdmin = `-- name: ListUsersForAdmin :many
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone FROM users
+SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users
 ORDER BY
     CASE role
         WHEN 'admin' THEN 0
@@ -129,7 +134,53 @@ func (q *Queries) ListUsersForAdmin(ctx context.Context) ([]User, error) {
 			&i.DefaultNodeVisibility,
 			&i.DefaultAudienceListID,
 			&i.Timezone,
+			&i.ProfileImagePath,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchUsers = `-- name: SearchUsers :many
+SELECT id, username, created_at
+FROM users
+WHERE username ILIKE '%' || $1::text || '%'
+   OR username %> $1::text
+ORDER BY
+    CASE WHEN username ILIKE $1::text || '%' THEN 0 ELSE 1 END,
+    word_similarity($1::text, username) DESC,
+    username ASC
+LIMIT $2
+`
+
+type SearchUsersParams struct {
+	Query       string `json:"query"`
+	ResultLimit int32  `json:"result_limit"`
+}
+
+type SearchUsersRow struct {
+	ID        uuid.UUID          `json:"id"`
+	Username  string             `json:"username"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// People search for /search. Prefix/substring matching makes exact handle
+// discovery predictable, while trigram word similarity catches small typos.
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
+	rows, err := q.db.Query(ctx, searchUsers, arg.Query, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchUsersRow
+	for rows.Next() {
+		var i SearchUsersRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -179,6 +230,20 @@ func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPrefe
 		arg.DefaultAudienceListID,
 		arg.Timezone,
 	)
+	return err
+}
+
+const updateUserProfileImage = `-- name: UpdateUserProfileImage :exec
+UPDATE users SET profile_image_path = $2 WHERE id = $1
+`
+
+type UpdateUserProfileImageParams struct {
+	ID               uuid.UUID `json:"id"`
+	ProfileImagePath string    `json:"profile_image_path"`
+}
+
+func (q *Queries) UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error {
+	_, err := q.db.Exec(ctx, updateUserProfileImage, arg.ID, arg.ProfileImagePath)
 	return err
 }
 

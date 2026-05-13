@@ -175,6 +175,8 @@ func (s *Server) routes() {
 	}
 	staticFS := http.FileServer(http.FS(staticSub))
 	r.Handle("/static/*", http.StripPrefix("/static/", cacheStatic(staticFS)))
+	uploadFS := http.FileServer(http.Dir(s.cfg.UploadDir))
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", cacheStatic(uploadFS)))
 
 	r.Get("/", s.handleLanding)
 
@@ -198,6 +200,7 @@ func (s *Server) routes() {
 		r.Get("/home", s.handleHome)
 		r.Get("/account", s.handleAccount)
 		r.Post("/account/preferences", s.handleAccountPreferences)
+		r.Post("/account/profile-image", s.handleAccountProfileImage)
 		r.Post("/account/password", s.handleAccountPasswordSet)
 		r.Post("/account/identities/{id}/disconnect", s.handleAccountIdentityDisconnect)
 		r.Get("/nodes/new", s.handleNodeNew)

@@ -12,6 +12,19 @@ SELECT * FROM users WHERE email = $1;
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1;
 
+-- name: SearchUsers :many
+-- People search for /search. Prefix/substring matching makes exact handle
+-- discovery predictable, while trigram word similarity catches small typos.
+SELECT id, username, created_at
+FROM users
+WHERE username ILIKE '%' || sqlc.arg(query)::text || '%'
+   OR username %> sqlc.arg(query)::text
+ORDER BY
+    CASE WHEN username ILIKE sqlc.arg(query)::text || '%' THEN 0 ELSE 1 END,
+    word_similarity(sqlc.arg(query)::text, username) DESC,
+    username ASC
+LIMIT sqlc.arg(result_limit);
+
 -- name: ListUsersForAdmin :many
 -- Roster for the admin /users page. Recent signups first; staff bubble to
 -- the top so they're easy to find.
@@ -42,3 +55,6 @@ SET default_node_visibility = $2,
     default_audience_list_id = $3,
     timezone = $4
 WHERE id = $1;
+
+-- name: UpdateUserProfileImage :exec
+UPDATE users SET profile_image_path = $2 WHERE id = $1;

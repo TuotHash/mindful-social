@@ -81,3 +81,38 @@ func TestNodeCreate_RejectsReasoningAndEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeUpdate_HTMXRequestsGetFullRedirect(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, c, "view", "Original title", "Original body")
+	node, err := testServer.queries.GetNode(t.Context(), id)
+	if err != nil {
+		t.Fatalf("get node: %v", err)
+	}
+
+	form := url.Values{
+		"title": {"Updated title"},
+		"body":  {"Updated body"},
+	}
+	form.Set("gorilla.csrf.Token", fetchCSRFToken(t, c))
+	req, err := http.NewRequest(http.MethodPost, testTS.URL+"/nodes/"+node.Slug, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatalf("POST update: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("htmx update status = %d, want 200", resp.StatusCode)
+	}
+	if got, want := resp.Header.Get("HX-Redirect"), "/nodes/"+node.Slug; got != want {
+		t.Fatalf("HX-Redirect = %q, want %q", got, want)
+	}
+}

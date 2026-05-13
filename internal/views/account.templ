@@ -92,6 +92,18 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">Details</h2>
 				<div class="account-field">
+					<div class="account-field-label">Profile picture</div>
+					<div class="row gap-12 center wrap" style="margin-top: 8px;">
+						@AvatarImage(user.Username, user.ProfileImagePath, 56)
+						<form method="post" action="/account/profile-image" enctype="multipart/form-data" class="inline">
+							@CSRFField()
+							<input type="file" name="profile_image" accept="image/png,image/jpeg,image/gif" required/>
+							<button type="submit" class="btn ghost sm">Upload</button>
+						</form>
+					</div>
+					<div class="account-field-note muted">PNG, JPEG, or GIF. Maximum size: 2 MB.</div>
+				</div>
+				<div class="account-field">
 					<div class="account-field-label">Username</div>
 					<div class="account-field-value">{ user.Username }</div>
 					<div class="account-field-note muted">Changing usernames isn't available yet — we still need rate limits to keep handle-cycling under control.</div>

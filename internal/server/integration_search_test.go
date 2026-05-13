@@ -55,3 +55,20 @@ func TestSearch_BodyOnlyMatchStillWorks(t *testing.T) {
 		t.Fatalf("/search should match body-only term; body: %s", snippet(body))
 	}
 }
+
+func TestSearch_FindsPeopleByUsername(t *testing.T) {
+	integrationDB(t)
+	aliceClient := newClient(t)
+	signup(t, aliceClient, "alice", "alice@example.com", "correct horse battery staple")
+	bobClient := newClient(t)
+	signup(t, bobClient, "bob-builder", "bob@example.com", "correct horse battery staple")
+
+	resp := get(t, aliceClient, "/search?"+url.Values{"q": {"builder"}}.Encode())
+	body := readBody(t, resp)
+	if !strings.Contains(body, "People") {
+		t.Fatalf("/search should render a People section; body: %s", snippet(body))
+	}
+	if !strings.Contains(body, `href="/users/bob-builder"`) {
+		t.Fatalf("/search should link matching user profile; body: %s", snippet(body))
+	}
+}

@@ -18,6 +18,12 @@ type SearchHit struct {
 	Excerpt []ExcerptPart
 }
 
+// UserSearchHit is one person result on the /search page.
+type UserSearchHit struct {
+	ID       uuid.UUID
+	Username string
+}
+
 // ExcerptPart is one chunk of a search result's body excerpt. Match=true
 // segments are wrapped in <mark> at render time.
 type ExcerptPart struct {
@@ -25,7 +31,7 @@ type ExcerptPart struct {
 	Match bool
 }
 
-templ SearchResults(viewer *Viewer, q string, hits []SearchHit) {
+templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSearchHit) {
 	@Layout("Search", viewer) {
 		<div class="page medium">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -33,25 +39,47 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit) {
 				<h1 class="h-1">Search the graph</h1>
 			</div>
 			<form method="get" action="/search" class="search-form">
-				<input type="search" name="q" value={ q } placeholder="search node titles and bodies…"/>
+				<input type="search" name="q" value={ q } placeholder="search people, node titles, and bodies..."/>
 				<button type="submit" class="btn accent">Search</button>
 			</form>
 			if q == "" {
-				<p class="muted">Type a query above to search node titles and bodies.</p>
+				<p class="muted">Type a query above to search people, node titles, and bodies.</p>
 			}
-			if isQueryWithNoHits(q, hits) {
+			if isQueryWithNoHits(q, hits, users) {
 				<div class="card muted" style="text-align: center; padding: 24px;">{ noMatchesPhrase(q) }</div>
 			}
-			if isQueryWithHits(q, hits) {
-				<p class="muted" style="margin: 0 0 12px;">{ resultsForPhrase(len(hits), q) }</p>
-				<ul class="search-results">
-					for _, h := range hits {
-						@searchHitItem(h)
-					}
-				</ul>
+			if q != "" && len(users) > 0 {
+				<section class="search-section">
+					<h2>People</h2>
+					<ul class="search-results">
+						for _, u := range users {
+							@userSearchHitItem(u)
+						}
+					</ul>
+				</section>
+			}
+			if q != "" && len(hits) > 0 {
+				<section class="search-section">
+					<h2>Graph</h2>
+					<p class="muted" style="margin: 0 0 12px;">{ resultsForPhrase(len(hits), q) }</p>
+					<ul class="search-results">
+						for _, h := range hits {
+							@searchHitItem(h)
+						}
+					</ul>
+				</section>
 			}
 		</div>
 	}
+}
+
+templ userSearchHitItem(u UserSearchHit) {
+	<li>
+		<a href={ templ.SafeURL("/users/" + u.Username) } class="search-hit">
+			@Avatar(u.Username, 28)
+			<span class="title">{ u.Username }</span>
+		</a>
+	</li>
 }
 
 templ searchHitItem(h SearchHit) {
@@ -82,17 +110,18 @@ templ searchExcerpt(parts []ExcerptPart) {
 	}
 }
 
-func isQueryWithNoHits(q string, hits []SearchHit) bool { return q != "" && len(hits) == 0 }
-func isQueryWithHits(q string, hits []SearchHit) bool   { return q != "" && len(hits) > 0 }
+func isQueryWithNoHits(q string, hits []SearchHit, users []UserSearchHit) bool {
+	return q != "" && len(hits) == 0 && len(users) == 0
+}
 
 // resultsForPhrase returns "N results for QUERY" — folded into one Go
 // expression because templ's parser refuses a paragraph that mixes two outer
 // {…} interpolations with an inline element that itself contains {…}.
 func resultsForPhrase(n int, q string) string {
 	if n == 1 {
-		return "1 result for " + q + "."
+		return "1 graph result for " + q + "."
 	}
-	return strconv.Itoa(n) + " results for " + q + "."
+	return strconv.Itoa(n) + " graph results for " + q + "."
 }
 
 func noMatchesPhrase(q string) string {

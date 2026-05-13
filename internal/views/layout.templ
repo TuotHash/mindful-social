@@ -118,13 +118,13 @@ templ TopNav(currentUser *Viewer) {
 					<circle cx="6" cy="6" r="4.2" stroke="currentColor" stroke-width="1.4" fill="none"></circle>
 					<path d="M9.2 9.2L12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path>
 				</svg>
-				<input type="search" name="q" placeholder="Search topics, views, evidence…" aria-label="Search"/>
+				<input type="search" name="q" placeholder="Search people and nodes..." aria-label="Search"/>
 			</form>
 			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle theme">☀</button>
 			if currentUser != nil {
 				<details class="user-menu">
 					<summary class="user-menu-trigger" aria-label="Account menu">
-						@Avatar(currentUser.Username, 28)
+						@AvatarImage(currentUser.Username, currentUser.ProfileImagePath, 28)
 						<span class="user-menu-name">{ currentUser.Username }</span>
 						<span class="material-symbols-outlined user-menu-caret">arrow_drop_down</span>
 					</summary>
@@ -158,10 +158,25 @@ templ TopNav(currentUser *Viewer) {
 // the username. Hue derives from the username so a user always gets the same
 // background across pages.
 templ Avatar(username string, size int) {
+	@AvatarImage(username, "", size)
+}
+
+templ AvatarImage(username, imagePath string, size int) {
+	if imagePath != "" {
+		<img
+			class="avatar"
+			src={ templ.SafeURL(imagePath) }
+			alt=""
+			width={ fmt.Sprintf("%d", size) }
+			height={ fmt.Sprintf("%d", size) }
+			style={ avatarImageStyle(size) }
+		/>
+	} else {
 	<span
 		class="avatar"
 		style={ avatarStyle(username, size) }
 	>{ avatarInitials(username) }</span>
+	}
 }
 
 func avatarHue(s string) int {
@@ -191,14 +206,19 @@ func avatarStyle(username string, size int) string {
 	)
 }
 
+func avatarImageStyle(size int) string {
+	return fmt.Sprintf("width:%dpx;height:%dpx;border-radius:50%%;object-fit:cover;display:inline-block;flex:none;", size, size)
+}
+
 // Viewer is the small slice of user info templates need. We avoid passing
 // the full db.User so views don't depend on database types.
 type Viewer struct {
-	ID       string
-	Username string
-	IsAdmin  bool
-	IsStaff  bool   // admins or moderators — used to flag curation UI
-	Timezone string // IANA name; empty = UTC fallback
+	ID               string
+	Username         string
+	ProfileImagePath string
+	IsAdmin          bool
+	IsStaff          bool   // admins or moderators — used to flag curation UI
+	Timezone         string // IANA name; empty = UTC fallback
 }
 
 // Location returns the viewer's preferred IANA location, falling back to

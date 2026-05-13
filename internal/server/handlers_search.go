@@ -11,25 +11,34 @@ import (
 const searchResultLimit = 50
 
 // handleSearch renders /search?q=...: full-text matches across node titles
-// and bodies, ranked by relevance.
+// and bodies plus matching usernames, ranked by relevance.
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	viewer := viewerFor(currentUser(r))
 	if q == "" {
-		render(w, r, views.SearchResults(viewer, "", nil))
+		render(w, r, views.SearchResults(viewer, "", nil, nil))
 		return
 	}
-	rows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
+	nodeRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
 		Query:       q,
 		ResultLimit: searchResultLimit,
 		ViewerID:    viewerID(r),
 	})
 	if err != nil {
-		s.logger.Error("search", "err", err, "q", q)
+		s.logger.Error("search nodes", "err", err, "q", q)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.SearchResults(viewer, q, searchHits(rows)))
+	userRows, err := s.queries.SearchUsers(r.Context(), db.SearchUsersParams{
+		Query:       q,
+		ResultLimit: searchResultLimit,
+	})
+	if err != nil {
+		s.logger.Error("search users", "err", err, "q", q)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.SearchResults(viewer, q, searchHits(nodeRows), userHits(userRows)))
 }
 
 func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
@@ -41,6 +50,17 @@ func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
 			Type:    row.Type,
 			Title:   row.Title,
 			Excerpt: parseHighlightedExcerpt(row.Excerpt),
+		})
+	}
+	return out
+}
+
+func userHits(rows []db.SearchUsersRow) []views.UserSearchHit {
+	out := make([]views.UserSearchHit, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, views.UserSearchHit{
+			ID:       row.ID,
+			Username: row.Username,
 		})
 	}
 	return out

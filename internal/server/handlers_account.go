@@ -1,8 +1,16 @@
 package server
 
 import (
+	"bytes"
 	"errors"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,8 +23,11 @@ import (
 )
 
 const (
-	accountFlashKey   = "account_flash"
-	accountSuccessKey = "account_success"
+	accountFlashKey        = "account_flash"
+	accountSuccessKey      = "account_success"
+	maxProfileImageBytes   = 2 << 20
+	profileImageFormField  = "profile_image"
+	profileImageUploadPerm = 0o644
 )
 
 // handleAccount renders /account: preferences, read-only details, password
@@ -96,10 +107,10 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.queries.UpdateUserPreferences(r.Context(), db.UpdateUserPreferencesParams{
-		ID:                     user.ID,
-		DefaultNodeVisibility:  visKind,
-		DefaultAudienceListID:  visListID,
-		Timezone:               tz,
+		ID:                    user.ID,
+		DefaultNodeVisibility: visKind,
+		DefaultAudienceListID: visListID,
+		Timezone:              tz,
 	}); err != nil {
 		s.logger.Error("account prefs: update", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -108,6 +119,87 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 
 	s.successAccount(r, "Preferences saved.")
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
+func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	r.Body = http.MaxBytesReader(w, r.Body, maxProfileImageBytes+1024)
+	file, _, err := r.FormFile(profileImageFormField)
+	if err != nil {
+		s.flashAccount(r, "Choose a PNG, JPEG, or GIF image to upload.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, maxProfileImageBytes+1))
+	if err != nil {
+		s.logger.Error("account image: read", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if len(data) == 0 {
+		s.flashAccount(r, "Choose a PNG, JPEG, or GIF image to upload.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+	if len(data) > maxProfileImageBytes {
+		s.flashAccount(r, "Profile pictures must be 2 MB or smaller.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
+	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+	ext, ok := profileImageExtension(format)
+	if !ok {
+		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
+	dir := filepath.Join(s.cfg.UploadDir, "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.logger.Error("account image: mkdir", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	name := user.ID.String() + ext
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, profileImageUploadPerm); err != nil {
+		s.logger.Error("account image: write", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	publicPath := "/uploads/profiles/" + name
+	if err := s.queries.UpdateUserProfileImage(r.Context(), db.UpdateUserProfileImageParams{
+		ID:               user.ID,
+		ProfileImagePath: publicPath,
+	}); err != nil {
+		s.logger.Error("account image: update user", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	s.successAccount(r, "Profile picture updated.")
+	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
+func profileImageExtension(format string) (string, bool) {
+	switch format {
+	case "jpeg":
+		return ".jpg", true
+	case "png":
+		return ".png", true
+	case "gif":
+		return ".gif", true
+	default:
+		return "", false
+	}
 }
 
 // handleAccountPasswordSet handles both setting an initial password

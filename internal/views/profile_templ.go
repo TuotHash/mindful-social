@@ -112,7 +112,7 @@ func Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, p
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = Avatar(profile.Username, 88).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AvatarImage(profile.Username, profile.ProfileImagePath, 88).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

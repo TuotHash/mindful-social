@@ -426,6 +426,7 @@ type User struct {
 	DefaultNodeVisibility VisibilityKind     `json:"default_node_visibility"`
 	DefaultAudienceListID *uuid.UUID         `json:"default_audience_list_id"`
 	Timezone              string             `json:"timezone"`
+	ProfileImagePath      string             `json:"profile_image_path"`
 }
 
 type UserNodePin struct {

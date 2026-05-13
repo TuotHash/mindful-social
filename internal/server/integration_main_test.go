@@ -31,11 +31,17 @@ func integrationDB(t *testing.T) *Server {
 		t.Skip("TEST_DATABASE_URL not set; skipping integration test (run scripts/db-test-setup.sh)")
 	}
 	testInitOnce.Do(func() {
+		uploadDir, err := os.MkdirTemp("", "mindful-social-test-uploads-*")
+		if err != nil {
+			testInitErr = err
+			return
+		}
 		cfg := config.Config{
 			ListenAddr:    "127.0.0.1:0",
 			DatabaseURL:   url,
 			PublicBaseURL: "http://127.0.0.1",
 			SignupEnabled: true,
+			UploadDir:     uploadDir,
 		}
 		// Discard logs in tests; failures surface via assertions.
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))

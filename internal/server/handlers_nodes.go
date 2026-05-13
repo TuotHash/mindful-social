@@ -705,6 +705,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
 		s.logger.Error("update node: set tags", "err", err)
 	}
+	if isHTMX(r) {
+		w.Header().Set("HX-Redirect", "/nodes/"+node.Slug)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
@@ -817,6 +822,16 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		rerender("Pick a valid relationship kind.")
 		return
 	}
+
+	if ok, err := s.canLinkToNode(r.Context(), fromNode, user); err != nil {
+		s.logger.Error("edge create: link policy from", "err", err)
+		rerender("Could not create connection. Please try again.")
+		return
+	} else if !ok {
+		rerender("You don't have permission to link from this node.")
+		return
+	}
+
 	toID, err := uuid.Parse(rawToID)
 	if err != nil {
 		rerender("Select a target node.")
@@ -824,17 +839,6 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if toID == fromID {
 		rerender("A node cannot connect to itself.")
-		return
-	}
-
-	// Both endpoints must permit links from this viewer. fromNode is
-	// already loaded; toNode needs a separate fetch.
-	if ok, err := s.canLinkToNode(r.Context(), fromNode, user); err != nil {
-		s.logger.Error("edge create: link policy from", "err", err)
-		rerender("Could not create connection. Please try again.")
-		return
-	} else if !ok {
-		rerender("You don't have permission to link from this node.")
 		return
 	}
 	toNode, err := s.queries.GetNode(r.Context(), toID)
