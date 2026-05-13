@@ -497,8 +497,13 @@ button {
     background 0.12s,
     box-shadow 0.12s;
 }
-.topbar-search input,
-.nav-search input {
+/* The generic input[type="search"] rule further down has the same
+   specificity as `.nav-search input`, so on source order it would win and
+   redraw the input with its own border, padding, and background inside the
+   pill — which looks like the leading icon overlapping the text. Adding
+   `[type="search"]` here bumps specificity above the generic rule. */
+.topbar-search input[type="search"],
+.nav-search input[type="search"] {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
@@ -512,20 +517,20 @@ button {
   outline: none;
   min-width: 0;
 }
-.topbar-search input::placeholder,
-.nav-search input::placeholder {
+.topbar-search input[type="search"]::placeholder,
+.nav-search input[type="search"]::placeholder {
   color: var(--text-subtle);
 }
-.topbar-search input:hover,
-.nav-search input:hover {
+.topbar-search input[type="search"]:hover,
+.nav-search input[type="search"]:hover {
   border-color: transparent;
 }
 .topbar-search:hover,
 .nav-search:hover {
   border-color: var(--border-strong);
 }
-.topbar-search input:focus,
-.nav-search input:focus {
+.topbar-search input[type="search"]:focus,
+.nav-search input[type="search"]:focus {
   box-shadow: none;
 }
 .topbar-search:focus-within,
@@ -534,10 +539,10 @@ button {
   background: var(--bg-elev-1);
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
-.topbar-search input::-webkit-search-decoration,
-.topbar-search input::-webkit-search-cancel-button,
-.nav-search input::-webkit-search-decoration,
-.nav-search input::-webkit-search-cancel-button {
+.topbar-search input[type="search"]::-webkit-search-decoration,
+.topbar-search input[type="search"]::-webkit-search-cancel-button,
+.nav-search input[type="search"]::-webkit-search-decoration,
+.nav-search input[type="search"]::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
 
