@@ -107,3 +107,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 - Graph editor UI (Svelte + svelte-flow)
 - Mobile polish
 - Org-wide graphs / multi-tenant deployments
+
+## More
+
+- Reenable reasoning and evidence node creation inside the Connect menu
