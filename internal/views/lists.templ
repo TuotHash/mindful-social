@@ -46,6 +46,7 @@ templ ListsIndex(viewer *Viewer, flash string, lists []ListSummary) {
 								</a>
 								if !l.List.IsTrusted {
 									<form method="post" action={ templ.SafeURL("/lists/" + l.List.ID.String() + "/delete") } class="inline">
+										@CSRFField()
 										<button type="submit" class="btn ghost sm" onclick="return confirm('Delete this list?')">Delete</button>
 									</form>
 								}
@@ -58,6 +59,7 @@ templ ListsIndex(viewer *Viewer, flash string, lists []ListSummary) {
 			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">New list</h2>
 				<form method="post" action="/lists" class="form">
+					@CSRFField()
 					<label>
 						Name
 						<input type="text" name="name" required maxlength="60" placeholder="Colleagues, Reading group, …"/>
@@ -97,6 +99,7 @@ templ ListDetail(viewer *Viewer, flash string, list db.AudienceList, members []d
 									<span>{ m.Username }</span>
 								</a>
 								<form method="post" action={ templ.SafeURL("/lists/" + list.ID.String() + "/members/" + m.ID.String() + "/delete") } class="inline">
+									@CSRFField()
 									<button type="submit" class="btn ghost sm">Remove</button>
 								</form>
 							</li>
@@ -107,6 +110,7 @@ templ ListDetail(viewer *Viewer, flash string, list db.AudienceList, members []d
 			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">Add member</h2>
 				<form method="post" action={ templ.SafeURL("/lists/" + list.ID.String() + "/members") } class="form">
+					@CSRFField()
 					<label>
 						Username
 						<input type="text" name="username" required placeholder="username"/>

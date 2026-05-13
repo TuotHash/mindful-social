@@ -96,10 +96,12 @@ templ Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, 
 								<div class="col gap-8">
 									if relation.ViewerFollows {
 										<form method="post" action={ templ.SafeURL("/users/" + profile.Username + "/unfollow") } class="inline">
+											@CSRFField()
 											<button class="btn ghost" type="submit">Following</button>
 										</form>
 									} else {
 										<form method="post" action={ templ.SafeURL("/users/" + profile.Username + "/follow") } class="inline">
+											@CSRFField()
 											<button class="btn accent" type="submit">+ Follow</button>
 										</form>
 									}

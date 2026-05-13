@@ -71,6 +71,7 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 				<h2 style="margin-top: 0;">Preferences</h2>
 				<p class="muted" style="margin-top: 0;">Defaults applied when you create a new node and when timestamps are displayed.</p>
 				<form method="post" action="/account/preferences" class="form">
+					@CSRFField()
 					@visibilitySelect(prefVisibility, lists)
 					<label>
 						Timezone
@@ -106,6 +107,7 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 				<h2 style="margin-top: 0;">Password</h2>
 				if hasPassword {
 					<form method="post" action="/account/password" class="form">
+						@CSRFField()
 						<label>
 							Current password
 							<input type="password" name="current_password" required autocomplete="current-password"/>
@@ -125,6 +127,7 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 				} else {
 					<p class="muted" style="margin-top: 0;">You signed in with an external provider and haven't set a password yet. Add one to enable email + password sign-in as a backup.</p>
 					<form method="post" action="/account/password" class="form">
+						@CSRFField()
 						<label>
 							New password
 							<input type="password" name="new_password" required minlength="12" autocomplete="new-password" placeholder="at least 12 characters"/>
@@ -156,6 +159,7 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 								</div>
 								if ident.CanDisconnect {
 									<form method="post" action={ templ.SafeURL("/account/identities/" + ident.ID.String() + "/disconnect") } class="inline" onsubmit="return confirm('Disconnect this sign-in method? You can re-add it later by signing in with it again.')">
+										@CSRFField()
 										<button type="submit" class="btn ghost sm">Disconnect</button>
 									</form>
 								} else {

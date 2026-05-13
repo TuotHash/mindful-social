@@ -32,6 +32,7 @@ type Server struct {
 	authSvc  *auth.Service
 	sessions *scs.SessionManager
 	oauth    *auth.Registry
+	csrf     func(http.Handler) http.Handler
 	router   chi.Router
 }
 
@@ -85,6 +86,13 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		return nil, err
 	}
 
+	csrfMw, err := csrfMiddleware(cfg.PublicBaseURL)
+	if err != nil {
+		pool.Close()
+		_ = sqlDB.Close()
+		return nil, err
+	}
+
 	s := &Server{
 		cfg:      cfg,
 		logger:   logger,
@@ -94,6 +102,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		authSvc:  auth.NewService(pool),
 		sessions: sm,
 		oauth:    registry,
+		csrf:     csrfMw,
 	}
 	views.SetSignupEnabled(cfg.SignupEnabled)
 	if err := s.bootstrapAdmins(ctx); err != nil {
@@ -145,6 +154,10 @@ func (s *Server) routes() {
 	// and persists changes on the way out.
 	r.Use(s.sessions.LoadAndSave)
 	r.Use(s.loadUser)
+	// gorilla/csrf double-submit cookie + token check on unsafe methods.
+	// The bridge inside csrfMiddleware copies the per-request token onto
+	// our ctx so templates can render the hidden input via views.CSRFField.
+	r.Use(s.csrf)
 
 	r.Get("/healthz", s.handleHealth)
 

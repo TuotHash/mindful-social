@@ -27,13 +27,44 @@ func newClient(t *testing.T) *http.Client {
 
 // formPost sends an application/x-www-form-urlencoded POST and returns the
 // final response (after redirects). The caller is responsible for closing.
+// A CSRF token is fetched from the landing page and appended to the form so
+// gorilla/csrf accepts the request; the cookie jar on c carries the paired
+// _gorilla_csrf cookie automatically.
 func formPost(t *testing.T, c *http.Client, path string, form url.Values) *http.Response {
 	t.Helper()
+	tok := fetchCSRFToken(t, c)
+	if form == nil {
+		form = url.Values{}
+	}
+	form.Set("gorilla.csrf.Token", tok)
 	resp, err := c.PostForm(testTS.URL+path, form)
 	if err != nil {
 		t.Fatalf("POST %s: %v", path, err)
 	}
 	return resp
+}
+
+// fetchCSRFToken issues a GET to / and scrapes the csrf-token meta tag so
+// formPost can include the value. The cookie jar on c picks up the paired
+// _gorilla_csrf cookie on the same request.
+func fetchCSRFToken(t *testing.T, c *http.Client) string {
+	t.Helper()
+	resp, err := c.Get(testTS.URL + "/")
+	if err != nil {
+		t.Fatalf("csrf bootstrap GET /: %v", err)
+	}
+	body := readBody(t, resp)
+	const marker = `name="csrf-token" content="`
+	i := strings.Index(body, marker)
+	if i < 0 {
+		t.Fatalf("csrf bootstrap: meta tag not found in /, body excerpt: %s", snippet(body))
+	}
+	rest := body[i+len(marker):]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		t.Fatalf("csrf bootstrap: malformed meta tag")
+	}
+	return rest[:end]
 }
 
 // get sends a GET and returns the final response.

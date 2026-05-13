@@ -74,6 +74,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 // Position toggle when View is selected, and the topic picker when a root
 // topic is being created.
 templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
 		<div class="toggle-btns">
@@ -340,6 +341,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							hx-swap="innerHTML"
 						><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
 						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/unpin") } class="inline">
+							@CSRFField()
 							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">keep_off</span>Remove</button>
 						</form>
 					</div>
@@ -363,9 +365,11 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 							if canEdit {
 								<div class="row gap-8 wrap" style="margin-top: 12px;">
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/unhighlight") } class="inline">
+										@CSRFField()
 										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star</span>Unhighlight</button>
 									</form>
 									<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + f.EdgeID.String() + "/delete") } class="inline">
+										@CSRFField()
 										<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
 									</form>
 								</div>
@@ -394,10 +398,12 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 											<div class="edge-actions">
 												if r.Type == db.NodeTypeReasoning {
 													<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/highlight") } class="inline">
+														@CSRFField()
 														<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star_shine</span>Highlight</button>
 													</form>
 												}
 												<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/delete") } class="inline">
+													@CSRFField()
 													<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">conversion_path_off</span>Disconnect</button>
 												</form>
 											</div>
@@ -424,6 +430,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 			<p class="muted" style="margin: 0 0 24px;">The node type cannot be changed after creation.</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug) } class="form">
+				@CSRFField()
 				<label>
 					Title
 					<input type="text" name="title" required maxlength="200" value={ formTitle }/>
@@ -606,6 +613,7 @@ templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReas
 // PinModal (htmx modal). For views it offers support / oppose / feature
 // plus a reasoning picker; for other node types only "feature" applies.
 templ pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Stance</legend>
 		<div class="toggle-btns">
@@ -807,6 +815,7 @@ templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []
 }
 
 templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeCandidate) {
+	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Relationship kind</legend>
 		<div class="toggle-btns">
@@ -871,6 +880,7 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 				<li>Tags lose their link to this node, but the tags themselves remain.</li>
 			</ul>
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="form">
+				@CSRFField()
 				<div class="form-row">
 					<button type="submit" class="btn danger"><span class="material-symbols-outlined">delete_forever</span>Yes, delete this node</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>

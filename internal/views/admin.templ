@@ -75,6 +75,7 @@ templ AdminUsers(viewer *Viewer, users []AdminUserRow, flash, success string) {
 									for _, target := range otherRoles(u.Role) {
 										if !(u.IsSelf && target != db.UserRoleAdmin) {
 											<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID.String() + "/role") } class="inline">
+												@CSRFField()
 												<input type="hidden" name="role" value={ string(target) }/>
 												<button type="submit" class="btn ghost sm">{ roleActionLabel(u.Role, target) }</button>
 											</form>
@@ -143,6 +144,7 @@ templ AdminUserEdit(viewer *Viewer, target db.User, flash, success string) {
 			<section class="card" style="padding: 20px;">
 				<h2 style="margin-top: 0;">Username</h2>
 				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/username") } class="form">
+					@CSRFField()
 					<label>
 						Username
 						<input type="text" name="username" value={ target.Username } required minlength="3" maxlength="32" pattern="[A-Za-z0-9._\\-]+" autocomplete="off"/>
@@ -156,6 +158,7 @@ templ AdminUserEdit(viewer *Viewer, target db.User, flash, success string) {
 			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">Email</h2>
 				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/email") } class="form">
+					@CSRFField()
 					<label>
 						Email
 						<input type="email" name="email" value={ target.Email } required autocomplete="off"/>
@@ -170,6 +173,7 @@ templ AdminUserEdit(viewer *Viewer, target db.User, flash, success string) {
 				<h2 style="margin-top: 0;">Password</h2>
 				<p class="muted" style="margin-top: 0;">Sets a new password without needing the current one. If this user signed up via OAuth and has no password yet, this creates one — they can then sign in by email + password as a fallback.</p>
 				<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/password") } class="form">
+					@CSRFField()
 					<label>
 						New password
 						<input type="password" name="new_password" required minlength="12" autocomplete="new-password" placeholder="at least 12 characters"/>

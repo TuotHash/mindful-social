@@ -52,6 +52,7 @@ templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) 
 		@authShell("Bring your reasoning.", "Pick a handle. We'll never email you marketing.") {
 			@Flash(flash)
 			<form method="post" action="/signup" class="col gap-16">
+				@CSRFField()
 				<label class="field">
 					Username
 					<input class="input lg" type="text" name="username" required minlength="3" maxlength="32" value={ formUsername } placeholder="e.g. quiet-octopus"/>
@@ -102,6 +103,7 @@ templ Login(flash string, oauth []OAuthButton, formEmail string) {
 		@authShell("Welcome back.", "Sign in to keep your reasoning where you left it.") {
 			@Flash(flash)
 			<form method="post" action="/login" class="col gap-16">
+				@CSRFField()
 				<label class="field">
 					Email
 					<input class="input lg" type="email" name="email" required value={ formEmail } placeholder="you@example.org"/>

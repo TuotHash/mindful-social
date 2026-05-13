@@ -206,33 +206,41 @@ func Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) t
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " <form method=\"post\" action=\"/signup\" class=\"col gap-16\"><label class=\"field\">Username <input class=\"input lg\" type=\"text\" name=\"username\" required minlength=\"3\" maxlength=\"32\" value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " <form method=\"post\" action=\"/signup\" class=\"col gap-16\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = CSRFField().Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<label class=\"field\">Username <input class=\"input lg\" type=\"text\" name=\"username\" required minlength=\"3\" maxlength=\"32\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(formUsername)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 57, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 58, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" placeholder=\"e.g. quiet-octopus\"> <small class=\"muted\" style=\"font-size: 12px;\">3–32 chars: letters, digits, dot, dash, underscore.</small></label> <label class=\"field\">Email <input class=\"input lg\" type=\"email\" name=\"email\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" placeholder=\"e.g. quiet-octopus\"> <small class=\"muted\" style=\"font-size: 12px;\">3–32 chars: letters, digits, dot, dash, underscore.</small></label> <label class=\"field\">Email <input class=\"input lg\" type=\"email\" name=\"email\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(formEmail)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 62, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 63, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" placeholder=\"you@example.org\"></label> <label class=\"field\">Password <input class=\"input lg\" type=\"password\" name=\"password\" required minlength=\"12\" placeholder=\"at least 12 characters\"></label> <button type=\"submit\" class=\"btn accent lg\" style=\"justify-content: center;\">Create account</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" placeholder=\"you@example.org\"></label> <label class=\"field\">Password <input class=\"input lg\" type=\"password\" name=\"password\" required minlength=\"12\" placeholder=\"at least 12 characters\"></label> <button type=\"submit\" class=\"btn accent lg\" style=\"justify-content: center;\">Create account</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -240,7 +248,7 @@ func Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) t
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " <div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">Already a member? <a href=\"/login\" style=\"color: var(--ink); font-weight: 500;\">Sign in</a>.</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " <div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">Already a member? <a href=\"/login\" style=\"color: var(--ink); font-weight: 500;\">Sign in</a>.</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -309,53 +317,53 @@ func SignupClosed(oauth []OAuthButton) templ.Component {
 				}
 				ctx = templ.InitializeContext(ctx)
 				if len(oauth) == 0 {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flash\" role=\"status\">No sign-in providers are configured on this instance. Check back later.</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"flash\" role=\"status\">No sign-in providers are configured on this instance. Check back later.</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"oauth-buttons\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"oauth-buttons\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					for _, b := range oauth {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<a class=\"btn lg\" href=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<a class=\"btn lg\" href=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var15 templ.SafeURL
 						templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/auth/oauth/" + b.Key))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 89, Col: 68}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 90, Col: 68}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var16 string
 						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(b.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 89, Col: 80}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 90, Col: 80}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</a>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</a>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " <div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">Already a member? <a href=\"/login\" style=\"color: var(--ink); font-weight: 500;\">Sign in</a>.</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " <div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">Already a member? <a href=\"/login\" style=\"color: var(--ink); font-weight: 500;\">Sign in</a>.</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -424,20 +432,28 @@ func Login(flash string, oauth []OAuthButton, formEmail string) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " <form method=\"post\" action=\"/login\" class=\"col gap-16\"><label class=\"field\">Email <input class=\"input lg\" type=\"email\" name=\"email\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, " <form method=\"post\" action=\"/login\" class=\"col gap-16\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = CSRFField().Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<label class=\"field\">Email <input class=\"input lg\" type=\"email\" name=\"email\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(formEmail)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 107, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/auth.templ`, Line: 109, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" placeholder=\"you@example.org\"></label> <label class=\"field\">Password <input class=\"input lg\" type=\"password\" name=\"password\" required placeholder=\"••••••••\"></label> <button type=\"submit\" class=\"btn accent lg\" style=\"justify-content: center;\">Sign in</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" placeholder=\"you@example.org\"></label> <label class=\"field\">Password <input class=\"input lg\" type=\"password\" name=\"password\" required placeholder=\"••••••••\"></label> <button type=\"submit\" class=\"btn accent lg\" style=\"justify-content: center;\">Sign in</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -445,12 +461,12 @@ func Login(flash string, oauth []OAuthButton, formEmail string) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, " ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if SignupEnabled() {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">No account yet? <a href=\"/signup\" style=\"color: var(--ink); font-weight: 500;\">Sign up</a>.</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div style=\"margin-top: 32px; font-size: 14px; color: var(--ink-3);\">No account yet? <a href=\"/signup\" style=\"color: var(--ink); font-weight: 500;\">Sign up</a>.</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

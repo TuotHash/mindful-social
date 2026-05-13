@@ -13,6 +13,7 @@ templ Layout(title string, currentUser *Viewer) {
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="csrf-token" content={ CSRFToken(ctx) }/>
 			<title>{ title } — Mindful Social</title>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -30,6 +31,15 @@ templ Layout(title string, currentUser *Viewer) {
 				})();
 			</script>
 			<script src="/static/htmx.min.js" defer></script>
+			<script>
+				// Forward the CSRF token on every htmx request from the
+				// meta tag above so hx-post/hx-delete etc. don't need
+				// per-form wiring. gorilla/csrf accepts X-CSRF-Token.
+				document.addEventListener('htmx:configRequest', function (evt) {
+					var meta = document.querySelector('meta[name="csrf-token"]');
+					if (meta) evt.detail.headers['X-CSRF-Token'] = meta.getAttribute('content');
+				});
+			</script>
 		</head>
 		<body>
 			<div class="app">
@@ -129,6 +139,7 @@ templ TopNav(currentUser *Viewer) {
 						}
 						<div class="user-menu-divider"></div>
 						<form method="post" action="/logout" class="user-menu-form">
+							@CSRFField()
 							<button type="submit" class="user-menu-item" role="menuitem">Log out</button>
 						</form>
 					</div>
@@ -210,4 +221,11 @@ templ Flash(msg string) {
 	if msg != "" {
 		<div class="flash" role="alert">{ msg }</div>
 	}
+}
+
+// CSRFField renders the hidden input that gorilla/csrf checks on unsafe
+// methods. Include it in every non-GET form. htmx posts get the token via
+// the meta tag + htmx:configRequest listener wired in Layout above.
+templ CSRFField() {
+	<input type="hidden" name="gorilla.csrf.Token" value={ CSRFToken(ctx) }/>
 }
