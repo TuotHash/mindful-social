@@ -2226,14 +2226,13 @@ fieldset.toggle-group legend {
 .post-form:has(input[name="type"][value="view"]:checked) .if-topic {
   display: none;
 }
-/* Hide the parent-topic picker when creating a root topic (type=topic AND
-   position=root) or when the type is view. It only stays visible for
+/* Hide the parent-topic picker only when creating a root topic (type=topic
+   AND position=root). It stays visible for views (always required) and for
    sub-topics. */
 .post-form:has(input[name="type"][value="topic"]:checked):has(
     input[name="topic_parent_mode"][value="root"]:checked
   )
-  .topic-picker-section,
-.post-form:has(input[name="type"][value="view"]:checked) .topic-picker-section {
+  .topic-picker-section {
   display: none;
 }
 
