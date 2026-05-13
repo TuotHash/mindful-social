@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
+	"image/draw"
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,11 +27,13 @@ import (
 )
 
 const (
-	accountFlashKey        = "account_flash"
-	accountSuccessKey      = "account_success"
-	maxProfileImageBytes   = 2 << 20
-	profileImageFormField  = "profile_image"
-	profileImageUploadPerm = 0o644
+	accountFlashKey          = "account_flash"
+	accountSuccessKey        = "account_success"
+	maxProfileImageBytes     = 12 << 20
+	maxCompressedImageBytes  = 2 << 20
+	maxProfileImageDimension = 2048
+	profileImageFormField    = "profile_image"
+	profileImageUploadPerm   = 0o644
 )
 
 // handleAccount renders /account: preferences, read-only details, password
@@ -144,20 +150,25 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if len(data) > maxProfileImageBytes {
-		s.flashAccount(r, "Profile pictures must be 2 MB or smaller.")
+		s.flashAccount(r, "Profile pictures must be 12 MB or smaller before processing.")
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
 
-	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
-	ext, ok := profileImageExtension(format)
-	if !ok {
+	if !isSupportedProfileImageFormat(format) {
 		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+	processed, err := compressProfileImage(img, maxProfileImageDimension, maxCompressedImageBytes)
+	if err != nil {
+		s.flashAccount(r, "Could not compress image under 2 MB. Try a smaller image.")
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
@@ -168,9 +179,9 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	name := user.ID.String() + ext
+	name := user.ID.String() + ".jpg"
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, data, profileImageUploadPerm); err != nil {
+	if err := os.WriteFile(path, processed, profileImageUploadPerm); err != nil {
 		s.logger.Error("account image: write", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -189,17 +200,80 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
 
-func profileImageExtension(format string) (string, bool) {
+func isSupportedProfileImageFormat(format string) bool {
 	switch format {
-	case "jpeg":
-		return ".jpg", true
-	case "png":
-		return ".png", true
-	case "gif":
-		return ".gif", true
+	case "jpeg", "png", "gif":
+		return true
 	default:
-		return "", false
+		return false
 	}
+}
+
+func compressProfileImage(src image.Image, maxDimension int, maxBytes int) ([]byte, error) {
+	b := src.Bounds()
+	w := b.Dx()
+	h := b.Dy()
+	if w <= 0 || h <= 0 {
+		return nil, errors.New("invalid image dimensions")
+	}
+	scale := 1.0
+	largest := w
+	if h > largest {
+		largest = h
+	}
+	if largest > maxDimension {
+		scale = float64(maxDimension) / float64(largest)
+	}
+
+	for attempt := 0; attempt < 8; attempt++ {
+		tw := int(math.Round(float64(w) * scale))
+		th := int(math.Round(float64(h) * scale))
+		if tw < 1 {
+			tw = 1
+		}
+		if th < 1 {
+			th = 1
+		}
+		resized := resizeImageNearest(src, tw, th)
+		rgba := flattenToOpaqueRGBA(resized)
+		for _, quality := range []int{86, 80, 74, 68, 62, 56, 50} {
+			var out bytes.Buffer
+			if err := jpeg.Encode(&out, rgba, &jpeg.Options{Quality: quality}); err != nil {
+				return nil, err
+			}
+			if out.Len() <= maxBytes {
+				return out.Bytes(), nil
+			}
+		}
+		scale *= 0.85
+	}
+	return nil, errors.New("unable to compress within byte limit")
+}
+
+func flattenToOpaqueRGBA(src image.Image) *image.RGBA {
+	b := src.Bounds()
+	dst := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(dst, dst.Bounds(), &image.Uniform{C: color.White}, image.Point{}, draw.Src)
+	draw.Draw(dst, dst.Bounds(), src, b.Min, draw.Over)
+	return dst
+}
+
+func resizeImageNearest(src image.Image, width, height int) *image.RGBA {
+	sb := src.Bounds()
+	sw := sb.Dx()
+	sh := sb.Dy()
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	if sw == 0 || sh == 0 {
+		return dst
+	}
+	for y := 0; y < height; y++ {
+		sy := sb.Min.Y + (y * sh / height)
+		for x := 0; x < width; x++ {
+			sx := sb.Min.X + (x * sw / width)
+			dst.Set(x, y, src.At(sx, sy))
+		}
+	}
+	return dst
 }
 
 // handleAccountPasswordSet handles both setting an initial password

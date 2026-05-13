@@ -206,7 +206,7 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<input type=\"file\" name=\"profile_image\" accept=\"image/png,image/jpeg,image/gif\" required> <button type=\"submit\" class=\"btn ghost sm\">Upload</button></form></div><div class=\"account-field-note muted\">PNG, JPEG, or GIF. Maximum size: 2 MB.</div></div><div class=\"account-field\"><div class=\"account-field-label\">Username</div><div class=\"account-field-value\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<input type=\"file\" name=\"profile_image\" accept=\"image/png,image/jpeg,image/gif\" required> <button type=\"submit\" class=\"btn ghost sm\">Upload</button></form></div><div class=\"account-field-note muted\">PNG, JPEG, or GIF. Up to 12 MB upload, auto-resized and compressed to a max 2048 px edge and under 2 MB.</div></div><div class=\"account-field\"><div class=\"account-field-label\">Username</div><div class=\"account-field-value\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

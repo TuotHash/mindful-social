@@ -3,6 +3,9 @@ package server
 import (
 	"bytes"
 	"encoding/base64"
+	"image"
+	"image/color"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -59,5 +62,92 @@ func TestAccountProfileImageUpload(t *testing.T) {
 	defer imageResp.Body.Close()
 	if imageResp.StatusCode != http.StatusOK {
 		t.Fatalf("uploaded image status = %d, want 200", imageResp.StatusCode)
+	}
+}
+
+func TestAccountProfileImageUpload_CompressesAndResizes(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	_ = signupAndGetUser(t, c, "charlie", "charlie@example.com", "correct horse battery staple")
+
+	var source bytes.Buffer
+	src := image.NewRGBA(image.Rect(0, 0, 4200, 3200))
+	for y := 0; y < 3200; y++ {
+		for x := 0; x < 4200; x++ {
+			src.SetRGBA(x, y, color.RGBA{
+				R: uint8((x*17 + y*11) % 255),
+				G: uint8((x*29 + y*7) % 255),
+				B: uint8((x*3 + y*23) % 255),
+				A: 255,
+			})
+		}
+	}
+	if err := png.Encode(&source, src); err != nil {
+		t.Fatalf("encode source png: %v", err)
+	}
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	if err := mw.WriteField("gorilla.csrf.Token", fetchCSRFToken(t, c)); err != nil {
+		t.Fatalf("write csrf field: %v", err)
+	}
+	fw, err := mw.CreateFormFile(profileImageFormField, "big.png")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := fw.Write(source.Bytes()); err != nil {
+		t.Fatalf("write source png: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, testTS.URL+"/account/profile-image", &body)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatalf("upload profile image: %v", err)
+	}
+	page := readBody(t, resp)
+	if !strings.Contains(page, "Profile picture updated.") {
+		t.Fatalf("account page missing success message; body: %s", snippet(page))
+	}
+
+	profileBody := readBody(t, get(t, c, "/users/charlie"))
+	if !strings.Contains(profileBody, "/uploads/profiles/") {
+		t.Fatalf("profile should reference uploaded image; body: %s", snippet(profileBody))
+	}
+
+	// Reload account to read the persisted path and inspect the served file.
+	accountBody := readBody(t, get(t, c, "/account"))
+	idx := strings.Index(accountBody, "/uploads/profiles/")
+	if idx < 0 {
+		t.Fatalf("account should reference uploaded image path; body: %s", snippet(accountBody))
+	}
+	rest := accountBody[idx:]
+	end := strings.Index(rest, "\"")
+	if end < 0 {
+		t.Fatalf("malformed uploaded image path in account html")
+	}
+	publicPath := rest[:end]
+
+	imageResp := get(t, c, publicPath)
+	raw := readBody(t, imageResp)
+	if imageResp.StatusCode != http.StatusOK {
+		t.Fatalf("uploaded image status = %d, want 200", imageResp.StatusCode)
+	}
+	if len(raw) > maxCompressedImageBytes {
+		t.Fatalf("compressed image is %d bytes, want <= %d", len(raw), maxCompressedImageBytes)
+	}
+	outImg, _, err := image.Decode(bytes.NewReader([]byte(raw)))
+	if err != nil {
+		t.Fatalf("decode compressed image: %v", err)
+	}
+	b := outImg.Bounds()
+	if b.Dx() > maxProfileImageDimension || b.Dy() > maxProfileImageDimension {
+		t.Fatalf("compressed image dimensions = %dx%d, want max %d", b.Dx(), b.Dy(), maxProfileImageDimension)
 	}
 }
