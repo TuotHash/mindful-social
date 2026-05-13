@@ -2,13 +2,14 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"image"
 	"image/color"
 	"image/draw"
 	_ "image/gif"
 	"image/jpeg"
-	_ "image/jpeg"
 	_ "image/png"
 	"io"
 	"math"
@@ -127,30 +128,42 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
 
+// handleAccountProfileImage accepts a PNG/JPEG/GIF upload, decodes it,
+// downscales and re-encodes it as a JPEG under maxCompressedImageBytes,
+// and stores it at /uploads/profiles/<uid>-<hash>.jpg. The hash in the
+// filename busts the 24-hour Cache-Control set by cacheStatic so a
+// re-upload shows immediately. The previous file is removed on re-upload
+// so the upload dir doesn't accrue orphaned blobs.
 func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	r.Body = http.MaxBytesReader(w, r.Body, maxProfileImageBytes+1024)
 	file, _, err := r.FormFile(profileImageFormField)
 	if err != nil {
-		s.flashAccount(r, "Choose a PNG, JPEG, or GIF image to upload.")
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			s.flashAccount(r, "Profile pictures must be 12 MB or smaller before processing.")
+		} else {
+			s.flashAccount(r, "Choose a PNG, JPEG, or GIF image to upload.")
+		}
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
 	defer file.Close()
 
-	data, err := io.ReadAll(io.LimitReader(file, maxProfileImageBytes+1))
+	data, err := io.ReadAll(file)
 	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			s.flashAccount(r, "Profile pictures must be 12 MB or smaller before processing.")
+			http.Redirect(w, r, "/account", http.StatusSeeOther)
+			return
+		}
 		s.logger.Error("account image: read", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if len(data) == 0 {
 		s.flashAccount(r, "Choose a PNG, JPEG, or GIF image to upload.")
-		http.Redirect(w, r, "/account", http.StatusSeeOther)
-		return
-	}
-	if len(data) > maxProfileImageBytes {
-		s.flashAccount(r, "Profile pictures must be 12 MB or smaller before processing.")
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
@@ -179,7 +192,8 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	name := user.ID.String() + ".jpg"
+	sum := sha256.Sum256(processed)
+	name := user.ID.String() + "-" + hex.EncodeToString(sum[:4]) + ".jpg"
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, processed, profileImageUploadPerm); err != nil {
 		s.logger.Error("account image: write", "err", err)
@@ -187,6 +201,7 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	publicPath := "/uploads/profiles/" + name
+	previousPath := user.ProfileImagePath
 	if err := s.queries.UpdateUserProfileImage(r.Context(), db.UpdateUserProfileImageParams{
 		ID:               user.ID,
 		ProfileImagePath: publicPath,
@@ -195,9 +210,30 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	removePreviousProfileImage(s.cfg.UploadDir, previousPath, publicPath)
 
 	s.successAccount(r, "Profile picture updated.")
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
+// removePreviousProfileImage deletes the file an earlier upload left
+// behind once the database points at a new one. Failures are silent —
+// an orphaned blob is harmless, and we don't want the success flash to
+// flip to an error on what is effectively a cleanup pass.
+func removePreviousProfileImage(uploadDir, previousPath, currentPath string) {
+	const prefix = "/uploads/profiles/"
+	if previousPath == "" || previousPath == currentPath {
+		return
+	}
+	if !strings.HasPrefix(previousPath, prefix) {
+		return
+	}
+	name := strings.TrimPrefix(previousPath, prefix)
+	// Defensive: reject anything that would escape the profiles dir.
+	if name == "" || strings.ContainsRune(name, '/') || strings.Contains(name, "..") {
+		return
+	}
+	_ = os.Remove(filepath.Join(uploadDir, "profiles", name))
 }
 
 func isSupportedProfileImageFormat(format string) bool {
