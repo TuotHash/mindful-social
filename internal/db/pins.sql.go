@@ -97,8 +97,14 @@ SELECT
 FROM user_node_pins p
 JOIN nodes n ON n.id = p.node_id
 WHERE p.user_id = $1
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY p.created_at DESC
 `
+
+type ListPinsByUserParams struct {
+	UserID   uuid.UUID  `json:"user_id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
 
 type ListPinsByUserRow struct {
 	ID        uuid.UUID          `json:"id"`
@@ -112,9 +118,10 @@ type ListPinsByUserRow struct {
 
 // A user's pins with the joined node — for the "On my profile" section on
 // a profile page. Reasonings are loaded separately via ListReasoningsForPins
-// to avoid row-multiplying joins.
-func (q *Queries) ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error) {
-	rows, err := q.db.Query(ctx, listPinsByUser, userID)
+// to avoid row-multiplying joins. node_visible_to() hides pins whose
+// underlying node the viewer isn't entitled to see.
+func (q *Queries) ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error) {
+	rows, err := q.db.Query(ctx, listPinsByUser, arg.UserID, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +153,14 @@ SELECT n.id, n.slug, n.title
 FROM pin_reasonings pr
 JOIN nodes n ON n.id = pr.reasoning_id
 WHERE pr.pin_id = $1
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY pr.created_at ASC
 `
+
+type ListReasoningsForPinParams struct {
+	PinID    uuid.UUID  `json:"pin_id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
 
 type ListReasoningsForPinRow struct {
 	ID    uuid.UUID `json:"id"`
@@ -156,9 +169,9 @@ type ListReasoningsForPinRow struct {
 }
 
 // Reasonings attached to a single pin, oldest-attached first so the order
-// the user added them is preserved.
-func (q *Queries) ListReasoningsForPin(ctx context.Context, pinID uuid.UUID) ([]ListReasoningsForPinRow, error) {
-	rows, err := q.db.Query(ctx, listReasoningsForPin, pinID)
+// the user added them is preserved. Hidden reasonings are filtered out.
+func (q *Queries) ListReasoningsForPin(ctx context.Context, arg ListReasoningsForPinParams) ([]ListReasoningsForPinRow, error) {
+	rows, err := q.db.Query(ctx, listReasoningsForPin, arg.PinID, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,8 +195,14 @@ SELECT pr.pin_id, n.id, n.slug, n.title
 FROM pin_reasonings pr
 JOIN nodes n ON n.id = pr.reasoning_id
 WHERE pr.pin_id = ANY($1::uuid[])
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY pr.created_at ASC
 `
+
+type ListReasoningsForPinsParams struct {
+	PinIds   []uuid.UUID `json:"pin_ids"`
+	ViewerID *uuid.UUID  `json:"viewer_id"`
+}
 
 type ListReasoningsForPinsRow struct {
 	PinID uuid.UUID `json:"pin_id"`
@@ -194,9 +213,9 @@ type ListReasoningsForPinsRow struct {
 
 // Batch-load reasonings for multiple pins at once — used to avoid N+1 when
 // rendering a profile's pin list. Result includes the pin_id so callers
-// can group by pin.
-func (q *Queries) ListReasoningsForPins(ctx context.Context, pinIds []uuid.UUID) ([]ListReasoningsForPinsRow, error) {
-	rows, err := q.db.Query(ctx, listReasoningsForPins, pinIds)
+// can group by pin. Hidden reasonings are filtered out.
+func (q *Queries) ListReasoningsForPins(ctx context.Context, arg ListReasoningsForPinsParams) ([]ListReasoningsForPinsRow, error) {
+	rows, err := q.db.Query(ctx, listReasoningsForPins, arg.PinIds, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}

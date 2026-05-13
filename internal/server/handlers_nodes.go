@@ -356,7 +356,10 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		if row != nil {
 			info := views.PinInfo{Kind: row.Kind}
-			rs, err := s.queries.ListReasoningsForPin(r.Context(), row.ID)
+			rs, err := s.queries.ListReasoningsForPin(r.Context(), db.ListReasoningsForPinParams{
+				PinID:    row.ID,
+				ViewerID: viewerID(r),
+			})
 			if err != nil {
 				s.logger.Error("node detail: pin reasonings", "err", err)
 			} else {
@@ -405,12 +408,17 @@ func (s *Server) handleEdgeHighlight(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.queries.HighlightEdge(r.Context(), db.HighlightEdgeParams{
+	rows, err := s.queries.HighlightEdge(r.Context(), db.HighlightEdgeParams{
 		PovNode: povNode.ID,
 		EdgeID:  edgeID,
-	}); err != nil {
+	})
+	if err != nil {
 		s.logger.Error("highlight edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0 {
+		http.NotFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
@@ -429,12 +437,17 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.queries.UnhighlightEdge(r.Context(), db.UnhighlightEdgeParams{
+	rows, err := s.queries.UnhighlightEdge(r.Context(), db.UnhighlightEdgeParams{
 		PovNode: povNode.ID,
 		EdgeID:  edgeID,
-	}); err != nil {
+	})
+	if err != nil {
 		s.logger.Error("unhighlight edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0 {
+		http.NotFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
@@ -529,9 +542,17 @@ func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.queries.DeleteEdge(r.Context(), edgeID); err != nil {
+	rows, err := s.queries.DeleteEdge(r.Context(), db.DeleteEdgeParams{
+		EdgeID:     edgeID,
+		PageNodeID: pageNode.ID,
+	})
+	if err != nil {
 		s.logger.Error("delete edge", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0 {
+		http.NotFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+pageNode.Slug, http.StatusSeeOther)

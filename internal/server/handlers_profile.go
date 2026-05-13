@@ -44,7 +44,10 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	pins, err := s.queries.ListPinsByUser(r.Context(), user.ID)
+	pins, err := s.queries.ListPinsByUser(r.Context(), db.ListPinsByUserParams{
+		UserID:   user.ID,
+		ViewerID: viewerID(r),
+	})
 	if err != nil {
 		s.logger.Error("profile: list pins", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -117,7 +120,10 @@ func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.
 	if len(pinIDs) == 0 {
 		return out, nil
 	}
-	rs, err := s.queries.ListReasoningsForPins(r.Context(), pinIDs)
+	rs, err := s.queries.ListReasoningsForPins(r.Context(), db.ListReasoningsForPinsParams{
+		PinIds:   pinIDs,
+		ViewerID: viewerID(r),
+	})
 	if err != nil {
 		return nil, err
 	}

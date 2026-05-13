@@ -30,7 +30,10 @@ func (s *Server) handlePinForm(w http.ResponseWriter, r *http.Request) {
 
 	var attached []views.PinReasoning
 	if current != nil {
-		rs, err := s.queries.ListReasoningsForPin(r.Context(), current.ID)
+		rs, err := s.queries.ListReasoningsForPin(r.Context(), db.ListReasoningsForPinParams{
+			PinID:    current.ID,
+			ViewerID: viewerID(r),
+		})
 		if err != nil {
 			s.logger.Error("pin form: list reasonings", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -157,7 +160,10 @@ func (s *Server) handleReasoningPicker(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if current != nil {
-			rs, err := s.queries.ListReasoningsForPin(r.Context(), current.ID)
+			rs, err := s.queries.ListReasoningsForPin(r.Context(), db.ListReasoningsForPinParams{
+				PinID:    current.ID,
+				ViewerID: viewerID(r),
+			})
 			if err == nil {
 				attached = pinReasoningsFromRows(rs)
 			}
@@ -220,7 +226,10 @@ func (s *Server) rerenderPinForm(w http.ResponseWriter, r *http.Request, user *d
 	}
 	var attached []views.PinReasoning
 	if current != nil {
-		if rs, err := s.queries.ListReasoningsForPin(r.Context(), current.ID); err == nil {
+		if rs, err := s.queries.ListReasoningsForPin(r.Context(), db.ListReasoningsForPinParams{
+			PinID:    current.ID,
+			ViewerID: viewerID(r),
+		}); err == nil {
 			attached = pinReasoningsFromRows(rs)
 		}
 	}

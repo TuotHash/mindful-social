@@ -27,7 +27,8 @@ WHERE p.user_id = $1 AND p.node_id = $2;
 -- name: ListPinsByUser :many
 -- A user's pins with the joined node — for the "On my profile" section on
 -- a profile page. Reasonings are loaded separately via ListReasoningsForPins
--- to avoid row-multiplying joins.
+-- to avoid row-multiplying joins. node_visible_to() hides pins whose
+-- underlying node the viewer isn't entitled to see.
 SELECT
     p.id,
     p.node_id,
@@ -38,26 +39,29 @@ SELECT
     n.title AS node_title
 FROM user_node_pins p
 JOIN nodes n ON n.id = p.node_id
-WHERE p.user_id = $1
+WHERE p.user_id = sqlc.arg(user_id)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY p.created_at DESC;
 
 -- name: ListReasoningsForPin :many
 -- Reasonings attached to a single pin, oldest-attached first so the order
--- the user added them is preserved.
+-- the user added them is preserved. Hidden reasonings are filtered out.
 SELECT n.id, n.slug, n.title
 FROM pin_reasonings pr
 JOIN nodes n ON n.id = pr.reasoning_id
-WHERE pr.pin_id = $1
+WHERE pr.pin_id = sqlc.arg(pin_id)
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY pr.created_at ASC;
 
 -- name: ListReasoningsForPins :many
 -- Batch-load reasonings for multiple pins at once — used to avoid N+1 when
 -- rendering a profile's pin list. Result includes the pin_id so callers
--- can group by pin.
+-- can group by pin. Hidden reasonings are filtered out.
 SELECT pr.pin_id, n.id, n.slug, n.title
 FROM pin_reasonings pr
 JOIN nodes n ON n.id = pr.reasoning_id
 WHERE pr.pin_id = ANY(sqlc.arg(pin_ids)::uuid[])
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY pr.created_at ASC;
 
 -- name: DeleteReasoningsForPin :exec

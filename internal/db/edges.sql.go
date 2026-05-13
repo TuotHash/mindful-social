@@ -46,19 +46,29 @@ func (q *Queries) CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, e
 	return i, err
 }
 
-const deleteEdge = `-- name: DeleteEdge :exec
-DELETE FROM edges WHERE id = $1
+const deleteEdge = `-- name: DeleteEdge :execrows
+DELETE FROM edges
+WHERE id = $1
+  AND $2 IN (from_node, to_node)
 `
 
-// Any logged-in user can delete any edge (wiki-open curation, same as
-// highlight/unhighlight). Both endpoints of an edge can trigger this — the
-// page the user is on is just where they get redirected after the delete.
-func (q *Queries) DeleteEdge(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteEdge, id)
-	return err
+type DeleteEdgeParams struct {
+	EdgeID     uuid.UUID `json:"edge_id"`
+	PageNodeID uuid.UUID `json:"page_node_id"`
 }
 
-const highlightEdge = `-- name: HighlightEdge :exec
+// Page-node editors can delete only edges touching the page node they are
+// editing. The handler enforces edit permission on that node; this WHERE
+// clause keeps the edge membership check in the database mutation too.
+func (q *Queries) DeleteEdge(ctx context.Context, arg DeleteEdgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteEdge, arg.EdgeID, arg.PageNodeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const highlightEdge = `-- name: HighlightEdge :execrows
 UPDATE edges AS e
 SET
     position = CASE
@@ -95,9 +105,12 @@ type HighlightEdgeParams struct {
 // card lands at the bottom by default. The "other" endpoint must be a
 // reasoning — the highlights section is for reasonings only. If either
 // check fails the WHERE clause filters the row out and nothing changes.
-func (q *Queries) HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error {
-	_, err := q.db.Exec(ctx, highlightEdge, arg.PovNode, arg.EdgeID)
-	return err
+func (q *Queries) HighlightEdge(ctx context.Context, arg HighlightEdgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, highlightEdge, arg.PovNode, arg.EdgeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listEdgesFromNodeForViewer = `-- name: ListEdgesFromNodeForViewer :many
@@ -306,7 +319,7 @@ func (q *Queries) ListHighlightedEdgesForNode(ctx context.Context, arg ListHighl
 	return items, nil
 }
 
-const unhighlightEdge = `-- name: UnhighlightEdge :exec
+const unhighlightEdge = `-- name: UnhighlightEdge :execrows
 UPDATE edges AS e
 SET
     position    = CASE WHEN e.from_node = $1 THEN NULL ELSE e.position END,
@@ -322,7 +335,10 @@ type UnhighlightEdgeParams struct {
 
 // Reverse of HighlightEdge: clears the rank on whichever side matches
 // pov_node. No-op if pov_node isn't one of the edge's endpoints.
-func (q *Queries) UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error {
-	_, err := q.db.Exec(ctx, unhighlightEdge, arg.PovNode, arg.EdgeID)
-	return err
+func (q *Queries) UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unhighlightEdge, arg.PovNode, arg.EdgeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

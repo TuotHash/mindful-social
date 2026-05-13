@@ -35,8 +35,8 @@ func TestEdgeCreate_AndDisconnect(t *testing.T) {
 
 	edge := singleEdge(t, from, to)
 
-	// Disconnect from the destination side (HTMX-free POST, but still
-	// allowed by the wiki-open delete rule).
+	// Disconnect from the destination side (HTMX-free POST), allowed because
+	// the edge touches the page node the user can edit.
 	resp = formPost(t, c, "/nodes/"+to.String()+"/edges/"+edge.String()+"/delete", url.Values{})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("disconnect: status %d", resp.StatusCode)
@@ -46,6 +46,47 @@ func TestEdgeCreate_AndDisconnect(t *testing.T) {
 	body = readBody(t, get(t, c, "/nodes/"+from.String()))
 	if strings.Contains(body, "Reason B") {
 		t.Fatalf("disconnected edge still rendered on legend; excerpt: %s", snippet(body))
+	}
+}
+
+func TestEdgeMutationsRequireEdgeTouchingPageNode(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	user := signupAndGetUser(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	page := createNode(t, c, "view", "View A", "")
+	from := createNode(t, c, "view", "View B", "")
+	to := createNode(t, c, "reasoning", "Reason C", "Because C is so")
+
+	edge, err := testServer.queries.CreateEdge(t.Context(), db.CreateEdgeParams{
+		FromNode:  from,
+		ToNode:    to,
+		Kind:      db.EdgeKindSupports,
+		CreatedBy: user.ID,
+	})
+	if err != nil {
+		t.Fatalf("create edge: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		path string
+	}{
+		{"delete", "/nodes/" + page.String() + "/edges/" + edge.ID.String() + "/delete"},
+		{"highlight", "/nodes/" + page.String() + "/edges/" + edge.ID.String() + "/highlight"},
+		{"unhighlight", "/nodes/" + page.String() + "/edges/" + edge.ID.String() + "/unhighlight"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := formPost(t, c, tc.path, url.Values{})
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNotFound {
+				t.Fatalf("%s unrelated edge: status %d, want 404", tc.name, resp.StatusCode)
+			}
+		})
+	}
+
+	stillThere := singleEdge(t, from, to)
+	if stillThere != edge.ID {
+		t.Fatalf("unrelated delete removed or changed edge: got %s want %s", stillThere, edge.ID)
 	}
 }
 

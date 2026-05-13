@@ -69,7 +69,7 @@ WHERE (e.from_node = sqlc.arg(node_id) OR e.to_node = sqlc.arg(node_id))
   AND node_visible_to(other.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY pos ASC;
 
--- name: HighlightEdge :exec
+-- name: HighlightEdge :execrows
 -- Promote an edge into the highlights section from the perspective of
 -- `pov_node`, which must be one of the edge's endpoints. The rank is the
 -- next-highest across the existing highlights on that side, so the new
@@ -100,7 +100,7 @@ WHERE e.id = sqlc.arg(edge_id)
         AND other.type = 'reasoning'
   );
 
--- name: UnhighlightEdge :exec
+-- name: UnhighlightEdge :execrows
 -- Reverse of HighlightEdge: clears the rank on whichever side matches
 -- pov_node. No-op if pov_node isn't one of the edge's endpoints.
 UPDATE edges AS e
@@ -110,8 +110,10 @@ SET
 WHERE e.id = sqlc.arg(edge_id)
   AND sqlc.arg(pov_node) IN (e.from_node, e.to_node);
 
--- name: DeleteEdge :exec
--- Any logged-in user can delete any edge (wiki-open curation, same as
--- highlight/unhighlight). Both endpoints of an edge can trigger this — the
--- page the user is on is just where they get redirected after the delete.
-DELETE FROM edges WHERE id = $1;
+-- name: DeleteEdge :execrows
+-- Page-node editors can delete only edges touching the page node they are
+-- editing. The handler enforces edit permission on that node; this WHERE
+-- clause keeps the edge membership check in the database mutation too.
+DELETE FROM edges
+WHERE id = sqlc.arg(edge_id)
+  AND sqlc.arg(page_node_id) IN (from_node, to_node);

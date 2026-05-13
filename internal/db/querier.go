@@ -53,10 +53,10 @@ type Querier interface {
 	// the caller having to remember.
 	DeleteAudienceList(ctx context.Context, arg DeleteAudienceListParams) error
 	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
-	// Any logged-in user can delete any edge (wiki-open curation, same as
-	// highlight/unhighlight). Both endpoints of an edge can trigger this — the
-	// page the user is on is just where they get redirected after the delete.
-	DeleteEdge(ctx context.Context, id uuid.UUID) error
+	// Page-node editors can delete only edges touching the page node they are
+	// editing. The handler enforces edit permission on that node; this WHERE
+	// clause keeps the edge membership check in the database mutation too.
+	DeleteEdge(ctx context.Context, arg DeleteEdgeParams) (int64, error)
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
@@ -96,7 +96,7 @@ type Querier interface {
 	// card lands at the bottom by default. The "other" endpoint must be a
 	// reasoning — the highlights section is for reasonings only. If either
 	// check fails the WHERE clause filters the row out and nothing changes.
-	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) error
+	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) (int64, error)
 	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
 	// Counts only nodes the viewer is allowed to see (public, plus connections-
@@ -143,15 +143,16 @@ type Querier interface {
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
 	// A user's pins with the joined node — for the "On my profile" section on
 	// a profile page. Reasonings are loaded separately via ListReasoningsForPins
-	// to avoid row-multiplying joins.
-	ListPinsByUser(ctx context.Context, userID uuid.UUID) ([]ListPinsByUserRow, error)
+	// to avoid row-multiplying joins. node_visible_to() hides pins whose
+	// underlying node the viewer isn't entitled to see.
+	ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error)
 	// Reasonings attached to a single pin, oldest-attached first so the order
-	// the user added them is preserved.
-	ListReasoningsForPin(ctx context.Context, pinID uuid.UUID) ([]ListReasoningsForPinRow, error)
+	// the user added them is preserved. Hidden reasonings are filtered out.
+	ListReasoningsForPin(ctx context.Context, arg ListReasoningsForPinParams) ([]ListReasoningsForPinRow, error)
 	// Batch-load reasonings for multiple pins at once — used to avoid N+1 when
 	// rendering a profile's pin list. Result includes the pin_id so callers
-	// can group by pin.
-	ListReasoningsForPins(ctx context.Context, pinIds []uuid.UUID) ([]ListReasoningsForPinsRow, error)
+	// can group by pin. Hidden reasonings are filtered out.
+	ListReasoningsForPins(ctx context.Context, arg ListReasoningsForPinsParams) ([]ListReasoningsForPinsRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
@@ -199,7 +200,7 @@ type Querier interface {
 	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
 	// Reverse of HighlightEdge: clears the rank on whichever side matches
 	// pov_node. No-op if pov_node isn't one of the edge's endpoints.
-	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) error
+	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error)
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Keeps the password identity's subject (an email mirror) aligned with the
