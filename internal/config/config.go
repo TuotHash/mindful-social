@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -28,20 +29,30 @@ type Config struct {
 	// and skipped.
 	AdminUsers []string
 
+	// DataDir is the writable base directory for persistent state owned
+	// by the service (currently just uploads, but the natural home for
+	// any future on-disk caches or generated assets). On NixOS this is
+	// the systemd StateDirectory, /var/lib/mindful-social.
+	DataDir string
+
 	// UploadDir stores user-uploaded files served from /uploads/*.
+	// Defaults to $DATA_DIR/uploads; override UPLOAD_DIR to point
+	// elsewhere (e.g. a mounted object-storage bucket).
 	UploadDir string
 }
 
 // Load reads configuration from environment variables.
 // DATABASE_URL is required; everything else has sensible defaults.
 func Load() (Config, error) {
+	dataDir := envOr("DATA_DIR", ".")
 	cfg := Config{
 		ListenAddr:    envOr("LISTEN_ADDR", "127.0.0.1:8080"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
 		SignupEnabled: envBool("SIGNUP_ENABLED", true),
 		AdminUsers:    envList("ADMIN_USERS"),
-		UploadDir:     envOr("UPLOAD_DIR", "uploads"),
+		DataDir:       dataDir,
+		UploadDir:     envOr("UPLOAD_DIR", filepath.Join(dataDir, "uploads")),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

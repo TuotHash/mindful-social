@@ -48,6 +48,7 @@
             export PGDATABASE=mindful_social
             export DATABASE_URL="postgres:///$PGDATABASE?host=$PGHOST&port=$PGPORT"
             export TEST_DATABASE_URL="postgres:///mindful_social_test?host=$PGHOST&port=$PGPORT"
+            export DATA_DIR="$PROJECT_ROOT"
 
             mkdir -p "$PGHOST"
 

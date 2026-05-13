@@ -157,6 +157,9 @@ in {
         LISTEN_ADDR = cfg.listenAddr;
         PUBLIC_BASE_URL = cfg.publicBaseURL;
         SIGNUP_ENABLED = if cfg.signupEnabled then "true" else "false";
+        # Matches StateDirectory below. systemd creates and owns this
+        # path, so it's the one place the sandboxed unit can write.
+        DATA_DIR = "/var/lib/mindful-social";
       }
       // lib.optionalAttrs (cfg.adminUsers != []) {
         ADMIN_USERS = lib.concatStringsSep "," cfg.adminUsers;
