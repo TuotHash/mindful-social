@@ -24,7 +24,7 @@ buildGoModule {
 
   # First-build flow: set this to lib.fakeHash, run `nix build`, then
   # replace with the hash the failed build prints.
-  vendorHash = "sha256-WP/Kk6n3Zw1JbmboPyIv6BOuKrZTaA1qHbiZhv1w1+U=";
+  vendorHash = "sha256-J4chudhkxIu0JHDvkGdg0hWwJHZpGJlXgisCYF1EEdw=";
 
   subPackages = [ "cmd/server" ];
 
