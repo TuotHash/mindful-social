@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
@@ -61,6 +63,7 @@ func (s *Server) handleSignupPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.logger.Info("signup", "user_id", user.ID, "username", user.Username, "method", "password")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -78,6 +81,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	id, err := s.authSvc.AuthenticatePassword(r.Context(), email, password)
 	if err != nil {
+		s.logger.Info("login failed", "email", email, "method", "password", "err", err)
 		render(w, r, views.Login(humanizeAuthErr(err), s.oauthButtons(), email))
 		return
 	}
@@ -87,12 +91,21 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.logger.Info("login", "user_id", id, "method", "password")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	var userID *uuid.UUID
+	if u := currentUser(r); u != nil {
+		id := u.ID
+		userID = &id
+	}
 	if err := auth.LogoutUser(r.Context(), s.sessions); err != nil {
 		s.logger.Warn("logout", "err", err)
+	}
+	if userID != nil {
+		s.logger.Info("logout", "user_id", *userID)
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -169,6 +182,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.logger.Info("login", "user_id", user.ID, "username", user.Username, "method", "oauth", "provider", key)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
