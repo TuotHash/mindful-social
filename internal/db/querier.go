@@ -178,7 +178,7 @@ type Querier interface {
 	ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
-	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error)
+	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Roster for the admin /users page. Recent signups first; staff bubble to
 	// the top so they're easy to find.
