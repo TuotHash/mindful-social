@@ -23,6 +23,12 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
 
+### Content Authoring
+
+- **Markdown node bodies** — Replace plain node body rendering with Markdown support. Use a prebuilt Markdown editor for create/edit forms, with EasyMDE as the preferred fit because it enhances normal textareas, preserves standard form posts, supports preview, and has image upload hooks we can reuse later for node images. Store raw Markdown in `nodes.body`; render server-side with a Markdown parser and sanitize the generated HTML before display.
+
+- **Node image uploads** — After Markdown support lands, add image uploads for node bodies. Uploaded node images should insert Markdown image syntax into the editor, be stored separately from profile images, and respect the node's effective visibility through the node page rather than becoming independently browsable content.
+
 ### Social Foundation
 
 - **Follow system** — One-directional follow with one button. When two users follow each other, they automatically become **connections** (mutuals). No friend requests, no private accounts.

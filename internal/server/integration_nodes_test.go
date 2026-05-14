@@ -22,6 +22,22 @@ func TestNodeCreate_RendersOnDetail(t *testing.T) {
 	}
 }
 
+func TestNodeCreate_RendersMarkdownBodySafely(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, c, "view", "Markdown body", "**important**\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))")
+
+	body := readBody(t, get(t, c, "/nodes/"+id.String()))
+	if !strings.Contains(body, "<strong>important</strong>") {
+		t.Fatalf("detail page missing rendered markdown; excerpt: %s", snippet(body))
+	}
+	lower := strings.ToLower(body)
+	if strings.Contains(lower, "<script>alert") || strings.Contains(lower, `href="javascript:`) {
+		t.Fatalf("detail page rendered unsafe markdown; excerpt: %s", snippet(body))
+	}
+}
+
 func TestNodeDelete_AuthorOnly(t *testing.T) {
 	integrationDB(t)
 	alice := newClient(t)

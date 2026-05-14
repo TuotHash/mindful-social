@@ -113,7 +113,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 	</label>
 	<label>
 		Body
-		<textarea name="body" rows="5">{ formBody }</textarea>
+		<textarea name="body" rows="5" class="markdown-editor">{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words.</small>
 	</label>
 	@nodeVisibilitySelect(formVisibility, lists, groups)
@@ -275,9 +275,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 					<h1 style="margin: 0; min-width: 0;">{ node.Title }</h1>
 					@nodeTypeChip(node.Type)
 				</header>
-				if node.Body != "" {
-					<section class="body" style="margin-top: 14px;">
-						<p>{ node.Body }</p>
+				if nodeMarkdownHasText(node.Body) {
+					<section class="body markdown-body" style="margin-top: 14px;">
+						@NodeMarkdown(node.Body)
 					</section>
 				}
 				if node.SourceUrl != nil && *node.SourceUrl != "" {
@@ -359,8 +359,10 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 								<span class="grow"></span>
 							</header>
 							<h3><a href={ templ.SafeURL("/nodes/" + f.Slug) }>{ f.Title }</a></h3>
-							if f.Body != "" {
-								<p>{ f.Body }</p>
+							if nodeMarkdownHasText(f.Body) {
+								<div class="markdown-body featured-markdown">
+									@NodeMarkdown(f.Body)
+								</div>
 							}
 							if canEdit {
 								<div class="row gap-8 wrap" style="margin-top: 12px;">
@@ -437,7 +439,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 				</label>
 				<label>
 					Body
-					<textarea name="body" rows="6">{ formBody }</textarea>
+					<textarea name="body" rows="6" class="markdown-editor">{ formBody }</textarea>
 					<small>Optional. Describe the node in your own words.</small>
 				</label>
 				if node.Type == db.NodeTypeFinding {
