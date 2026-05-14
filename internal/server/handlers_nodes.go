@@ -603,7 +603,14 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("node deleted", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID)
-	http.Redirect(w, r, "/users/"+user.Username, http.StatusSeeOther)
+	// Authors land back on their own profile; a moderator deleting
+	// someone else's content lands on /admin where the rest of the
+	// moderation surface lives.
+	dest := "/users/" + user.Username
+	if node.CreatedBy != user.ID {
+		dest = "/admin"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
