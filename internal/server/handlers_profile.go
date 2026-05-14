@@ -87,7 +87,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 
 	pinRowsOut, err := s.pinRows(r, pins)
 	if err != nil {
-		s.logger.Error("profile: pin reasonings", "err", err)
+		s.logger.Error("profile: pin findings", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -102,7 +102,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	))
 }
 
-// pinRows turns DB pin rows into view rows, batch-loading reasonings for
+// pinRows turns DB pin rows into view rows, batch-loading findings for
 // all pins in one query to avoid N+1.
 func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.PinRow, error) {
 	out := make([]views.PinRow, 0, len(rows))
@@ -120,21 +120,21 @@ func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.
 	if len(pinIDs) == 0 {
 		return out, nil
 	}
-	rs, err := s.queries.ListReasoningsForPins(r.Context(), db.ListReasoningsForPinsParams{
+	rs, err := s.queries.ListFindingsForPins(r.Context(), db.ListFindingsForPinsParams{
 		PinIds:   pinIDs,
 		ViewerID: viewerID(r),
 	})
 	if err != nil {
 		return nil, err
 	}
-	byPin := map[uuid.UUID][]views.PinReasoning{}
+	byPin := map[uuid.UUID][]views.PinFinding{}
 	for _, row := range rs {
-		byPin[row.PinID] = append(byPin[row.PinID], views.PinReasoning{
+		byPin[row.PinID] = append(byPin[row.PinID], views.PinFinding{
 			ID: row.ID, Slug: row.Slug, Title: row.Title,
 		})
 	}
 	for i, row := range rows {
-		out[i].Reasonings = byPin[row.ID]
+		out[i].Findings = byPin[row.ID]
 	}
 	return out, nil
 }

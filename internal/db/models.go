@@ -125,10 +125,9 @@ func (e NodeActionPolicy) Valid() bool {
 type NodeType string
 
 const (
-	NodeTypeTopic     NodeType = "topic"
-	NodeTypeView      NodeType = "view"
-	NodeTypeReasoning NodeType = "reasoning"
-	NodeTypeEvidence  NodeType = "evidence"
+	NodeTypeTopic   NodeType = "topic"
+	NodeTypeView    NodeType = "view"
+	NodeTypeFinding NodeType = "finding"
 )
 
 func (e *NodeType) Scan(src interface{}) error {
@@ -170,8 +169,7 @@ func (e NodeType) Valid() bool {
 	switch e {
 	case NodeTypeTopic,
 		NodeTypeView,
-		NodeTypeReasoning,
-		NodeTypeEvidence:
+		NodeTypeFinding:
 		return true
 	}
 	return false
@@ -400,10 +398,10 @@ type NodeTag struct {
 	TagID  uuid.UUID `json:"tag_id"`
 }
 
-type PinReasoning struct {
-	PinID       uuid.UUID          `json:"pin_id"`
-	ReasoningID uuid.UUID          `json:"reasoning_id"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+type PinFinding struct {
+	PinID     uuid.UUID          `json:"pin_id"`
+	FindingID uuid.UUID          `json:"finding_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Session struct {

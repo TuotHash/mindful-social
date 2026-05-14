@@ -91,14 +91,14 @@ ORDER BY
     title ASC
 LIMIT 20;
 
--- name: SearchReasonings :many
--- Reasoning picker for the pin form: same fuzzy + recency-fallback shape as
--- SearchTopics, but filtered to type='reasoning'. Returns reasoning nodes
--- the viewer is permitted to see — authorship is irrelevant, anyone can
--- attach any visible reasoning to their pin.
+-- name: SearchFindings :many
+-- Finding picker for the pin form: same fuzzy + recency-fallback shape as
+-- SearchTopics, but filtered to type='finding'. Returns finding nodes the
+-- viewer is permitted to see — authorship is irrelevant, anyone can attach
+-- any visible finding to their pin.
 SELECT id, slug, title
 FROM nodes
-WHERE type = 'reasoning'
+WHERE type = 'finding'
   AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
   AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
 ORDER BY

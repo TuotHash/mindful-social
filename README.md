@@ -2,8 +2,9 @@
 
 A community platform for respectful, mindful conversations. Combines free-form
 discussion with a structured **argument graph**: typed nodes (Topic / View /
-Reasoning / Evidence) connected by typed edges (supports / opposes / refines /
-cites / relates_to). Users commit to views and attach personal reasoning.
+Finding) connected by typed edges (supports / opposes / refines / cites /
+relates_to). Users commit to views and attach findings that explain their
+thinking.
 
 > **Status:** early development — MVP in progress.
 
@@ -84,13 +85,13 @@ nix/module.nix      NixOS module (systemd service + optional Postgres)
 ## Domain model
 
 - **Node** — anything in the graph. `type` is one of `topic`, `view`,
-  `reasoning`, `evidence`. Free-form `tags` add further grouping (domain,
-  nature) without bloating the type system.
+  `finding`. Free-form `tags` add further grouping (domain, nature)
+  without bloating the type system.
 - **Edge** — directed, typed link between two nodes. `kind` is one of
   `supports`, `opposes`, `refines`, `cites`, `relates_to`.
-- **Commitment** — a user pinning themselves to a View, optionally with a
-  personal Reasoning node they authored. Shows on their profile as a feed
-  entry.
+- **Commitment** — a user pinning themselves to a View, optionally with
+  one or more Finding nodes that explain their stance. Shows on their
+  profile as a feed entry.
 
 See [`migrations/00001_initial_schema.sql`](migrations/00001_initial_schema.sql)
 for the full schema.

@@ -10,15 +10,15 @@ import (
 // NodeNew renders the standalone Post form. Used as a fallback for direct
 // URL hits and no-JS clients; the nav button opens NodeNewModal via htmx.
 // Source URL is intentionally absent — only Topic and View are creatable
-// from the Post path; reasoning and evidence are created by attachment to
-// an existing topic or view.
+// from the Post path; findings are created by attachment to an existing
+// topic or view.
 templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
 				<span class="eyebrow">Post</span>
 				<h1 class="h-1">New post</h1>
-				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. Reasoning and evidence are added later as connections off an existing topic or view.</p>
+				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. Findings are added later as connections off an existing topic or view.</p>
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
@@ -47,7 +47,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			</div>
 			<h2 id="post-modal-title" style="margin: 0 0 6px; font-size: 22px;">New post</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
-				Share a view or start a topic. Reasoning and evidence are added later as connections.
+				Share a view or start a topic. Findings are added later as connections.
 			</p>
 			@Flash(flash)
 			<form
@@ -189,7 +189,7 @@ type EdgeGroup struct {
 	Rows  []EdgeRow
 }
 
-// FeaturedRow is one card in the "Key reasoning" section, where the
+// FeaturedRow is one card in the "Key findings" section, where the
 // destination node's body is rendered inline rather than just linked.
 type FeaturedRow struct {
 	EdgeID uuid.UUID
@@ -203,15 +203,15 @@ type FeaturedRow struct {
 }
 
 // PinInfo is non-nil when the current viewer has pinned the node being
-// rendered. Reasonings is empty when the pin has no attached reasoning.
+// rendered. Findings is empty when the pin has no attached finding.
 type PinInfo struct {
-	Kind       db.PinKind
-	Reasonings []PinReasoning
+	Kind     db.PinKind
+	Findings []PinFinding
 }
 
-// PinReasoning is one reasoning node attached to a pin, in the shape the
+// PinFinding is one finding node attached to a pin, in the shape the
 // banner and profile list need to render a link.
-type PinReasoning struct {
+type PinFinding struct {
 	ID    uuid.UUID
 	Slug  string
 	Title string
@@ -323,13 +323,13 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 				if viewer != nil && pin != nil {
 					<div class={ pinBannerClass(pin.Kind) } style="margin-top: 18px;">
 						<strong>{ pinKindLabel(pin.Kind) }.</strong>
-						if len(pin.Reasonings) > 0 {
+						if len(pin.Findings) > 0 {
 							via
-							for i, rs := range pin.Reasonings {
+							for i, f := range pin.Findings {
 								if i > 0 {
 									{ ", " }
 								}
-								<a href={ templ.SafeURL("/nodes/" + rs.Slug) }>{ rs.Title }</a>
+								<a href={ templ.SafeURL("/nodes/" + f.Slug) }>{ f.Title }</a>
 							}
 						}
 						<a
@@ -350,7 +350,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 
 			if len(featured) > 0 {
 				<section class="featured">
-					<h2>Key reasoning</h2>
+					<h2>Key findings</h2>
 					for _, f := range featured {
 						<article class={ "featured-card", "edge-" + string(f.Kind) }>
 							<header class="featured-head">
@@ -396,7 +396,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 										</a>
 										if canEdit {
 											<div class="edge-actions">
-												if r.Type == db.NodeTypeReasoning {
+												if r.Type == db.NodeTypeFinding {
 													<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/edges/" + r.EdgeID.String() + "/highlight") } class="inline">
 														@CSRFField()
 														<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">star_shine</span>Highlight</button>
@@ -440,9 +440,9 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<textarea name="body" rows="6">{ formBody }</textarea>
 					<small>Optional. Describe the node in your own words.</small>
 				</label>
-				if node.Type == db.NodeTypeEvidence {
+				if node.Type == db.NodeTypeFinding {
 					<label>
-						Source URL <small>(required for evidence)</small>
+						Source URL <small>(optional — link to the external evidence, if any)</small>
 						<input type="url" name="source_url" value={ formSourceURL }/>
 					</label>
 				}
@@ -532,15 +532,15 @@ templ visibilitySelect(selected string, lists []db.AudienceList) {
 	</fieldset>
 }
 
-// ReasoningCandidate is one reasoning node row rendered as a checkbox toggle
-// in the pin form's reasoning picker.
-type ReasoningCandidate struct {
+// FindingCandidate is one finding node row rendered as a checkbox toggle
+// in the pin form's finding picker.
+type FindingCandidate struct {
 	ID    uuid.UUID
 	Slug  string
 	Title string
 }
 
-templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) {
 	@Layout("Resonate · "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -550,14 +550,14 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning strin
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — support or oppose — or just feature it. Optionally attach reasonings that explain your thinking.
+					Take a stance — support or oppose — or just feature it. Optionally attach findings that explain your thinking.
 				} else {
 					Feature this on your profile.
 				}
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/pin") } class="form">
-				@pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates)
+				@pinFormFields(node, formKind, findFinding, selectedFindingIDs, attached, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">graphic_eq</span>Resonate</button>
 					<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -572,7 +572,7 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning strin
 // Resonate button opens it in-place). Form submit posts via htmx; on
 // validation error the server re-renders this fragment, on success the
 // handler sets HX-Redirect so htmx does a full page navigation.
-templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+templ PinModal(node db.Node, flash, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -585,7 +585,7 @@ templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReas
 			<h2 id="pin-modal-title" style="margin: 0 0 6px; font-size: 22px;">{ node.Title }</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — or just feature it. Optionally attach reasonings.
+					Take a stance — or just feature it. Optionally attach findings.
 				} else {
 					Feature this on your profile.
 				}
@@ -599,7 +599,7 @@ templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReas
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates)
+				@pinFormFields(node, formKind, findFinding, selectedFindingIDs, attached, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">graphic_eq</span>Resonate</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -611,8 +611,8 @@ templ PinModal(node db.Node, flash, formKind, findReasoning string, selectedReas
 
 // pinFormFields is the shared body of PinForm (standalone page) and
 // PinModal (htmx modal). For views it offers support / oppose / feature
-// plus a reasoning picker; for other node types only "feature" applies.
-templ pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
+// plus a finding picker; for other node types only "feature" applies.
+templ pinFormFields(node db.Node, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) {
 	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Stance</legend>
@@ -638,12 +638,12 @@ templ pinFormFields(node db.Node, formKind, findReasoning string, selectedReason
 	</fieldset>
 	if node.Type == db.NodeTypeView {
 		<fieldset class="toggle-group">
-			<legend>Reasonings <small>(optional, multiple allowed)</small></legend>
+			<legend>Findings <small>(optional, multiple allowed)</small></legend>
 			if len(attached) > 0 {
 				<div class="toggle-btns toggle-btns-stack">
 					for _, a := range attached {
-						<label class="toggle-btn" data-reasoning="attached">
-							<input type="checkbox" name="reasoning_ids" value={ a.ID.String() } checked/>
+						<label class="toggle-btn" data-finding="attached">
+							<input type="checkbox" name="finding_ids" value={ a.ID.String() } checked/>
 							<span class="material-symbols-outlined">psychology</span>
 							{ a.Title }
 						</label>
@@ -652,31 +652,31 @@ templ pinFormFields(node db.Node, formKind, findReasoning string, selectedReason
 				<small class="muted" style="font-size: 12px;">Currently attached. Untick to remove.</small>
 			}
 			<label>
-				Find more reasonings to attach
+				Find more findings to attach
 				<input
 					type="search"
-					name="find_reasoning"
-					value={ findReasoning }
-					placeholder="search reasoning titles…"
+					name="find_finding"
+					value={ findFinding }
+					placeholder="search finding titles…"
 					autocomplete="off"
-					hx-get={ "/nodes/" + node.Slug + "/reasoning-picker" }
+					hx-get={ "/nodes/" + node.Slug + "/finding-picker" }
 					hx-trigger="input changed delay:200ms, search"
-					hx-target="#reasoning-picker-target"
+					hx-target="#finding-picker-target"
 					hx-swap="outerHTML"
-					hx-include="[name='find_reasoning'],[name='reasoning_ids']"
+					hx-include="[name='find_finding'],[name='finding_ids']"
 				/>
 			</label>
-			@ReasoningCandidatePicker(findReasoning, selectedReasoningIDs, attached, candidates)
+			@FindingCandidatePicker(findFinding, selectedFindingIDs, attached, candidates)
 		</fieldset>
 	}
 }
 
-// ReasoningCandidatePicker renders the reasoning search results. Stable id
-// lets HTMX swap it on each keystroke. Reasonings already attached to the
+// FindingCandidatePicker renders the finding search results. Stable id
+// lets HTMX swap it on each keystroke. Findings already attached to the
 // pin (or selected in this form session) are filtered out so the picker
 // only shows new options to add.
-templ ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) {
-	<div id="reasoning-picker-target">
+templ FindingCandidatePicker(find string, selectedIDs []string, attached []PinFinding, candidates []FindingCandidate) {
+	<div id="finding-picker-target">
 		{{
 			exclude := map[string]struct{}{}
 			for _, a := range attached {
@@ -685,7 +685,7 @@ templ ReasoningCandidatePicker(find string, selectedIDs []string, attached []Pin
 			for _, id := range selectedIDs {
 				exclude[id] = struct{}{}
 			}
-			visible := make([]ReasoningCandidate, 0, len(candidates))
+			visible := make([]FindingCandidate, 0, len(candidates))
 			for _, c := range candidates {
 				if _, hit := exclude[c.ID.String()]; !hit {
 					visible = append(visible, c)
@@ -693,16 +693,16 @@ templ ReasoningCandidatePicker(find string, selectedIDs []string, attached []Pin
 			}
 		}}
 		if find == "" && len(visible) == 0 {
-			<p class="muted" style="font-size: 13px;">No more reasonings to attach. Start typing to search.</p>
+			<p class="muted" style="font-size: 13px;">No more findings to attach. Start typing to search.</p>
 		}
 		if find != "" && len(visible) == 0 {
-			<p class="muted" style="font-size: 13px;">No reasonings match that query.</p>
+			<p class="muted" style="font-size: 13px;">No findings match that query.</p>
 		}
 		if len(visible) > 0 {
 			<div class="toggle-btns toggle-btns-stack">
 				for _, c := range visible {
-					<label class="toggle-btn" data-reasoning="candidate">
-						<input type="checkbox" name="reasoning_ids" value={ c.ID.String() }/>
+					<label class="toggle-btn" data-finding="candidate">
+						<input type="checkbox" name="finding_ids" value={ c.ID.String() }/>
 						<span class="material-symbols-outlined">psychology</span>
 						{ c.Title }
 					</label>
@@ -876,7 +876,7 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 			<ul class="muted" style="margin: 0 0 24px; padding-left: 20px; line-height: 1.7;">
 				<li>{ cascadeEdgeLabel(edgeCount) } will be removed.</li>
 				<li>{ cascadePinLabel(otherPinCount) }</li>
-				<li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li>
+				<li>Findings attached to other users' pins will detach (the pins survive without a finding).</li>
 				<li>Tags lose their link to this node, but the tags themselves remain.</li>
 			</ul>
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="form">

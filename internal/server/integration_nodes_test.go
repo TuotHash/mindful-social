@@ -58,27 +58,24 @@ func TestNodeDelete_AuthorOnly(t *testing.T) {
 	resp.Body.Close()
 }
 
-func TestNodeCreate_RejectsReasoningAndEvidence(t *testing.T) {
-	// The Post path is intentionally limited to topics and views — reasoning
-	// and evidence are created later as connections off an existing node.
-	// Direct POSTs of those types should re-render with a flash, not create
-	// a row.
+func TestNodeCreate_RejectsFinding(t *testing.T) {
+	// The Post path is intentionally limited to topics and views — findings
+	// are created later as connections off an existing node. Direct POSTs of
+	// 'finding' should re-render with a flash, not create a row.
 	integrationDB(t)
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
 
-	for _, ty := range []string{"reasoning", "evidence"} {
-		resp := formPost(t, c, "/nodes", url.Values{
-			"type":  {ty},
-			"title": {"Should not create"},
-		})
-		body := readBody(t, resp)
-		if !strings.Contains(body, "View or Topic") {
-			t.Fatalf("type=%s: expected flash about View or Topic, got: %s", ty, snippet(body))
-		}
-		if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
-			t.Fatalf("type=%s: unexpected redirect to %s", ty, resp.Request.URL.Path)
-		}
+	resp := formPost(t, c, "/nodes", url.Values{
+		"type":  {"finding"},
+		"title": {"Should not create"},
+	})
+	body := readBody(t, resp)
+	if !strings.Contains(body, "View or Topic") {
+		t.Fatalf("expected flash about View or Topic, got: %s", snippet(body))
+	}
+	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
+		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
 	}
 }
 

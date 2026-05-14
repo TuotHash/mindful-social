@@ -8,15 +8,14 @@ This document outlines upcoming features beyond the MVP.
 
 Topics are the centre of the graph — the source around which nodes and discussions flow. All other node types must be anchored to one.
 
-- **Fix pin form** — Remove the reasoning-node picker from the pin/stance form. Pinning is a simple three-way stance: Support, Oppose, or Feature. No nested reasoning attachment. Topics can only be Featured (support/oppose don't apply to a grouping node).
+- **Fix pin form** — Remove the finding-node picker from the pin/stance form. Pinning is a simple three-way stance: Support, Oppose, or Feature. No nested finding attachment. Topics can only be Featured (support/oppose don't apply to a grouping node).
 
 - **Enforced parent connections** — Each non-topic node type must declare a parent at creation time:
   - **View** → must connect to a parent **Topic** (a view is a stance inside a topic's discussion)
-  - **Reasoning** → must connect to a parent **View** (reasoning argues for or against a specific view)
-  - **Evidence** → must connect to a parent **View** or **Reasoning** (evidence cites or supports a specific claim)
+  - **Finding** → must connect to a parent **View** or another **Finding** (a finding argues for or against a specific claim, or refines another finding)
   - Topics have no required parent; they are root nodes.
 
-- **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and reasoning as a single unit. Individual topics and evidence can still be featured standalone; the bundle is an additive display mode on top.
+- **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
 
 ### Social Foundation
 
@@ -42,7 +41,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Central graph engine** — A single interactive graph viewer that renders different slices of the argument graph depending on the active view and filters. All graph modes below are powered by this shared engine.
 
-- **Personal graph view** — Shows a user's own nodes, pins (supports/opposes), and reasoning threads. Starting point for understanding one's own argument landscape.
+- **Personal graph view** — Shows a user's own nodes, pins (supports/opposes), and finding threads. Starting point for understanding one's own argument landscape.
 
 - **Friends / social bubble view** — Shows the combined graph of people you follow. Highlights where your positions overlap, conflict, or are unconnected with the people in your network.
 
@@ -50,7 +49,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Graph filters** — Once a view is selected, users can narrow the graph further by:
   - **Topic** — filter to nodes tagged under a specific subject area
-  - **Node type** — show only View nodes, Claim nodes, Reasoning nodes, etc.
+  - **Node type** — show only Topic, View, or Finding nodes
   - **Person** — overlay or isolate the nodes of a specific user
 
 - **Graph search** — Full-text search across visible nodes and edges directly within the graph view. Matching nodes are highlighted in place so the user can see them in context rather than jumping to a list.
@@ -59,7 +58,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 - **Threads on View nodes** — Each view node becomes a host for a discussion thread. Users can comment, reply, and build conversations anchored to specific views in the argument graph.
 
-- **Threads on Reasoning nodes** — Similar to views, reasoning nodes can host threaded discussions, allowing users to debate and refine the logic behind specific arguments.
+- **Threads on Finding nodes** — Similar to views, finding nodes can host threaded discussions, allowing users to debate and refine the logic or evidence behind specific arguments.
 
 ### Voting & Engagement
 
@@ -91,7 +90,7 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 ### Groups & Communities
 
-- **Shared spaces** — A group is a multi-member home for views, discussions, and reasoning that members share with each other rather than with the wider public. Friends, study groups, research teams, or any cluster of people who want a shared canvas can have one. Distinct from audience lists: a list is a *recipient set* you control privately; a group is a *collaborative space* every member sees.
+- **Shared spaces** — A group is a multi-member home for views, discussions, and findings that members share with each other rather than with the wider public. Friends, study groups, research teams, or any cluster of people who want a shared canvas can have one. Distinct from audience lists: a list is a *recipient set* you control privately; a group is a *collaborative space* every member sees.
 
 - **Membership & visibility** — Each group has an owner (or co-owners), a roster of members, and per-group visibility for the group itself (public, invite-only, closed). Nodes posted into a group default to group-scope visibility — visible to members only — but a member can also publish a node beyond the group if they choose.
 
@@ -110,4 +109,4 @@ Topics are the centre of the graph — the source around which nodes and discuss
 
 ## More
 
-- Reenable reasoning and evidence node creation inside the Connect menu
+- Reenable finding node creation inside the Connect menu

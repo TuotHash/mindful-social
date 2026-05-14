@@ -217,7 +217,7 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}/edges/{edgeID}/unhighlight", s.handleEdgeUnhighlight)
 		r.Post("/nodes/{id}/edges/{edgeID}/delete", s.handleEdgeDelete)
 		r.Get("/nodes/{id}/pin", s.handlePinForm)
-		r.Get("/nodes/{id}/reasoning-picker", s.handleReasoningPicker)
+		r.Get("/nodes/{id}/finding-picker", s.handleFindingPicker)
 		r.Post("/nodes/{id}/pin", s.handlePinSet)
 		r.Post("/nodes/{id}/unpin", s.handlePinDelete)
 		r.Post("/users/{username}/follow", s.handleFollow)

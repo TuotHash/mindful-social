@@ -20,11 +20,10 @@ func TestParsePinKind(t *testing.T) {
 		{"opposes on view", "opposes", db.NodeTypeView, db.PinKindOpposes, false},
 		{"featured on view", "featured", db.NodeTypeView, db.PinKindFeatured, false},
 		{"featured on topic", "featured", db.NodeTypeTopic, db.PinKindFeatured, false},
-		{"featured on reasoning", "featured", db.NodeTypeReasoning, db.PinKindFeatured, false},
-		{"featured on evidence", "featured", db.NodeTypeEvidence, db.PinKindFeatured, false},
+		{"featured on finding", "featured", db.NodeTypeFinding, db.PinKindFeatured, false},
 		{"supports on topic rejected", "supports", db.NodeTypeTopic, "", true},
-		{"opposes on reasoning rejected", "opposes", db.NodeTypeReasoning, "", true},
-		{"supports on evidence rejected", "supports", db.NodeTypeEvidence, "", true},
+		{"opposes on finding rejected", "opposes", db.NodeTypeFinding, "", true},
+		{"supports on finding rejected", "supports", db.NodeTypeFinding, "", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

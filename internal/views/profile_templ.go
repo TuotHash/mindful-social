@@ -27,14 +27,14 @@ func followingLabel(n int64) string {
 }
 
 // PinRow is one entry in the "On profile" section: the pinned node, the
-// kind of pin (supports / opposes / featured), and any attached reasonings.
+// kind of pin (supports / opposes / featured), and any attached findings.
 type PinRow struct {
-	NodeID     uuid.UUID
-	NodeSlug   string
-	NodeType   db.NodeType
-	NodeTitle  string
-	Kind       db.PinKind
-	Reasonings []PinReasoning
+	NodeID    uuid.UUID
+	NodeSlug  string
+	NodeType  db.NodeType
+	NodeTitle string
+	Kind      db.PinKind
+	Findings  []PinFinding
 }
 
 // FollowRelation captures the follow relationship between the viewer and
@@ -396,12 +396,12 @@ func Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, p
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					if len(p.Reasonings) > 0 {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"pin-reasoning\">via ")
+					if len(p.Findings) > 0 {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"pin-finding\">via ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						for i, rs := range p.Reasonings {
+						for i, f := range p.Findings {
 							if i > 0 {
 								var templ_7745c5c3_Var17 string
 								templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(", ")
@@ -418,9 +418,9 @@ func Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, p
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var18 templ.SafeURL
-							templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + rs.Slug))
+							templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + f.Slug))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/profile.templ`, Line: 143, Col: 56}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/profile.templ`, Line: 143, Col: 55}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 							if templ_7745c5c3_Err != nil {
@@ -431,9 +431,9 @@ func Profile(viewer *Viewer, profile db.User, isSelf bool, authored []db.Node, p
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var19 string
-							templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(rs.Title)
+							templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(f.Title)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/profile.templ`, Line: 143, Col: 69}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/profile.templ`, Line: 143, Col: 67}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 							if templ_7745c5c3_Err != nil {

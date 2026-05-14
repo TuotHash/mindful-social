@@ -17,7 +17,7 @@ func TestEdgeCreate_AndDisconnect(t *testing.T) {
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
 	from := createNode(t, c, "view", "View A", "")
-	to := createNode(t, c, "reasoning", "Reason B", "Because B is so")
+	to := createNode(t, c, "finding", "Reason B", "Because B is so")
 
 	resp := formPost(t, c, "/nodes/"+from.String()+"/edges", url.Values{
 		"kind":  {"supports"},
@@ -55,7 +55,7 @@ func TestEdgeMutationsRequireEdgeTouchingPageNode(t *testing.T) {
 	user := signupAndGetUser(t, c, "alice", "alice@example.com", "correct horse battery staple")
 	page := createNode(t, c, "view", "View A", "")
 	from := createNode(t, c, "view", "View B", "")
-	to := createNode(t, c, "reasoning", "Reason C", "Because C is so")
+	to := createNode(t, c, "finding", "Reason C", "Because C is so")
 
 	edge, err := testServer.queries.CreateEdge(t.Context(), db.CreateEdgeParams{
 		FromNode:  from,
@@ -95,7 +95,7 @@ func TestEdgeCreate_DuplicateRejected(t *testing.T) {
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
 	from := createNode(t, c, "view", "View A", "")
-	to := createNode(t, c, "reasoning", "Reason B", "")
+	to := createNode(t, c, "finding", "Reason B", "")
 
 	resp := formPost(t, c, "/nodes/"+from.String()+"/edges", url.Values{
 		"kind":  {"supports"},

@@ -123,12 +123,12 @@ func signupAndGetUser(t *testing.T, c *http.Client, username, email, password st
 
 // createNode is a convenience for tests that need a node to operate on.
 // Returns the node's id. Always logs in `c` first via signup if needed.
-// Only "topic" and "view" go through the public Post path; for reasoning
-// and evidence (which are normally created by attachment) the helper
-// inserts directly via the DB layer.
+// Only "topic" and "view" go through the public Post path; for findings
+// (which are normally created by attachment) the helper inserts directly
+// via the DB layer.
 func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid.UUID {
 	t.Helper()
-	if nodeType == "reasoning" || nodeType == "evidence" {
+	if nodeType == "finding" {
 		return createNodeDirect(t, c, nodeType, title, body)
 	}
 	vals := url.Values{
@@ -165,10 +165,10 @@ func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid
 }
 
 // createNodeDirect inserts a node via the DB layer, bypassing the Post
-// form's topic/view restriction. Used by tests that need reasoning or
-// evidence nodes — those types are normally created by attachment, but
-// the underlying schema and edge system still support them. The signed-in
-// user is identified by scraping the home page nav for the user link.
+// form's topic/view restriction. Used by tests that need finding nodes —
+// findings are normally created by attachment, but the underlying schema
+// and edge system still support them. The signed-in user is identified by
+// scraping the home page nav for the user link.
 func createNodeDirect(t *testing.T, c *http.Client, nodeType, title, body string) uuid.UUID {
 	t.Helper()
 	homeBody := readBody(t, get(t, c, "/"))
@@ -186,16 +186,11 @@ func createNodeDirect(t *testing.T, c *http.Client, nodeType, title, body string
 	if err != nil {
 		t.Fatalf("createNodeDirect: lookup user %q: %v", rest[:end], err)
 	}
-	var srcPtr *string
-	if nodeType == "evidence" {
-		src := "https://example.test/source"
-		srcPtr = &src
-	}
 	node, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
 		Type:       db.NodeType(nodeType),
 		Title:      title,
 		Body:       body,
-		SourceUrl:  srcPtr,
+		SourceUrl:  nil,
 		CreatedBy:  user.ID,
 		Slug:       "direct-" + uuid.NewString()[:8],
 		Visibility: db.VisibilityKindPublic,

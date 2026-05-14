@@ -12,21 +12,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addPinReasoning = `-- name: AddPinReasoning :exec
-INSERT INTO pin_reasonings (pin_id, reasoning_id)
+const addPinFinding = `-- name: AddPinFinding :exec
+INSERT INTO pin_findings (pin_id, finding_id)
 VALUES ($1, $2)
-ON CONFLICT (pin_id, reasoning_id) DO NOTHING
+ON CONFLICT (pin_id, finding_id) DO NOTHING
 `
 
-type AddPinReasoningParams struct {
-	PinID       uuid.UUID `json:"pin_id"`
-	ReasoningID uuid.UUID `json:"reasoning_id"`
+type AddPinFindingParams struct {
+	PinID     uuid.UUID `json:"pin_id"`
+	FindingID uuid.UUID `json:"finding_id"`
 }
 
-// Attach one reasoning to a pin. ON CONFLICT DO NOTHING so the same
-// (pin, reasoning) pair is a harmless retry rather than an error.
-func (q *Queries) AddPinReasoning(ctx context.Context, arg AddPinReasoningParams) error {
-	_, err := q.db.Exec(ctx, addPinReasoning, arg.PinID, arg.ReasoningID)
+// Attach one finding to a pin. ON CONFLICT DO NOTHING so the same
+// (pin, finding) pair is a harmless retry rather than an error.
+func (q *Queries) AddPinFinding(ctx context.Context, arg AddPinFindingParams) error {
+	_, err := q.db.Exec(ctx, addPinFinding, arg.PinID, arg.FindingID)
+	return err
+}
+
+const deleteFindingsForPin = `-- name: DeleteFindingsForPin :exec
+DELETE FROM pin_findings WHERE pin_id = $1
+`
+
+// Clear all attached findings for a pin. Combined with AddPinFinding
+// this implements "replace the set" semantics for the pin form.
+func (q *Queries) DeleteFindingsForPin(ctx context.Context, pinID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteFindingsForPin, pinID)
 	return err
 }
 
@@ -41,17 +52,6 @@ type DeletePinParams struct {
 
 func (q *Queries) DeletePin(ctx context.Context, arg DeletePinParams) error {
 	_, err := q.db.Exec(ctx, deletePin, arg.UserID, arg.NodeID)
-	return err
-}
-
-const deleteReasoningsForPin = `-- name: DeleteReasoningsForPin :exec
-DELETE FROM pin_reasonings WHERE pin_id = $1
-`
-
-// Clear all attached reasonings for a pin. Combined with AddPinReasoning
-// this implements "replace the set" semantics for the pin form.
-func (q *Queries) DeleteReasoningsForPin(ctx context.Context, pinID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteReasoningsForPin, pinID)
 	return err
 }
 
@@ -75,14 +75,105 @@ type GetPinForUserAndNodeRow struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-// Whether and how the viewer has pinned a given node. Attached reasonings
-// are loaded separately via ListReasoningsForPin so the same shape covers
-// 0, 1, or many reasonings without nested aggregation here.
+// Whether and how the viewer has pinned a given node. Attached findings
+// are loaded separately via ListFindingsForPin so the same shape covers
+// 0, 1, or many findings without nested aggregation here.
 func (q *Queries) GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error) {
 	row := q.db.QueryRow(ctx, getPinForUserAndNode, arg.UserID, arg.NodeID)
 	var i GetPinForUserAndNodeRow
 	err := row.Scan(&i.ID, &i.Kind, &i.CreatedAt)
 	return i, err
+}
+
+const listFindingsForPin = `-- name: ListFindingsForPin :many
+SELECT n.id, n.slug, n.title
+FROM pin_findings pf
+JOIN nodes n ON n.id = pf.finding_id
+WHERE pf.pin_id = $1
+  AND node_visible_to(n.*, $2::uuid)
+ORDER BY pf.created_at ASC
+`
+
+type ListFindingsForPinParams struct {
+	PinID    uuid.UUID  `json:"pin_id"`
+	ViewerID *uuid.UUID `json:"viewer_id"`
+}
+
+type ListFindingsForPinRow struct {
+	ID    uuid.UUID `json:"id"`
+	Slug  string    `json:"slug"`
+	Title string    `json:"title"`
+}
+
+// Findings attached to a single pin, oldest-attached first so the order
+// the user added them is preserved. Hidden findings are filtered out.
+func (q *Queries) ListFindingsForPin(ctx context.Context, arg ListFindingsForPinParams) ([]ListFindingsForPinRow, error) {
+	rows, err := q.db.Query(ctx, listFindingsForPin, arg.PinID, arg.ViewerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFindingsForPinRow
+	for rows.Next() {
+		var i ListFindingsForPinRow
+		if err := rows.Scan(&i.ID, &i.Slug, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFindingsForPins = `-- name: ListFindingsForPins :many
+SELECT pf.pin_id, n.id, n.slug, n.title
+FROM pin_findings pf
+JOIN nodes n ON n.id = pf.finding_id
+WHERE pf.pin_id = ANY($1::uuid[])
+  AND node_visible_to(n.*, $2::uuid)
+ORDER BY pf.created_at ASC
+`
+
+type ListFindingsForPinsParams struct {
+	PinIds   []uuid.UUID `json:"pin_ids"`
+	ViewerID *uuid.UUID  `json:"viewer_id"`
+}
+
+type ListFindingsForPinsRow struct {
+	PinID uuid.UUID `json:"pin_id"`
+	ID    uuid.UUID `json:"id"`
+	Slug  string    `json:"slug"`
+	Title string    `json:"title"`
+}
+
+// Batch-load findings for multiple pins at once — used to avoid N+1 when
+// rendering a profile's pin list. Result includes the pin_id so callers
+// can group by pin. Hidden findings are filtered out.
+func (q *Queries) ListFindingsForPins(ctx context.Context, arg ListFindingsForPinsParams) ([]ListFindingsForPinsRow, error) {
+	rows, err := q.db.Query(ctx, listFindingsForPins, arg.PinIds, arg.ViewerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFindingsForPinsRow
+	for rows.Next() {
+		var i ListFindingsForPinsRow
+		if err := rows.Scan(
+			&i.PinID,
+			&i.ID,
+			&i.Slug,
+			&i.Title,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPinsByUser = `-- name: ListPinsByUser :many
@@ -117,7 +208,7 @@ type ListPinsByUserRow struct {
 }
 
 // A user's pins with the joined node — for the "On my profile" section on
-// a profile page. Reasonings are loaded separately via ListReasoningsForPins
+// a profile page. Findings are loaded separately via ListFindingsForPins
 // to avoid row-multiplying joins. node_visible_to() hides pins whose
 // underlying node the viewer isn't entitled to see.
 func (q *Queries) ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error) {
@@ -148,97 +239,6 @@ func (q *Queries) ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) 
 	return items, nil
 }
 
-const listReasoningsForPin = `-- name: ListReasoningsForPin :many
-SELECT n.id, n.slug, n.title
-FROM pin_reasonings pr
-JOIN nodes n ON n.id = pr.reasoning_id
-WHERE pr.pin_id = $1
-  AND node_visible_to(n.*, $2::uuid)
-ORDER BY pr.created_at ASC
-`
-
-type ListReasoningsForPinParams struct {
-	PinID    uuid.UUID  `json:"pin_id"`
-	ViewerID *uuid.UUID `json:"viewer_id"`
-}
-
-type ListReasoningsForPinRow struct {
-	ID    uuid.UUID `json:"id"`
-	Slug  string    `json:"slug"`
-	Title string    `json:"title"`
-}
-
-// Reasonings attached to a single pin, oldest-attached first so the order
-// the user added them is preserved. Hidden reasonings are filtered out.
-func (q *Queries) ListReasoningsForPin(ctx context.Context, arg ListReasoningsForPinParams) ([]ListReasoningsForPinRow, error) {
-	rows, err := q.db.Query(ctx, listReasoningsForPin, arg.PinID, arg.ViewerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListReasoningsForPinRow
-	for rows.Next() {
-		var i ListReasoningsForPinRow
-		if err := rows.Scan(&i.ID, &i.Slug, &i.Title); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listReasoningsForPins = `-- name: ListReasoningsForPins :many
-SELECT pr.pin_id, n.id, n.slug, n.title
-FROM pin_reasonings pr
-JOIN nodes n ON n.id = pr.reasoning_id
-WHERE pr.pin_id = ANY($1::uuid[])
-  AND node_visible_to(n.*, $2::uuid)
-ORDER BY pr.created_at ASC
-`
-
-type ListReasoningsForPinsParams struct {
-	PinIds   []uuid.UUID `json:"pin_ids"`
-	ViewerID *uuid.UUID  `json:"viewer_id"`
-}
-
-type ListReasoningsForPinsRow struct {
-	PinID uuid.UUID `json:"pin_id"`
-	ID    uuid.UUID `json:"id"`
-	Slug  string    `json:"slug"`
-	Title string    `json:"title"`
-}
-
-// Batch-load reasonings for multiple pins at once — used to avoid N+1 when
-// rendering a profile's pin list. Result includes the pin_id so callers
-// can group by pin. Hidden reasonings are filtered out.
-func (q *Queries) ListReasoningsForPins(ctx context.Context, arg ListReasoningsForPinsParams) ([]ListReasoningsForPinsRow, error) {
-	rows, err := q.db.Query(ctx, listReasoningsForPins, arg.PinIds, arg.ViewerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListReasoningsForPinsRow
-	for rows.Next() {
-		var i ListReasoningsForPinsRow
-		if err := rows.Scan(
-			&i.PinID,
-			&i.ID,
-			&i.Slug,
-			&i.Title,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const setPin = `-- name: SetPin :one
 INSERT INTO user_node_pins (user_id, node_id, kind)
 VALUES ($1, $2, $3)
@@ -257,7 +257,7 @@ type SetPinParams struct {
 // Upsert: changing your stance from supports → opposes (or any other
 // transition) replaces the existing row in place. created_at is reset on
 // update so the profile shows the most recent stance change first. Returns
-// the pin's id so callers can attach reasonings to it.
+// the pin's id so callers can attach findings to it.
 func (q *Queries) SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, setPin, arg.UserID, arg.NodeID, arg.Kind)
 	var id uuid.UUID

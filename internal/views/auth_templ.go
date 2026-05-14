@@ -254,7 +254,7 @@ func Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) t
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = authShell("Bring your reasoning.", "Pick a handle. We'll never email you marketing.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = authShell("Bring your findings.", "Pick a handle. We'll never email you marketing.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -473,7 +473,7 @@ func Login(flash string, oauth []OAuthButton, formEmail string) templ.Component 
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = authShell("Welcome back.", "Sign in to keep your reasoning where you left it.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = authShell("Welcome back.", "Sign in to pick up where you left off.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

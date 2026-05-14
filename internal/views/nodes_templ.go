@@ -18,8 +18,8 @@ import (
 // NodeNew renders the standalone Post form. Used as a fallback for direct
 // URL hits and no-JS clients; the nav button opens NodeNewModal via htmx.
 // Source URL is intentionally absent — only Topic and View are creatable
-// from the Post path; reasoning and evidence are created by attachment to
-// an existing topic or view.
+// from the Post path; findings are created by attachment to an existing
+// topic or view.
 func NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -53,7 +53,7 @@ func NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPi
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"page narrow\"><div class=\"col gap-12\" style=\"margin-bottom: 24px;\"><span class=\"eyebrow\">Post</span><h1 class=\"h-1\">New post</h1><p class=\"muted\" style=\"margin: 0;\">A view is a stance — that's the standard post. A topic groups views together. Reasoning and evidence are added later as connections off an existing topic or view.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"page narrow\"><div class=\"col gap-12\" style=\"margin-bottom: 24px;\"><span class=\"eyebrow\">Post</span><h1 class=\"h-1\">New post</h1><p class=\"muted\" style=\"margin: 0;\">A view is a stance — that's the standard post. A topic groups views together. Findings are added later as connections off an existing topic or view.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -108,7 +108,7 @@ func NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"modal-backdrop\" onclick=\"if(event.target===this)document.getElementById('modal').innerHTML=''\"><div class=\"modal-dialog\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"post-modal-title\"><button type=\"button\" class=\"modal-close\" aria-label=\"Close\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span></button><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 6px;\"><span class=\"eyebrow\">Post</span></div><h2 id=\"post-modal-title\" style=\"margin: 0 0 6px; font-size: 22px;\">New post</h2><p class=\"muted\" style=\"margin: 0 0 18px; font-size: 13px;\">Share a view or start a topic. Reasoning and evidence are added later as connections.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"modal-backdrop\" onclick=\"if(event.target===this)document.getElementById('modal').innerHTML=''\"><div class=\"modal-dialog\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"post-modal-title\"><button type=\"button\" class=\"modal-close\" aria-label=\"Close\" onclick=\"document.getElementById('modal').innerHTML=''\"><span class=\"material-symbols-outlined\">close</span></button><div class=\"row gap-12 wrap center\" style=\"margin-bottom: 6px;\"><span class=\"eyebrow\">Post</span></div><h2 id=\"post-modal-title\" style=\"margin: 0 0 6px; font-size: 22px;\">New post</h2><p class=\"muted\" style=\"margin: 0 0 18px; font-size: 13px;\">Share a view or start a topic. Findings are added later as connections.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -340,7 +340,7 @@ type EdgeGroup struct {
 	Rows  []EdgeRow
 }
 
-// FeaturedRow is one card in the "Key reasoning" section, where the
+// FeaturedRow is one card in the "Key findings" section, where the
 // destination node's body is rendered inline rather than just linked.
 type FeaturedRow struct {
 	EdgeID uuid.UUID
@@ -354,15 +354,15 @@ type FeaturedRow struct {
 }
 
 // PinInfo is non-nil when the current viewer has pinned the node being
-// rendered. Reasonings is empty when the pin has no attached reasoning.
+// rendered. Findings is empty when the pin has no attached finding.
 type PinInfo struct {
-	Kind       db.PinKind
-	Reasonings []PinReasoning
+	Kind     db.PinKind
+	Findings []PinFinding
 }
 
-// PinReasoning is one reasoning node attached to a pin, in the shape the
+// PinFinding is one finding node attached to a pin, in the shape the
 // banner and profile list need to render a link.
-type PinReasoning struct {
+type PinFinding struct {
 	ID    uuid.UUID
 	Slug  string
 	Title string
@@ -770,12 +770,12 @@ func NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []E
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if len(pin.Reasonings) > 0 {
+				if len(pin.Findings) > 0 {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "via ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					for i, rs := range pin.Reasonings {
+					for i, f := range pin.Findings {
 						if i > 0 {
 							var templ_7745c5c3_Var30 string
 							templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(", ")
@@ -792,9 +792,9 @@ func NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []E
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var31 templ.SafeURL
-						templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + rs.Slug))
+						templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + f.Slug))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 332, Col: 52}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 332, Col: 51}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 						if templ_7745c5c3_Err != nil {
@@ -805,9 +805,9 @@ func NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []E
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var32 string
-						templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(rs.Title)
+						templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(f.Title)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 332, Col: 65}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 332, Col: 63}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 						if templ_7745c5c3_Err != nil {
@@ -876,7 +876,7 @@ func NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []E
 				return templ_7745c5c3_Err
 			}
 			if len(featured) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<section class=\"featured\"><h2>Key reasoning</h2>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<section class=\"featured\"><h2>Key findings</h2>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1117,7 +1117,7 @@ func NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []E
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
-							if r.Type == db.NodeTypeReasoning {
+							if r.Type == db.NodeTypeFinding {
 								templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "<form method=\"post\" action=\"")
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
@@ -1308,8 +1308,8 @@ func NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, f
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if node.Type == db.NodeTypeEvidence {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "<label>Source URL <small>(required for evidence)</small> <input type=\"url\" name=\"source_url\" value=\"")
+			if node.Type == db.NodeTypeFinding {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "<label>Source URL <small>(optional — link to the external evidence, if any)</small> <input type=\"url\" name=\"source_url\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1632,15 +1632,15 @@ func visibilitySelect(selected string, lists []db.AudienceList) templ.Component 
 	})
 }
 
-// ReasoningCandidate is one reasoning node row rendered as a checkbox toggle
-// in the pin form's reasoning picker.
-type ReasoningCandidate struct {
+// FindingCandidate is one finding node row rendered as a checkbox toggle
+// in the pin form's finding picker.
+type FindingCandidate struct {
 	ID    uuid.UUID
 	Slug  string
 	Title string
 }
 
-func PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) templ.Component {
+func PinForm(viewer *Viewer, node db.Node, flash, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1699,7 +1699,7 @@ func PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string
 				return templ_7745c5c3_Err
 			}
 			if node.Type == db.NodeTypeView {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "Take a stance — support or oppose — or just feature it. Optionally attach reasonings that explain your thinking.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "Take a stance — support or oppose — or just feature it. Optionally attach findings that explain your thinking.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1734,7 +1734,7 @@ func PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = pinFormFields(node, formKind, findFinding, selectedFindingIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1770,7 +1770,7 @@ func PinForm(viewer *Viewer, node db.Node, flash, formKind, findReasoning string
 // Resonate button opens it in-place). Form submit posts via htmx; on
 // validation error the server re-renders this fragment, on success the
 // handler sets HX-Redirect so htmx does a full page navigation.
-func PinModal(node db.Node, flash, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) templ.Component {
+func PinModal(node db.Node, flash, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1817,7 +1817,7 @@ func PinModal(node db.Node, flash, formKind, findReasoning string, selectedReaso
 			return templ_7745c5c3_Err
 		}
 		if node.Type == db.NodeTypeView {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "Take a stance — or just feature it. Optionally attach reasonings.")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "Take a stance — or just feature it. Optionally attach findings.")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1865,7 +1865,7 @@ func PinModal(node db.Node, flash, formKind, findReasoning string, selectedReaso
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = pinFormFields(node, formKind, findReasoning, selectedReasoningIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = pinFormFields(node, formKind, findFinding, selectedFindingIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1879,8 +1879,8 @@ func PinModal(node db.Node, flash, formKind, findReasoning string, selectedReaso
 
 // pinFormFields is the shared body of PinForm (standalone page) and
 // PinModal (htmx modal). For views it offers support / oppose / feature
-// plus a reasoning picker; for other node types only "feature" applies.
-func pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoningIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) templ.Component {
+// plus a finding picker; for other node types only "feature" applies.
+func pinFormFields(node db.Node, formKind, findFinding string, selectedFindingIDs []string, attached []PinFinding, candidates []FindingCandidate) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1950,7 +1950,7 @@ func pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoni
 			return templ_7745c5c3_Err
 		}
 		if node.Type == db.NodeTypeView {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "<fieldset class=\"toggle-group\"><legend>Reasonings <small>(optional, multiple allowed)</small></legend> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "<fieldset class=\"toggle-group\"><legend>Findings <small>(optional, multiple allowed)</small></legend> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1960,14 +1960,14 @@ func pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoni
 					return templ_7745c5c3_Err
 				}
 				for _, a := range attached {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "<label class=\"toggle-btn\" data-reasoning=\"attached\"><input type=\"checkbox\" name=\"reasoning_ids\" value=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "<label class=\"toggle-btn\" data-finding=\"attached\"><input type=\"checkbox\" name=\"finding_ids\" value=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var78 string
 					templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID.String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 646, Col: 72}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 646, Col: 70}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 					if templ_7745c5c3_Err != nil {
@@ -1996,37 +1996,37 @@ func pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoni
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "<label>Find more reasonings to attach <input type=\"search\" name=\"find_reasoning\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "<label>Find more findings to attach <input type=\"search\" name=\"find_finding\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var80 string
-			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(findReasoning)
+			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(findFinding)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 659, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 659, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "\" placeholder=\"search reasoning titles…\" autocomplete=\"off\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "\" placeholder=\"search finding titles…\" autocomplete=\"off\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var81 string
-			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs("/nodes/" + node.Slug + "/reasoning-picker")
+			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs("/nodes/" + node.Slug + "/finding-picker")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 662, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 662, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#reasoning-picker-target\" hx-swap=\"outerHTML\" hx-include=\"[name='find_reasoning'],[name='reasoning_ids']\"></label>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "\" hx-trigger=\"input changed delay:200ms, search\" hx-target=\"#finding-picker-target\" hx-swap=\"outerHTML\" hx-include=\"[name='find_finding'],[name='finding_ids']\"></label>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ReasoningCandidatePicker(findReasoning, selectedReasoningIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = FindingCandidatePicker(findFinding, selectedFindingIDs, attached, candidates).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2039,11 +2039,11 @@ func pinFormFields(node db.Node, formKind, findReasoning string, selectedReasoni
 	})
 }
 
-// ReasoningCandidatePicker renders the reasoning search results. Stable id
-// lets HTMX swap it on each keystroke. Reasonings already attached to the
+// FindingCandidatePicker renders the finding search results. Stable id
+// lets HTMX swap it on each keystroke. Findings already attached to the
 // pin (or selected in this form session) are filtered out so the picker
 // only shows new options to add.
-func ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinReasoning, candidates []ReasoningCandidate) templ.Component {
+func FindingCandidatePicker(find string, selectedIDs []string, attached []PinFinding, candidates []FindingCandidate) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -2064,7 +2064,7 @@ func ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinR
 			templ_7745c5c3_Var82 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 188, "<div id=\"reasoning-picker-target\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 188, "<div id=\"finding-picker-target\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2075,20 +2075,20 @@ func ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinR
 		for _, id := range selectedIDs {
 			exclude[id] = struct{}{}
 		}
-		visible := make([]ReasoningCandidate, 0, len(candidates))
+		visible := make([]FindingCandidate, 0, len(candidates))
 		for _, c := range candidates {
 			if _, hit := exclude[c.ID.String()]; !hit {
 				visible = append(visible, c)
 			}
 		}
 		if find == "" && len(visible) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 189, "<p class=\"muted\" style=\"font-size: 13px;\">No more reasonings to attach. Start typing to search.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 189, "<p class=\"muted\" style=\"font-size: 13px;\">No more findings to attach. Start typing to search.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if find != "" && len(visible) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "<p class=\"muted\" style=\"font-size: 13px;\">No reasonings match that query.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "<p class=\"muted\" style=\"font-size: 13px;\">No findings match that query.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2099,14 +2099,14 @@ func ReasoningCandidatePicker(find string, selectedIDs []string, attached []PinR
 				return templ_7745c5c3_Err
 			}
 			for _, c := range visible {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 192, "<label class=\"toggle-btn\" data-reasoning=\"candidate\"><input type=\"checkbox\" name=\"reasoning_ids\" value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 192, "<label class=\"toggle-btn\" data-finding=\"candidate\"><input type=\"checkbox\" name=\"finding_ids\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var83 string
 				templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 705, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 705, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 				if templ_7745c5c3_Err != nil {
@@ -2665,7 +2665,7 @@ func NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) te
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 240, "</li><li>Reasonings attached to other users' pins will detach (the pins survive without a reasoning).</li><li>Tags lose their link to this node, but the tags themselves remain.</li></ul><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 240, "</li><li>Findings attached to other users' pins will detach (the pins survive without a finding).</li><li>Tags lose their link to this node, but the tags themselves remain.</li></ul><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

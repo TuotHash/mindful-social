@@ -132,7 +132,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"hero\"><div class=\"page\" style=\"position: relative; z-index: 2;\"><div class=\"hero-grid\"><div class=\"col gap-24 fadein\"><div class=\"row gap-8\"><span class=\"chip\" style=\"background: var(--paper);\"><span class=\"dot\" style=\"background: var(--accent-deep);\"></span> Public alpha · early development</span></div><h1 class=\"h-display\">Disagree<br><em>with grace.</em></h1><p class=\"lede\" style=\"font-size: 21px; max-width: 50ch;\">Mindful Social is a community where people commit to views, show their reasoning, and connect ideas in a shared argument graph — not a feed of hot takes.</p><div class=\"row gap-12 wrap\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"hero\"><div class=\"page\" style=\"position: relative; z-index: 2;\"><div class=\"hero-grid\"><div class=\"col gap-24 fadein\"><div class=\"row gap-8\"><span class=\"chip\" style=\"background: var(--paper);\"><span class=\"dot\" style=\"background: var(--accent-deep);\"></span> Public alpha · early development</span></div><h1 class=\"h-display\">Disagree<br><em>with grace.</em></h1><p class=\"lede\" style=\"font-size: 21px; max-width: 50ch;\">Mindful Social is a community where people commit to views, share their findings, and connect ideas in a shared argument graph — not a feed of hot takes.</p><div class=\"row gap-12 wrap\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -191,7 +191,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"h-3\" style=\"font-family: var(--serif); font-size: 22px; color: var(--ink-2);\">Interactive graph view in development</div><p class=\"muted\" style=\"font-size: 14px; margin: 0;\">The argument graph will let you explore connections between topics, views, reasoning, and evidence — all in one visual space.</p></div></div></div></div></div></div></section><section class=\"section-paper\"><div class=\"page\" style=\"padding-top: 80px; padding-bottom: 80px;\"><div class=\"col gap-16\" style=\"margin-bottom: 48px; max-width: 720px;\"><span class=\"eyebrow\">The four primitives</span><h2 class=\"h-1\">Every conversation, mapped to four shapes.</h2><p class=\"lede\">No likes, no quote-replies, no algorithmic feed. Each contribution is one of four kinds — and every connection is named.</p></div><div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"h-3\" style=\"font-family: var(--serif); font-size: 22px; color: var(--ink-2);\">Interactive graph view in development</div><p class=\"muted\" style=\"font-size: 14px; margin: 0;\">The argument graph will let you explore connections between topics, views, and findings — all in one visual space.</p></div></div></div></div></div></div></section><section class=\"section-paper\"><div class=\"page\" style=\"padding-top: 80px; padding-bottom: 80px;\"><div class=\"col gap-16\" style=\"margin-bottom: 48px; max-width: 720px;\"><span class=\"eyebrow\">The three primitives</span><h2 class=\"h-1\">Every conversation, mapped to three shapes.</h2><p class=\"lede\">No likes, no quote-replies, no algorithmic feed. Each contribution is one of three kinds — and every connection is named.</p></div><div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -203,11 +203,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = primitiveCard("reasoning", "Reasoning", "Your personal argument behind a view — why you committed. Attached to your profile.").Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = primitiveCard("evidence", "Evidence", "A linkable external source. Reasoning cites evidence; evidence can be challenged on its own.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = primitiveCard("finding", "Finding", "An argument or piece of evidence. Whether reasoned or sourced, it supports or contests a view — and can be challenged on its own.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -227,7 +223,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = edgeCard("cites", "cites", "points to evidence").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = edgeCard("cites", "cites", "points to a finding").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -239,15 +235,15 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and reasoning chains expand below.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and finding chains expand below.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = stepCard("02", "Read the views and their evidence", "Each view shows who commits, opposing views, and cited evidence.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = stepCard("02", "Read the views and their findings", "Each view shows who commits, opposing views, and cited findings.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = stepCard("03", "Write your own reasoning", "Pin your stance with a paragraph in your own words. Link evidence you find compelling.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = stepCard("03", "Share your own findings", "Pin your stance with a paragraph in your own words. Link findings you find compelling.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -267,7 +263,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div style=\"position: relative; z-index: 2; max-width: 640px; margin: 0 auto;\"><h2 class=\"h-1\" style=\"font-size: 56px;\">Stop dunking. Start <em style=\"font-style: italic; color: var(--accent-deep);\">thinking together.</em></h2><p class=\"lede\" style=\"margin: 20px auto 32px;\">Free forever. No advertisers, no algorithm. Just you, your reasoning, and a slowly-better-organized internet.</p><div class=\"row gap-12\" style=\"justify-content: center;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div style=\"position: relative; z-index: 2; max-width: 640px; margin: 0 auto;\"><h2 class=\"h-1\" style=\"font-size: 56px;\">Stop dunking. Start <em style=\"font-style: italic; color: var(--accent-deep);\">thinking together.</em></h2><p class=\"lede\" style=\"margin: 20px auto 32px;\">Free forever. No advertisers, no algorithm. Just you, your findings, and a slowly-better-organized internet.</p><div class=\"row gap-12\" style=\"justify-content: center;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -322,7 +318,7 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(viewer.Username)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 162, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 161, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -350,7 +346,7 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 				var templ_7745c5c3_Var8 templ.SafeURL
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + n.Slug))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 182, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 181, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -385,7 +381,7 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(string(n.Type))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 185, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 184, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -398,7 +394,7 @@ func homeFeed(viewer *Viewer, recent []db.Node) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 187, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 186, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -455,7 +451,7 @@ func argumentGraphPromo() templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<section class=\"promo\" aria-label=\"Coming soon: Argument graph\" style=\"margin-top: 56px;\"><div class=\"promo-inner\"><span class=\"badge\">Coming soon</span><h2>The argument graph</h2><p>See how topics, views, reasonings and sources connect — and trace any claim back to what supports or opposes it.</p></div><div class=\"promo-graph\" aria-hidden=\"true\"><svg viewBox=\"0 0 360 280\" preserveAspectRatio=\"xMaxYMid meet\"><defs><radialGradient id=\"bubble-topic\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 60)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(88% 0.14 60)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(68% 0.18 50)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(42% 0.12 45)\"></stop></radialGradient> <radialGradient id=\"bubble-view\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 250)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.13 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.17 260)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.12 265)\"></stop></radialGradient> <radialGradient id=\"bubble-reasoning\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 168)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 168)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(60% 0.16 168)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(38% 0.10 168)\"></stop></radialGradient> <radialGradient id=\"bubble-fact\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 332)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 332)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.18 340)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.13 340)\"></stop></radialGradient> <radialGradient id=\"bubble-small\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(96% 0.02 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(72% 0.05 250)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(48% 0.04 250)\"></stop></radialGradient> <linearGradient id=\"hi-shine\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.95)\"></stop> <stop offset=\"60%\" stop-color=\"oklch(100% 0 0 / 0.15)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></linearGradient> <radialGradient id=\"rim-soft\" cx=\"50%\" cy=\"95%\" r=\"60%\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.30)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></radialGradient> <filter id=\"ball-shadow\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"160%\"><feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"3\"></feGaussianBlur> <feOffset dx=\"0\" dy=\"3\" result=\"off\"></feOffset> <feComponentTransfer><feFuncA type=\"linear\" slope=\"0.55\"></feFuncA></feComponentTransfer> <feMerge><feMergeNode></feMergeNode><feMergeNode in=\"SourceGraphic\"></feMergeNode></feMerge></filter></defs> <g stroke-width=\"1.2\" fill=\"none\" opacity=\"0.45\" stroke-linecap=\"round\"><path d=\"M180 140 C 220 100 240 90 260 80\" stroke=\"oklch(75% 0.14 250)\"></path> <path d=\"M180 140 C 220 170 250 195 270 200\" stroke=\"oklch(70% 0.14 168)\"></path> <path d=\"M180 140 C 140 120 110 100 90 90\" stroke=\"oklch(70% 0.16 50)\"></path> <path d=\"M180 140 C 140 170 110 195 80 200\" stroke=\"oklch(72% 0.15 332)\"></path> <path d=\"M260 80 C 290 110 310 130 320 150\" stroke=\"oklch(72% 0.10 200)\"></path></g> <g filter=\"url(#ball-shadow)\"><g><circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#bubble-topic)\"></circle> <circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"170\" cy=\"120\" rx=\"22\" ry=\"13\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"253\" cy=\"66\" rx=\"15\" ry=\"9\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#bubble-reasoning)\"></circle> <circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"263\" cy=\"187\" rx=\"14\" ry=\"8\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#bubble-fact)\"></circle> <circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"86\" cy=\"78\" rx=\"12\" ry=\"7\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"76\" cy=\"191\" rx=\"11\" ry=\"6\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"324\" cy=\"148\" r=\"10\" fill=\"url(#bubble-small)\"></circle> <ellipse cx=\"321\" cy=\"144\" rx=\"5\" ry=\"3\" fill=\"url(#hi-shine)\" opacity=\"0.85\"></ellipse></g></g></svg></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<section class=\"promo\" aria-label=\"Coming soon: Argument graph\" style=\"margin-top: 56px;\"><div class=\"promo-inner\"><span class=\"badge\">Coming soon</span><h2>The argument graph</h2><p>See how topics, views, and findings connect — and trace any claim back to what supports or opposes it.</p></div><div class=\"promo-graph\" aria-hidden=\"true\"><svg viewBox=\"0 0 360 280\" preserveAspectRatio=\"xMaxYMid meet\"><defs><radialGradient id=\"bubble-topic\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 60)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(88% 0.14 60)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(68% 0.18 50)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(42% 0.12 45)\"></stop></radialGradient> <radialGradient id=\"bubble-view\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 250)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.13 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.17 260)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.12 265)\"></stop></radialGradient> <radialGradient id=\"bubble-reasoning\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 168)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 168)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(60% 0.16 168)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(38% 0.10 168)\"></stop></radialGradient> <radialGradient id=\"bubble-fact\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(98% 0.04 332)\"></stop> <stop offset=\"18%\" stop-color=\"oklch(86% 0.14 332)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(64% 0.18 340)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(40% 0.13 340)\"></stop></radialGradient> <radialGradient id=\"bubble-small\" cx=\"35%\" cy=\"28%\" r=\"75%\"><stop offset=\"0%\" stop-color=\"oklch(96% 0.02 250)\"></stop> <stop offset=\"55%\" stop-color=\"oklch(72% 0.05 250)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(48% 0.04 250)\"></stop></radialGradient> <linearGradient id=\"hi-shine\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.95)\"></stop> <stop offset=\"60%\" stop-color=\"oklch(100% 0 0 / 0.15)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></linearGradient> <radialGradient id=\"rim-soft\" cx=\"50%\" cy=\"95%\" r=\"60%\"><stop offset=\"0%\" stop-color=\"oklch(100% 0 0 / 0.30)\"></stop> <stop offset=\"100%\" stop-color=\"oklch(100% 0 0 / 0)\"></stop></radialGradient> <filter id=\"ball-shadow\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"160%\"><feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"3\"></feGaussianBlur> <feOffset dx=\"0\" dy=\"3\" result=\"off\"></feOffset> <feComponentTransfer><feFuncA type=\"linear\" slope=\"0.55\"></feFuncA></feComponentTransfer> <feMerge><feMergeNode></feMergeNode><feMergeNode in=\"SourceGraphic\"></feMergeNode></feMerge></filter></defs> <g stroke-width=\"1.2\" fill=\"none\" opacity=\"0.45\" stroke-linecap=\"round\"><path d=\"M180 140 C 220 100 240 90 260 80\" stroke=\"oklch(75% 0.14 250)\"></path> <path d=\"M180 140 C 220 170 250 195 270 200\" stroke=\"oklch(70% 0.14 168)\"></path> <path d=\"M180 140 C 140 120 110 100 90 90\" stroke=\"oklch(70% 0.16 50)\"></path> <path d=\"M180 140 C 140 170 110 195 80 200\" stroke=\"oklch(72% 0.15 332)\"></path> <path d=\"M260 80 C 290 110 310 130 320 150\" stroke=\"oklch(72% 0.10 200)\"></path></g> <g filter=\"url(#ball-shadow)\"><g><circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#bubble-topic)\"></circle> <circle cx=\"180\" cy=\"140\" r=\"40\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"170\" cy=\"120\" rx=\"22\" ry=\"13\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"260\" cy=\"80\" r=\"28\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"253\" cy=\"66\" rx=\"15\" ry=\"9\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#bubble-reasoning)\"></circle> <circle cx=\"270\" cy=\"200\" r=\"26\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"263\" cy=\"187\" rx=\"14\" ry=\"8\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#bubble-fact)\"></circle> <circle cx=\"92\" cy=\"90\" r=\"24\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"86\" cy=\"78\" rx=\"12\" ry=\"7\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#bubble-view)\"></circle> <circle cx=\"82\" cy=\"202\" r=\"22\" fill=\"url(#rim-soft)\"></circle> <ellipse cx=\"76\" cy=\"191\" rx=\"11\" ry=\"6\" fill=\"url(#hi-shine)\" opacity=\"0.9\"></ellipse></g> <g><circle cx=\"324\" cy=\"148\" r=\"10\" fill=\"url(#bubble-small)\"></circle> <ellipse cx=\"321\" cy=\"144\" rx=\"5\" ry=\"3\" fill=\"url(#hi-shine)\" opacity=\"0.85\"></ellipse></g></g></svg></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -520,7 +516,7 @@ func bloom(size int, hue int, style string) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(bloomStyle(size, hue, style))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 305, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 304, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -591,7 +587,7 @@ func primitiveCard(typ, label, blurb string) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 319, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 318, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -604,7 +600,7 @@ func primitiveCard(typ, label, blurb string) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 321, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 320, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -617,7 +613,7 @@ func primitiveCard(typ, label, blurb string) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 322, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 321, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -677,7 +673,7 @@ func edgeCard(kind, label, blurb string) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 330, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 329, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -690,7 +686,7 @@ func edgeCard(kind, label, blurb string) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(blurb)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 331, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 330, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -732,7 +728,7 @@ func stepCard(num, title, body string) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(num)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 338, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 337, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -745,7 +741,7 @@ func stepCard(num, title, body string) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 339, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 338, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -758,7 +754,7 @@ func stepCard(num, title, body string) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 340, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 339, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {

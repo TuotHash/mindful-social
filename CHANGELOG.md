@@ -5,6 +5,19 @@ All notable changes to Mindful Social are documented in this file.
 The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Node types simplified** — `reasoning` and `evidence` merged into a
+  single `finding` type. The split forced contributors to pick a label
+  before the content was written and rarely mattered for downstream
+  queries. `source_url` stays optional on findings: set it when the
+  content cites an external source, leave it blank when the finding
+  stands on its argument. Migration `00016` rewrites the enum, folds
+  existing rows into `finding`, and renames `pin_reasonings` →
+  `pin_findings` (column `reasoning_id` → `finding_id`).
+
 ## [1.0.0-alpha] — 2026-05-11
 
 First public release. The structured-argument layer and the social

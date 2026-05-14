@@ -43,7 +43,7 @@ func TestDisplayGroups_emptyInput(t *testing.T) {
 
 func TestDisplayGroups_outgoingOnly_assignsActiveLabel(t *testing.T) {
 	target := uuid.New()
-	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindSupports, nil, target, db.NodeTypeReasoning, "R")}
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindSupports, nil, target, db.NodeTypeFinding, "R")}
 	groups := displayGroups(out, nil)
 
 	if len(groups) != 1 {
@@ -63,7 +63,7 @@ func TestDisplayGroups_outgoingOnly_assignsActiveLabel(t *testing.T) {
 
 func TestDisplayGroups_incomingOnly_assignsPassiveLabel(t *testing.T) {
 	source := uuid.New()
-	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindSupports, source, db.NodeTypeReasoning, "R")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindSupports, source, db.NodeTypeFinding, "R")}
 	groups := displayGroups(nil, in)
 
 	if len(groups) != 1 {
@@ -114,8 +114,8 @@ func TestDisplayGroups_relatesTo_mergesIntoOneBucket(t *testing.T) {
 func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 	pos := int16(1)
 	out := []db.ListEdgesFromNodeForViewerRow{
-		makeOut(db.EdgeKindSupports, &pos, uuid.New(), db.NodeTypeReasoning, "Featured"),
-		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeReasoning, "Legend"),
+		makeOut(db.EdgeKindSupports, &pos, uuid.New(), db.NodeTypeFinding, "Featured"),
+		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeFinding, "Legend"),
 	}
 	groups := displayGroups(out, nil)
 
@@ -133,8 +133,8 @@ func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 func TestDisplayGroups_kindOrderingIsCanonical(t *testing.T) {
 	out := []db.ListEdgesFromNodeForViewerRow{
 		makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "rel"),
-		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeEvidence, "cite"),
-		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeReasoning, "sup"),
+		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeFinding, "cite"),
+		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeFinding, "sup"),
 		makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "ref"),
 		makeOut(db.EdgeKindOpposes, nil, uuid.New(), db.NodeTypeView, "opp"),
 	}

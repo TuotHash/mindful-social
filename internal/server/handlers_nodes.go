@@ -186,8 +186,8 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	var pinKind db.PinKind
 	var parentTopicID uuid.UUID
 	switch {
-	// The Post path only creates topics or views. Reasoning and evidence
-	// are created later as connections off an existing topic or view.
+	// The Post path only creates topics or views. Findings are created
+	// later as connections off an existing topic or view.
 	case nt != db.NodeTypeTopic && nt != db.NodeTypeView:
 		flash = "Pick a type: View or Topic."
 	case title == "":
@@ -356,14 +356,14 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		if row != nil {
 			info := views.PinInfo{Kind: row.Kind}
-			rs, err := s.queries.ListReasoningsForPin(r.Context(), db.ListReasoningsForPinParams{
+			rs, err := s.queries.ListFindingsForPin(r.Context(), db.ListFindingsForPinParams{
 				PinID:    row.ID,
 				ViewerID: viewerID(r),
 			})
 			if err != nil {
-				s.logger.Error("node detail: pin reasonings", "err", err)
+				s.logger.Error("node detail: pin findings", "err", err)
 			} else {
-				info.Reasonings = pinReasoningsFromRows(rs)
+				info.Findings = pinFindingsFromRows(rs)
 			}
 			pin = &info
 		}
@@ -657,8 +657,6 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
-	case node.Type == db.NodeTypeEvidence && sourceURL == "":
-		flash = "Evidence needs a source URL."
 	}
 	visKind, visListID, visErr := parseVisibility(rawVisibility, node.CreatedBy, lists)
 	if flash == "" && visErr != "" {
@@ -902,7 +900,7 @@ var edgeOrder = []struct {
 // separate sections with active and passive labels ("Supports" /
 // "Supported by"). For relates_to (symmetric) both directions merge into a
 // single "Relates to" section. Featured outgoing edges are excluded — they
-// render inline in the "Key reasoning" section above the legend.
+// render inline in the "Key findings" section above the legend.
 func displayGroups(out []db.ListEdgesFromNodeForViewerRow, in []db.ListEdgesToNodeForViewerRow) []views.EdgeGroup {
 	var groups []views.EdgeGroup
 	for _, ek := range edgeOrder {

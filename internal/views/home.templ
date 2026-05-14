@@ -38,7 +38,7 @@ templ landingMarketing(viewer *Viewer) {
 					</h1>
 					<p class="lede" style="font-size: 21px; max-width: 50ch;">
 						Mindful Social is a community where people commit to views,
-						show their reasoning, and connect ideas in a shared
+						share their findings, and connect ideas in a shared
 						argument graph — not a feed of hot takes.
 					</p>
 					<div class="row gap-12 wrap">
@@ -76,7 +76,7 @@ templ landingMarketing(viewer *Viewer) {
 									Interactive graph view in development
 								</div>
 								<p class="muted" style="font-size: 14px; margin: 0;">
-									The argument graph will let you explore connections between topics, views, reasoning, and evidence — all in one visual space.
+									The argument graph will let you explore connections between topics, views, and findings — all in one visual space.
 								</p>
 							</div>
 						</div>
@@ -88,16 +88,15 @@ templ landingMarketing(viewer *Viewer) {
 	<section class="section-paper">
 		<div class="page" style="padding-top: 80px; padding-bottom: 80px;">
 			<div class="col gap-16" style="margin-bottom: 48px; max-width: 720px;">
-				<span class="eyebrow">The four primitives</span>
-				<h2 class="h-1">Every conversation, mapped to four shapes.</h2>
+				<span class="eyebrow">The three primitives</span>
+				<h2 class="h-1">Every conversation, mapped to three shapes.</h2>
 				<p class="lede">No likes, no quote-replies, no algorithmic feed.
-					Each contribution is one of four kinds — and every connection is named.</p>
+					Each contribution is one of three kinds — and every connection is named.</p>
 			</div>
 			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
 				@primitiveCard("topic", "Topic", "Big questions you want to think about — UBI, AI alignment, urban transit. Containers for views.")
 				@primitiveCard("view", "View", "A specific stance someone could commit to. Sharper than a topic, debatable as a sentence.")
-				@primitiveCard("reasoning", "Reasoning", "Your personal argument behind a view — why you committed. Attached to your profile.")
-				@primitiveCard("evidence", "Evidence", "A linkable external source. Reasoning cites evidence; evidence can be challenged on its own.")
+				@primitiveCard("finding", "Finding", "An argument or piece of evidence. Whether reasoned or sourced, it supports or contests a view — and can be challenged on its own.")
 			</div>
 			<div class="card" style="margin-top: 32px; padding: 28px;">
 				<div class="row between wrap gap-16" style="margin-bottom: 18px;">
@@ -113,7 +112,7 @@ templ landingMarketing(viewer *Viewer) {
 					@edgeCard("supports", "supports", "argues in favor")
 					@edgeCard("opposes", "opposes", "argues against")
 					@edgeCard("refines", "refines", "narrows or qualifies")
-					@edgeCard("cites", "cites", "points to evidence")
+					@edgeCard("cites", "cites", "points to a finding")
 					@edgeCard("relates_to", "relates to", "belongs in the same area")
 				</div>
 			</div>
@@ -126,9 +125,9 @@ templ landingMarketing(viewer *Viewer) {
 				<h2 class="h-1">From scrolling to thinking.</h2>
 			</div>
 			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
-				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and reasoning chains expand below.")
-				@stepCard("02", "Read the views and their evidence", "Each view shows who commits, opposing views, and cited evidence.")
-				@stepCard("03", "Write your own reasoning", "Pin your stance with a paragraph in your own words. Link evidence you find compelling.")
+				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and finding chains expand below.")
+				@stepCard("02", "Read the views and their findings", "Each view shows who commits, opposing views, and cited findings.")
+				@stepCard("03", "Share your own findings", "Pin your stance with a paragraph in your own words. Link findings you find compelling.")
 				@stepCard("04", "Watch the graph rebuild itself", "Your contribution rewires the conversation — visible, named, accountable.")
 			</div>
 		</div>
@@ -140,7 +139,7 @@ templ landingMarketing(viewer *Viewer) {
 			<div style="position: relative; z-index: 2; max-width: 640px; margin: 0 auto;">
 				<h2 class="h-1" style="font-size: 56px;">Stop dunking. Start <em style="font-style: italic; color: var(--accent-deep);">thinking together.</em></h2>
 				<p class="lede" style="margin: 20px auto 32px;">
-					Free forever. No advertisers, no algorithm. Just you, your reasoning, and a slowly-better-organized internet.
+					Free forever. No advertisers, no algorithm. Just you, your findings, and a slowly-better-organized internet.
 				</p>
 				<div class="row gap-12" style="justify-content: center;">
 					if SignupEnabled() {
@@ -204,7 +203,7 @@ templ argumentGraphPromo() {
 		<div class="promo-inner">
 			<span class="badge">Coming soon</span>
 			<h2>The argument graph</h2>
-			<p>See how topics, views, reasonings and sources connect — and trace any claim back to what supports or opposes it.</p>
+			<p>See how topics, views, and findings connect — and trace any claim back to what supports or opposes it.</p>
 		</div>
 		<div class="promo-graph" aria-hidden="true">
 			<svg viewBox="0 0 360 280" preserveAspectRatio="xMaxYMid meet">

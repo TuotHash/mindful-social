@@ -46,8 +46,7 @@
   /* node-type hues (used to derive badge color) */
   --topic-h: 32; /* warm amber  */
   --view-h: 250; /* indigo      */
-  --reasoning-h: 168; /* teal        */
-  --fact-h: 332; /* rose        */
+  --finding-h: 332; /* rose        */
 
   /* edge-kind colors */
   --supports: oklch(72% 0.14 158);
@@ -115,10 +114,8 @@
   --topic-ink: oklch(82% 0.13 var(--topic-h));
   --view-bg: oklch(75% 0.13 var(--view-h) / 0.13);
   --view-ink: oklch(82% 0.13 var(--view-h));
-  --reasoning-bg: oklch(72% 0.13 var(--reasoning-h) / 0.12);
-  --reasoning-ink: oklch(82% 0.13 var(--reasoning-h));
-  --evidence-bg: oklch(72% 0.15 var(--fact-h) / 0.12);
-  --evidence-ink: oklch(82% 0.13 var(--fact-h));
+  --finding-bg: oklch(72% 0.15 var(--finding-h) / 0.12);
+  --finding-ink: oklch(82% 0.13 var(--finding-h));
 }
 
 /* ---- LIGHT -------------------------------------------------------------- */
@@ -163,10 +160,8 @@
   --topic-ink: oklch(32% 0.1 var(--topic-h));
   --view-bg: oklch(93% 0.06 var(--view-h));
   --view-ink: oklch(36% 0.12 var(--view-h));
-  --reasoning-bg: oklch(93% 0.06 var(--reasoning-h));
-  --reasoning-ink: oklch(32% 0.1 var(--reasoning-h));
-  --evidence-bg: oklch(93% 0.06 var(--fact-h));
-  --evidence-ink: oklch(36% 0.1 var(--fact-h));
+  --finding-bg: oklch(93% 0.06 var(--finding-h));
+  --finding-ink: oklch(36% 0.1 var(--finding-h));
 }
 
 /* =========================================================================
@@ -1034,19 +1029,11 @@ label.field {
   background: var(--view-bg);
   border-color: color-mix(in oklab, var(--view-ink) 25%, transparent);
 }
-.badge-reasoning,
-.chip.reasoning {
-  color: var(--reasoning-ink);
-  background: var(--reasoning-bg);
-  border-color: color-mix(in oklab, var(--reasoning-ink) 25%, transparent);
-}
-.badge-fact,
-.badge-evidence,
-.chip.fact,
-.chip.evidence {
-  color: var(--evidence-ink);
-  background: var(--evidence-bg);
-  border-color: color-mix(in oklab, var(--evidence-ink) 25%, transparent);
+.badge-finding,
+.chip.finding {
+  color: var(--finding-ink);
+  background: var(--finding-bg);
+  border-color: color-mix(in oklab, var(--finding-ink) 25%, transparent);
 }
 
 .badge.accent {
@@ -1201,7 +1188,7 @@ label.field {
     110deg,
     oklch(78% 0.16 var(--topic-h)),
     oklch(78% 0.16 var(--view-h)),
-    oklch(78% 0.14 var(--reasoning-h))
+    oklch(78% 0.14 var(--finding-h))
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -1537,7 +1524,7 @@ header.node-header > .chip {
   border-color: var(--border-strong);
 }
 
-/* featured / key reasoning */
+/* featured / key findings */
 .featured {
   margin-bottom: var(--s-8);
   display: flex;
@@ -1925,12 +1912,12 @@ header.node-header > .chip {
 .pin-row .pin-node .title {
   font-weight: 500;
 }
-.pin-row .pin-reasoning {
+.pin-row .pin-finding {
   grid-column: 2;
   font-size: var(--fs-xs);
   color: var(--text-subtle);
 }
-.pin-reasoning a {
+.pin-finding a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -2206,16 +2193,10 @@ fieldset.toggle-group legend {
   color: var(--view-ink);
   border-color: color-mix(in oklab, var(--view-ink) 35%, transparent);
 }
-.toggle-btn[data-type="reasoning"]:has(input:checked) {
-  background: var(--reasoning-bg);
-  color: var(--reasoning-ink);
-  border-color: color-mix(in oklab, var(--reasoning-ink) 35%, transparent);
-}
-.toggle-btn[data-type="fact"]:has(input:checked),
-.toggle-btn[data-type="evidence"]:has(input:checked) {
-  background: var(--evidence-bg);
-  color: var(--evidence-ink);
-  border-color: color-mix(in oklab, var(--evidence-ink) 35%, transparent);
+.toggle-btn[data-type="finding"]:has(input:checked) {
+  background: var(--finding-bg);
+  color: var(--finding-ink);
+  border-color: color-mix(in oklab, var(--finding-ink) 35%, transparent);
 }
 
 /* Conditional fields in the post form: when type=topic, hide view-only opts. */
@@ -2375,7 +2356,7 @@ fieldset.toggle-group legend {
   .pin-row {
     grid-template-columns: 1fr;
   }
-  .pin-row .pin-reasoning {
+  .pin-row .pin-finding {
     grid-column: 1;
   }
 }

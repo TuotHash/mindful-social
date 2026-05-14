@@ -49,7 +49,7 @@ templ authShell(title, subtitle string) {
 
 templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) {
 	@Layout("Sign up", nil) {
-		@authShell("Bring your reasoning.", "Pick a handle. We'll never email you marketing.") {
+		@authShell("Bring your findings.", "Pick a handle. We'll never email you marketing.") {
 			@Flash(flash)
 			<form method="post" action="/signup" class="col gap-16">
 				@CSRFField()
@@ -100,7 +100,7 @@ templ SignupClosed(oauth []OAuthButton) {
 
 templ Login(flash string, oauth []OAuthButton, formEmail string) {
 	@Layout("Log in", nil) {
-		@authShell("Welcome back.", "Sign in to keep your reasoning where you left it.") {
+		@authShell("Welcome back.", "Sign in to pick up where you left off.") {
 			@Flash(flash)
 			<form method="post" action="/login" class="col gap-16">
 				@CSRFField()
