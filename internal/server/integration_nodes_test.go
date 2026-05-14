@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func TestNodeCreate_RendersOnDetail(t *testing.T) {
@@ -92,6 +94,85 @@ func TestNodeCreate_RejectsFinding(t *testing.T) {
 	}
 	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
 		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
+	}
+}
+
+func TestNodeUpdate_AdminCanChangeVisibility(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, alice, "view", "Public take", "Body")
+	node, err := testServer.queries.GetNode(t.Context(), id)
+	if err != nil {
+		t.Fatalf("get node: %v", err)
+	}
+	if node.Visibility != db.VisibilityKindPublic {
+		t.Fatalf("seed: expected public visibility, got %q", node.Visibility)
+	}
+	_ = aliceUser
+
+	mod := newClient(t)
+	modUser := signupAndGetUser(t, mod, "mod", "mod@example.com", "correct horse battery staple")
+	if err := testServer.queries.UpdateUserRole(t.Context(), db.UpdateUserRoleParams{
+		ID:   modUser.ID,
+		Role: db.UserRoleAdmin,
+	}); err != nil {
+		t.Fatalf("promote mod: %v", err)
+	}
+
+	// After the update, the admin is redirected to /nodes/<slug>, which
+	// 404s because the node is now private and the admin isn't the
+	// author — that's correct visibility behaviour, not an update
+	// failure. Verify the change at the DB layer.
+	resp := formPost(t, mod, "/nodes/"+node.Slug, url.Values{
+		"title":      {node.Title},
+		"body":       {node.Body},
+		"visibility": {"private"},
+	})
+	resp.Body.Close()
+
+	got, err := testServer.queries.GetNode(t.Context(), id)
+	if err != nil {
+		t.Fatalf("get node after update: %v", err)
+	}
+	if got.Visibility != db.VisibilityKindPrivate {
+		t.Fatalf("visibility = %q, want private", got.Visibility)
+	}
+	// Author-only fields must remain untouched even though the admin's POST
+	// did not include edit_policy / link_policy.
+	if got.EditPolicy != node.EditPolicy {
+		t.Fatalf("edit_policy mutated: was %q, now %q", node.EditPolicy, got.EditPolicy)
+	}
+	if got.LinkPolicy != node.LinkPolicy {
+		t.Fatalf("link_policy mutated: was %q, now %q", node.LinkPolicy, got.LinkPolicy)
+	}
+}
+
+func TestNodeDelete_AdminCanDeleteAnyNode(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	signup(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	id := createNode(t, alice, "topic", "Alice's topic", "")
+
+	mod := newClient(t)
+	modUser := signupAndGetUser(t, mod, "mod", "mod@example.com", "correct horse battery staple")
+	if err := testServer.queries.UpdateUserRole(t.Context(), db.UpdateUserRoleParams{
+		ID:   modUser.ID,
+		Role: db.UserRoleAdmin,
+	}); err != nil {
+		t.Fatalf("promote mod: %v", err)
+	}
+
+	resp := formPost(t, mod, "/nodes/"+id.String()+"/delete", url.Values{})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("admin delete: status %d", resp.StatusCode)
+	}
+
+	resp = get(t, alice, "/nodes/"+id.String())
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("after admin delete: expected 404, got %d", resp.StatusCode)
 	}
 }
 

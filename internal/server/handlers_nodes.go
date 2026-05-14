@@ -678,7 +678,19 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isAuthor := node.CreatedBy == user.ID
-	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID), lists, groups, isAuthor, string(node.EditPolicy), string(node.LinkPolicy)))
+	canChangeVisibility := isAuthor || isStaff(user)
+	// Audience lists and groups belong to the author's account, so when
+	// staff are moderating someone else's node we hide those scopes from
+	// the picker — they'd map to the moderator's own collections, which
+	// makes no sense as a visibility target. The picker keeps the
+	// public/connections/private options either way.
+	visLists := lists
+	visGroups := groups
+	if !isAuthor {
+		visLists = nil
+		visGroups = nil
+	}
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID), visLists, visGroups, isAuthor, canChangeVisibility, string(node.EditPolicy), string(node.LinkPolicy)))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -712,6 +724,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isAuthor := node.CreatedBy == user.ID
+	canChangeVisibility := isAuthor || isStaff(user)
 	id := node.ID
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
@@ -723,8 +736,9 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	sourceURL := strings.TrimSpace(r.PostFormValue("source_url"))
 	rawTags := r.PostFormValue("tags")
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
-	if rawVisibility == "" || !isAuthor {
-		// Visibility is author-only; non-author edits keep the existing setting.
+	if rawVisibility == "" || !canChangeVisibility {
+		// Editors without visibility rights keep the existing setting;
+		// an empty submission also falls through unchanged.
 		rawVisibility = formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID)
 	}
 	rawEditPolicy := strings.TrimSpace(r.PostFormValue("edit_policy"))
@@ -754,9 +768,20 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	visListID := node.VisibilityListID
 	visGroupID := node.VisibilityGroupID
 	groupID := node.GroupID
-	if isAuthor {
+	if canChangeVisibility {
+		// Non-authors (staff moderators) can only pick the
+		// owner-independent scopes — public/connections/private — so we
+		// validate against empty lists/groups, matching what the form
+		// rendered. The author keeps the full picker against their own
+		// lists and groups.
+		pickLists := lists
+		pickGroups := groups
+		if !isAuthor {
+			pickLists = nil
+			pickGroups = nil
+		}
 		var visErr string
-		visKind, visListID, visGroupID, visErr = parseNodeVisibility(rawVisibility, node.CreatedBy, lists, groups)
+		visKind, visListID, visGroupID, visErr = parseNodeVisibility(rawVisibility, node.CreatedBy, pickLists, pickGroups)
 		if flash == "" && visErr != "" {
 			flash = visErr
 		}
@@ -776,7 +801,13 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if flash != "" {
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists, groups, isAuthor, string(editPolicy), string(linkPolicy)))
+		formLists := lists
+		formGroups := groups
+		if !isAuthor {
+			formLists = nil
+			formGroups = nil
+		}
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, formLists, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
 		return
 	}
 
@@ -799,7 +830,13 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists, groups, isAuthor, string(editPolicy), string(linkPolicy)))
+		formLists := lists
+		formGroups := groups
+		if !isAuthor {
+			formLists = nil
+			formGroups = nil
+		}
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, formLists, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
 		return
 	}
 	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
