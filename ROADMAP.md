@@ -1,128 +1,100 @@
 # Feature Roadmap
 
-This document outlines upcoming features beyond the MVP.
+This document outlines upcoming features beyond the MVP. For the current feature set, see [FEATURES.md](FEATURES.md).
 
-## Planned Features
+---
 
-### Node Hierarchy & Connection Enforcement
+## Next Up
 
-Topics are the centre of the graph — the source around which nodes and discussions flow. All other node types must be anchored to one.
+### Node Hierarchy Polish
 
-- **Fix pin form** — Remove the finding-node picker from the pin/stance form. Pinning is a simple three-way stance: Support, Oppose, or Feature. No nested finding attachment. Topics can only be Featured (support/oppose don't apply to a grouping node).
+- **Fix pin form** — Remove the finding-node picker from the pin/stance form. Pinning is a simple three-way stance: Support, Oppose, or Feature. No nested finding attachment at pin time.
 
 - **Enforced parent connections** — Each non-topic node type must declare a parent at creation time:
-  - **View** → must connect to a parent **Topic** (a view is a stance inside a topic's discussion)
-  - **Finding** → must connect to a parent **View** or another **Finding** (a finding argues for or against a specific claim, or refines another finding)
+  - **View** → must connect to a parent **Topic**.
+  - **Finding** → must connect to a parent **View** or another **Finding**.
   - Topics have no required parent; they are root nodes.
 
-- **Parent-scoped visibility** *(after Groups & Communities)* — Once groups exist, child nodes must inherit the parent's visibility ceiling. A child cannot be more open than its parent:
-  - On sub-nodes, `public` means **inherit parent visibility**, not "visible to everyone".
-  - Any explicit child restriction is combined with the parent restriction rather than replacing it.
-  - Example: a group-only topic plus a connections-only view is visible only to viewers who are both group members and mutual connections.
-  - Private parents keep descendants private unless a future explicit promotion flow widens the parent first.
+- **Featured topic bundles** *(deferred)* — Surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
 
-- **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
+- **Re-enable finding node creation inside the Connect menu.**
 
-### Content Authoring
+---
 
-- **Markdown node bodies** — Replace plain node body rendering with Markdown support. Use a prebuilt Markdown editor for create/edit forms, with EasyMDE as the preferred fit because it enhances normal textareas, preserves standard form posts, supports preview, and has image upload hooks we can reuse later for node images. Store raw Markdown in `nodes.body`; render server-side with a Markdown parser and sanitize the generated HTML before display.
-
-- **Node image uploads** — After Markdown support lands, add image uploads for node bodies. Uploaded node images should insert Markdown image syntax into the editor, be stored separately from profile images, and respect the node's effective visibility through the node page rather than becoming independently browsable content.
-
-### Social Foundation
-
-- **Follow system** — One-directional follow with one button. When two users follow each other, they automatically become **connections** (mutuals). No friend requests, no private accounts.
-
-- **Audience lists** — Beyond connections, users can curate named lists of specific people to enable fine-grained sharing:
-  - **Trusted** — a built-in list for people you explicitly trust, independent of mutual-follow status
-  - **Custom lists** — user-created named lists (e.g. "Colleagues", "Research group") for any grouping that makes sense to the author
-
-- **Visibility controls** — Every node and thread is assigned a visibility level at creation time, changeable later. Levels in order from most to least open:
-  - `public` — visible to anyone, including logged-out users
-  - `connections` — visible to mutual followers only; provides real protection since you control who you follow back
-  - `[list name]` — visible to members of a specific audience list (Trusted or any custom list)
-  - `private` — visible only to the author (drafts, personal notes)
+## Planned
 
 ### Personal Feeds & Discovery
 
-- **Personal feed** — Chronological or engagement-sorted feed showing content from followed users, own posts, and trending items. Acts as home page for logged-in users.
+- **Trending section** — A dedicated page showing nodes and threads with the highest engagement (votes, comments, connections) over recent time periods. Community-driven discovery without algorithmic ranking.
 
-- **Trending section** — Dedicated page showing nodes and threads with highest engagement (votes, comments, connections) over recent time periods. Community-driven discovery without algorithmic ranking.
-
-### Graphs & Visualization
+### Graphs & Visualisation
 
 - **Central graph engine** — A single interactive graph viewer that renders different slices of the argument graph depending on the active view and filters. All graph modes below are powered by this shared engine.
 
-- **Personal graph view** — Shows a user's own nodes, pins (supports/opposes), and finding threads. Starting point for understanding one's own argument landscape.
+- **Personal graph view** — Shows a user's own nodes, pins, and finding threads.
 
-- **Friends / social bubble view** — Shows the combined graph of people you follow. Highlights where your positions overlap, conflict, or are unconnected with the people in your network.
+- **Friends / social bubble view** — Shows the combined graph of people you follow. Highlights where your positions overlap, conflict, or are unconnected.
 
-- **Trending graph view** — Shows the most-engaged nodes and edges over a recent time window (driven by votes and connections), surfacing community-wide debates without algorithmic sorting.
+- **Trending graph view** — Shows the most-engaged nodes and edges over a recent time window.
 
-- **Graph filters** — Once a view is selected, users can narrow the graph further by:
-  - **Topic** — filter to nodes tagged under a specific subject area
-  - **Node type** — show only Topic, View, or Finding nodes
-  - **Person** — overlay or isolate the nodes of a specific user
+- **Graph filters** — Narrow the graph by topic, node type, or specific person.
 
-- **Graph search** — Full-text search across visible nodes and edges directly within the graph view. Matching nodes are highlighted in place so the user can see them in context rather than jumping to a list.
+- **Graph search** — Full-text search across visible nodes and edges directly within the graph view. Matching nodes highlight in place so the user can see them in context.
 
 ### Threading & Discussion
 
-- **Threads on View nodes** — Each view node becomes a host for a discussion thread. Users can comment, reply, and build conversations anchored to specific views in the argument graph.
+- **Threads on View nodes** — Each view node becomes a host for a discussion thread. Users can comment, reply, and build conversations anchored to a specific view.
 
-- **Threads on Finding nodes** — Similar to views, finding nodes can host threaded discussions, allowing users to debate and refine the logic or evidence behind specific arguments.
+- **Threads on Finding nodes** — Similar to views; finding nodes can host threaded discussions for debating the logic or evidence behind a specific argument.
 
 ### Voting & Engagement
 
-- **Voting system** — Upvote / downvote mechanism for nodes and edges. Powers the trending section and personalizes graph visualizations with community emphasis.
+- **Voting system** — Upvote / downvote for nodes and edges. Powers the trending section and personalises graph visualisations with community emphasis.
 
 ### Moderation & Trust
 
-- **Version history + rollback** — Every edit to a node body creates a versioned snapshot. Any user can view the edit history and revert to a previous version. Turns the wiki-open model into a self-healing system: edit wars get rolled back by the community rather than escalated to admins.
+- **Version history + rollback** — Every edit to a node body creates a versioned snapshot. Any user can view the edit history and revert to a previous version. Turns wiki-open editing into a self-healing system.
 
-- **Trust score system** — Each user has a trust score derived from community signals, not just time on the platform. Inputs:
-  - **Net votes on authored nodes/edges** — the most direct signal of contribution quality
-  - **Revert rate** — fraction of your edits to others' nodes that were rolled back; low revert rate means you edit constructively
-  - **Content longevity** — nodes you authored that are still standing (not deleted/hidden) after 30/90 days
-  - **Endorsements from high-trust users** — explicit and weighted; a Tier 2 endorsement counts more than a Tier 1 one
-  - **What is intentionally excluded:** raw post count (gameable by spamming), follower count (popularity ≠ trustworthiness), account age alone
+- **Trust score system** — Each user has a trust score derived from community signals:
+  - **Net votes on authored nodes/edges** — most direct signal of contribution quality.
+  - **Revert rate** — fraction of edits to others' nodes that were rolled back.
+  - **Content longevity** — nodes authored that are still standing after 30/90 days.
+  - **Endorsements from high-trust users** — explicit and weighted.
+  - **Intentionally excluded:** raw post count, follower count, account age alone.
   - Score is visible on profiles and gates actions via trust tiers (see below).
 
-- **Domain-scoped trust (stretch goal)** — Trust score is scoped per tag: high trust in "climate science" does not carry over to "economics". Lets subject-matter experts moderate their corner of the graph without having power outside it. Maps naturally onto the existing tag system. Deferred until the flat trust score is proven; makes the score harder to explain to users.
+- **Domain-scoped trust** *(stretch goal)* — Trust score scoped per tag: high trust in "climate science" does not carry over to "economics". Deferred until flat trust score is proven.
 
-- **Trust tiers** — Actions are gated by tier rather than a single moderator flag:
-  - **Tier 0 (new):** can post and pin; cannot edit others' content
-  - **Tier 1 (member):** unlocked after basic participation; can edit nodes wiki-open, highlight/unhighlight edges
-  - **Tier 2 (trusted):** requires meaningful trust score; can flag content, access the mod queue, hide nodes pending review
-  - **Tier 3 (moderator):** manually assigned by admins; full mod powers — permanent deletion, user suspension, override flags
+- **Trust tiers** — Actions gated by tier rather than a single moderator flag:
+  - **Tier 0 (new):** can post and pin; cannot edit others' content.
+  - **Tier 1 (member):** can edit nodes wiki-open, highlight/unhighlight edges.
+  - **Tier 2 (trusted):** can flag content, access the mod queue, hide nodes pending review.
+  - **Tier 3 (moderator):** manually assigned by admins; full mod powers — permanent deletion, user suspension, override flags.
 
-- **Flagging + mod queue** — Any Tier 1+ user can flag a node or edge. After a threshold of flags (or a single Tier 2 flag) the content is soft-hidden: invisible to other users but accessible to the creator and visible in the mod queue. Tier 2/3 users review the queue and restore or permanently remove flagged content.
+- **Flagging + mod queue** — Any Tier 1+ user can flag a node or edge. After a threshold of flags the content is soft-hidden; Tier 2/3 users review and restore or remove.
 
-- **Vouching** — Tier 2+ users can vouch for a newcomer, giving them an accelerated path to Tier 1. Vouches are recorded and factor into the voucher's own trust score to discourage abuse.
+- **Vouching** — Tier 2+ users can vouch for a newcomer, giving them an accelerated path to Tier 1. Vouches are recorded and factor into the voucher's own trust score.
 
-### Groups & Communities
-
-- **Shared spaces** — A group is a multi-member home for views, discussions, and findings that members share with each other rather than with the wider public. Friends, study groups, research teams, or any cluster of people who want a shared canvas can have one. Distinct from audience lists: a list is a *recipient set* you control privately; a group is a *collaborative space* every member sees.
-
-- **Membership & visibility** — Each group has an owner (or co-owners), a roster of members, and per-group visibility for the group itself (public, invite-only, closed). Nodes posted into a group default to group-scope visibility — visible to members only — but a member can also publish a node beyond the group if they choose.
-
-- **Audience groups as first-class restrictions** — Groups become one of the visibility predicates used by nodes, alongside public, connections, custom lists, and private. The long-term visibility model should treat each restriction as a set of allowed viewers and resolve access by intersecting all applicable sets: parent node scope, child node scope, group membership, list membership, author/private rules, and moderation state.
-
-- **Implementation sketch** — Add `groups`, `group_memberships`, and `group_invites` tables first, then add optional `group_id`/group visibility support to nodes. Start with owner/member roles, member-only posting, a group detail page, and a group feed. After that, implement effective node visibility as a shared query/helper so feeds, profiles, search, tags, and edge listings all use the same parent-and-group-aware access check.
-
-- **Group-scoped permissions** — Group owners can pick per-group defaults for the edit/link policies on nodes posted into the group (e.g. "members can edit any group node", "only the author can edit"). Individual nodes can override the default.
-
-- **Discovery vs. privacy** — Public groups appear in browse/search and anyone can join (or request to join, if invite-only). Closed groups are completely hidden from non-members.
-
-- **Open questions** — how groups interact with the topic graph (is a group's discussion a slice of the global graph or its own subgraph?); whether group-only topics can later be promoted public; moderation scoping (group owners as local moderators of their space).
+---
 
 ## Future Considerations
 
-- AI helpers (link suggestion, compaction, thread→graph promotion)
-- Graph editor UI (Svelte + svelte-flow)
-- Mobile polish
-- Org-wide graphs / multi-tenant deployments
+- AI helpers: link suggestion, argument compaction, thread-to-graph promotion.
+- Graph editor UI (Svelte + svelte-flow).
+- Mobile polish.
+- Org-wide graphs / multi-tenant deployments.
 
-## More
+---
 
-- Reenable finding node creation inside the Connect menu
+## Completed
+
+Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
+
+- **Argument graph** — topics, views, findings; typed directed edges; parent-topic enforcement; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
+- **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode.
+- **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
+- **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, pins with finding attachments, home feed, public profiles.
+- **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
+- **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection.
+- **Administration** — role-based access, admin UI, `ADMIN_USERS` bootstrap.
+- **Deployment** — self-contained binary, embedded migrations, Nix flake, NixOS module, health check endpoint.
