@@ -35,6 +35,7 @@ Edge highlighting marks key reasoning inline on the node page.
 - Optional **body** written in Markdown (rendered server-side, sanitised before display).
 - Attached **images** inserted via Markdown syntax; stored separately from profile images.
 - Attached **videos** transcoded to H.264/AAC mp4 at up to 1080p.
+- **Author byline** — linked avatar + username shown below the node title on the detail page.
 
 ### Editing Model
 
@@ -46,7 +47,7 @@ Edge highlighting marks key reasoning inline on the node page.
 
 ## Discovery
 
-- **Full-text search** — Postgres `tsvector` with stemming; returns results with highlighted excerpts.
+- **Full-text search** — Postgres `tsvector` with stemming; returns results with highlighted excerpts and an author byline beside each hit.
 - **Fuzzy title search** — trigram similarity on node titles for typo and partial-match tolerance.
 - **Live search** — HTMX-powered picker in edge and topic forms; results update as you type.
 - **Tags** — public tag index and per-tag listings.
@@ -91,6 +92,7 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 ### Home Feed
 
 - `/home` shows recent nodes from users you follow plus your own posts, in reverse-chronological order.
+- Each row shows an **author byline** (avatar + linked username) alongside the node title.
 
 ---
 

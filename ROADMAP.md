@@ -93,7 +93,7 @@ Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
 - **Argument graph** — topics, views, findings; typed directed edges; parent-topic enforcement; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
 - **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode.
 - **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
-- **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, pins with finding attachments, home feed, public profiles.
+- **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, pins with finding attachments, home feed, public profiles; author bylines on node detail, home feed, and search results.
 - **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
 - **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection.
 - **Administration** — role-based access, admin UI, `ADMIN_USERS` bootstrap.
