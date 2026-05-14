@@ -1088,6 +1088,14 @@ label.field {
 .markdown-body th {
   background: var(--bg-elev-1);
 }
+.markdown-body video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin: var(--s-3) 0;
+  background: black;
+}
 
 .form-fieldset {
   border: 1px solid var(--border);

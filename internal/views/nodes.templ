@@ -119,8 +119,10 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			class="markdown-editor"
 			data-image-endpoint-template="/nodes/{id}/images"
 			data-image-endpoint-source="parent_topic_id"
+			data-video-endpoint-template="/nodes/{id}/videos"
+			data-video-endpoint-source="parent_topic_id"
 		>{ formBody }</textarea>
-		<small>Optional. Describe the node in your own words. Drop or paste an image to attach it to the root topic.</small>
+		<small>Optional. Describe the node in your own words. Drop or paste an image, or use the video button to attach a clip.</small>
 	</label>
 	@nodeVisibilitySelect(formVisibility, lists, groups)
 	<fieldset class="toggle-group">
@@ -450,8 +452,9 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 						rows="6"
 						class="markdown-editor"
 						data-image-endpoint={ "/nodes/" + node.Slug + "/images" }
+						data-video-endpoint={ "/nodes/" + node.Slug + "/videos" }
 					>{ formBody }</textarea>
-					<small>Optional. Describe the node in your own words. Drop or paste an image to attach it to the root topic.</small>
+					<small>Optional. Describe the node in your own words. Drop or paste an image, or use the video button to attach a clip.</small>
 				</label>
 				if node.Type == db.NodeTypeFinding {
 					<label>

@@ -25,20 +25,128 @@
     return meta ? meta.getAttribute("content") : "";
   }
 
-  // resolveImageEndpoint inspects the textarea's data-image-* attributes and
-  // returns the URL EasyMDE should POST uploads to. The "template" form
+  // resolveEndpoint inspects the textarea's data-<kind>-* attributes and
+  // returns the URL the editor should POST uploads to. The "template" form
   // ("/nodes/{id}/images") is paired with a form-input name that supplies
   // the id at runtime — used on the New-post composer where the parent
   // topic isn't known until the user picks one.
-  function resolveImageEndpoint(textarea) {
-    if (textarea.dataset.imageEndpoint) return textarea.dataset.imageEndpoint;
-    var template = textarea.dataset.imageEndpointTemplate;
-    var sourceName = textarea.dataset.imageEndpointSource;
+  function resolveEndpoint(textarea, kind) {
+    var direct = textarea.dataset[kind + "Endpoint"];
+    if (direct) return direct;
+    var template = textarea.dataset[kind + "EndpointTemplate"];
+    var sourceName = textarea.dataset[kind + "EndpointSource"];
     if (!template || !sourceName || !textarea.form) return "";
     var checked = textarea.form.querySelector('input[name="' + sourceName + '"]:checked');
     var value = checked ? checked.value : "";
     if (!value) return "";
     return template.replace("{id}", encodeURIComponent(value));
+  }
+
+  function resolveImageEndpoint(textarea) { return resolveEndpoint(textarea, "image"); }
+  function resolveVideoEndpoint(textarea) { return resolveEndpoint(textarea, "video"); }
+
+  function hasVideoEndpoint(textarea) {
+    return !!(textarea.dataset.videoEndpoint || textarea.dataset.videoEndpointTemplate);
+  }
+
+  var VIDEO_ERROR_MESSAGES = {
+    noFileGiven: "Choose a video to upload.",
+    typeNotAllowed: "That file isn't a video we can transcode.",
+    fileTooLarge: "Videos must be 256 MB or smaller.",
+    importError: "Could not upload the video. Please try again.",
+    noPermission: "You don't have permission to upload videos here.",
+  };
+
+  // uploadVideoFile streams a single file to the video endpoint resolved
+  // from the textarea (so endpoint switching when the composer's parent
+  // topic changes Just Works) and resolves to the public /uploads path.
+  function uploadVideoFile(textarea, file) {
+    return new Promise(function (resolve, reject) {
+      var endpoint = resolveVideoEndpoint(textarea);
+      if (!endpoint) {
+        reject(new Error(VIDEO_ERROR_MESSAGES.noPermission));
+        return;
+      }
+      var form = new FormData();
+      form.append("video", file);
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", endpoint);
+      xhr.setRequestHeader("X-CSRF-Token", csrfToken());
+      xhr.onload = function () {
+        var body = null;
+        try { body = JSON.parse(xhr.responseText); } catch (e) {}
+        if (xhr.status >= 200 && xhr.status < 300 && body && body.data && body.data.filePath) {
+          resolve(body.data.filePath);
+          return;
+        }
+        var code = (body && body.error) || "importError";
+        reject(new Error(VIDEO_ERROR_MESSAGES[code] || VIDEO_ERROR_MESSAGES.importError));
+      };
+      xhr.onerror = function () { reject(new Error(VIDEO_ERROR_MESSAGES.importError)); };
+      xhr.send(form);
+    });
+  }
+
+  // videoTag renders the HTML block the markdown sanitizer is configured
+  // to accept verbatim. Keep this in sync with the bluemonday allow-list
+  // in internal/views/markdown.go.
+  function videoTag(filePath) {
+    return '<video controls playsinline preload="metadata" src="' + filePath + '"></video>';
+  }
+
+  // triggerVideoUpload opens a hidden file picker, then uploads the
+  // selected clip while a placeholder line keeps the spot in the
+  // document. On success the placeholder is rewritten to the <video>
+  // tag; on failure it is removed and the editor shows an error notice.
+  function triggerVideoUpload(textarea, editor) {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "video/*";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      document.body.removeChild(input);
+      if (!file) return;
+      handleVideoUpload(textarea, editor, file);
+    });
+    input.click();
+  }
+
+  function handleVideoUpload(textarea, editor, file) {
+    var cm = editor.codemirror;
+    var doc = cm.getDoc();
+    var cursor = doc.getCursor();
+    var prefix = cursor.ch === 0 ? "" : "\n\n";
+    var placeholder = prefix + "<!-- uploading video… -->\n\n";
+    var from = { line: cursor.line, ch: cursor.ch };
+    doc.replaceRange(placeholder, from);
+    var to = doc.posFromIndex(doc.indexFromPos(from) + placeholder.length);
+    var marker = doc.markText(from, to, { className: "cm-uploading", clearOnEnter: false });
+    cm.setCursor(to);
+
+    var finish = function (replacement) {
+      var range = marker.find();
+      marker.clear();
+      if (!range) {
+        // The user already edited the placeholder out — fall back to
+        // splicing at the current cursor.
+        var cur = doc.getCursor();
+        doc.replaceRange(replacement, cur);
+        return;
+      }
+      doc.replaceRange(replacement, range.from, range.to);
+    };
+
+    uploadVideoFile(textarea, file).then(function (filePath) {
+      finish(prefix + videoTag(filePath) + "\n\n");
+    }).catch(function (err) {
+      finish("");
+      if (typeof editor.element !== "undefined" && editor.element) {
+        var msg = (err && err.message) || VIDEO_ERROR_MESSAGES.importError;
+        alert(msg);
+      }
+    });
   }
 
   function initMarkdownEditors(root) {
@@ -99,6 +207,16 @@
           importError: "Could not upload the image. Please try again.",
           noPermission: "You don't have permission to upload images here.",
         };
+      }
+
+      var videoEnabled = hasVideoEndpoint(textarea);
+      if (videoEnabled) {
+        options.toolbar.push({
+          name: "upload-video",
+          action: function (mde) { triggerVideoUpload(textarea, mde); },
+          icon: icon("movie"),
+          title: "Upload video",
+        });
       }
 
       options.toolbar.push("|");

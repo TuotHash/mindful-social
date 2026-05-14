@@ -153,6 +153,12 @@ in {
       wants = [ "network-online.target" ]
         ++ lib.optional cfg.database.createLocally "postgresql.service";
 
+      # ffmpeg/ffprobe drive the video-upload transcode pipeline. They
+      # need to be on the unit's PATH because the handler resolves them
+      # with exec.LookPath, and ProtectSystem=strict otherwise hides
+      # /run/current-system/sw from the sandbox.
+      path = [ pkgs.ffmpeg-headless ];
+
       environment = {
         LISTEN_ADDR = cfg.listenAddr;
         PUBLIC_BASE_URL = cfg.publicBaseURL;

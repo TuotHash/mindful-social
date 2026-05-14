@@ -55,6 +55,7 @@ type Querier interface {
 	CreateGroupInvite(ctx context.Context, arg CreateGroupInviteParams) (GroupInvite, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeImage(ctx context.Context, arg CreateNodeImageParams) (NodeImage, error)
+	CreateNodeVideo(ctx context.Context, arg CreateNodeVideoParams) (NodeVideo, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Trusted lists can't be deleted; the WHERE clause enforces this without
 	// the caller having to remember.
@@ -159,6 +160,7 @@ type Querier interface {
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
 	ListNodeImagesForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeImagesForRootRow, error)
+	ListNodeVideosForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeVideosForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
 	// on a profile page. Filtered through node_visible_to() so a visitor only
 	// sees nodes they're entitled to.
