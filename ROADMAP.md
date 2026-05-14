@@ -43,9 +43,68 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 ### Threading & Discussion
 
-- **Threads on View nodes** — Each view node becomes a host for a discussion thread. Users can comment, reply, and build conversations anchored to a specific view.
+#### Mental model
 
-- **Threads on Finding nodes** — Similar to views; finding nodes can host threaded discussions for debating the logic or evidence behind a specific argument.
+The social layer maps cleanly onto familiar patterns:
+
+| This platform | Reddit analogy |
+|---------------|---------------|
+| Topic node    | Subreddit / forum board |
+| View node     | Post / thread starter |
+| Comment       | Comment or reply |
+| Finding       | Wikipedia reference (citation, not discussion) |
+
+**Topics** are containers. The topic page lists its view nodes the way a subreddit lists posts — title, author, timestamp, comment count.
+
+**Views** ARE the threads. Clicking a view opens its full page: the view body, its findings listed as references below, and a two-level comment section below that.
+
+**Findings** are structured citations attached to a view — links, images, videos, or other safe file types. They live on the view page as a reference list, not as discussion. Their relationship to the view node (via the existing edge model or a simpler attachment model) is an open design decision.
+
+**Comments** are free-form plain text. They do not create nodes or edges. Posting a comment is low-friction — just writing, like Reddit.
+
+#### Comment threading: two-level
+
+- **Top-level comments** reply directly to the view.
+- **Replies** respond to a top-level comment. One level only — you cannot reply to a reply.
+- This keeps the thread readable and discourages the fragmented sub-debates that deep nesting produces. The argument graph already handles structured debate; comments are for social reaction and discussion.
+
+#### Schema
+
+```
+comments
+  id          bigint PK
+  node_id     bigint → nodes(id) ON DELETE CASCADE   -- must be a view node
+  parent_id   bigint → comments(id) ON DELETE CASCADE -- null = top-level; non-null = reply
+  author_id   bigint → users(id)
+  body        text NOT NULL
+  created_at  timestamptz
+  edited_at   timestamptz NULL
+  deleted_at  timestamptz NULL   -- soft delete: preserves thread shape, shows "comment removed"
+```
+
+Two-level is enforced in the application: a reply's `parent_id` must point to a top-level comment (one whose own `parent_id` is null). The schema does not need to encode this constraint.
+
+#### Visibility
+
+Comments inherit the view node's visibility. If a view is group-only or restricted to a specific audience, its comment thread is too. No separate visibility configuration needed.
+
+#### Authoring rules
+
+- Any user who can see the view can post a comment (consistent with wiki-open editing philosophy for nodes).
+- Authors can edit their own comment; `edited_at` is shown to readers.
+- Authors can soft-delete their own comment. The slot remains with "comment removed" so replies do not orphan.
+- Tier 3 moderators can hard-delete (ties into the trust tier system).
+- No markdown in v1 — plain textarea. Can revisit once the UX is validated.
+
+#### Topic page (view listing)
+
+The topic's page shows its connected view nodes as a feed: title, author avatar + username, relative timestamp, comment count, and a short excerpt of the view body. Sorted chronologically by default; by engagement once voting lands.
+
+#### Open design decisions
+
+- **Findings attachment model** — do findings attach to a view via the existing typed-edge graph (a finding node + an edge), or via a lighter `view_findings` join table that skips the graph layer? The edge model is more powerful but adds friction when attaching a quick citation. Decide before implementing.
+- **Comment notifications** — notify the view author when someone comments; notify a commenter when someone replies. Requires a notifications table (not yet designed).
+- **Voting on comments** — deferred to the Voting & Engagement milestone; design comment voting alongside node voting so the schema is consistent.
 
 ### Voting & Engagement
 
