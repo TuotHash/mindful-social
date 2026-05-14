@@ -8,10 +8,11 @@ let
   # archives) that would otherwise bloat the store derivation or, in
   # the case of redesign/, break `go build`.
   src = lib.cleanSourceWith {
-    src = lib.cleanSource ../.;
+    src = ../.;
     filter = path: type:
       let baseName = baseNameOf (toString path); in
-        !(baseName == ".pgdata")
+        type != "unknown"
+        && !(baseName == ".pgdata")
         && !(baseName == ".pgrun")
         && !(baseName == "redesign")
         && !(lib.hasSuffix ".zip" baseName);
