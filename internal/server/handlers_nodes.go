@@ -62,7 +62,7 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 // handleHome serves the personal feed at /home for logged-in users.
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	recent, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
+	rows, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
 		Limit:    25,
 		ViewerID: viewerID(r),
 	})
@@ -71,7 +71,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.Feed(viewerFor(user), recent))
+	items := make([]views.FeedItem, len(rows))
+	for i, r := range rows {
+		items[i] = views.FeedItem{Slug: r.Slug, Type: r.Type, Title: r.Title, AuthorUsername: r.AuthorUsername}
+	}
+	render(w, r, views.Feed(viewerFor(user), items))
 }
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
@@ -405,6 +409,13 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	author, err := s.queries.GetUser(r.Context(), node.CreatedBy)
+	if err != nil {
+		s.logger.Error("node detail: author", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	canEdit, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: edit policy", "err", err)
@@ -421,6 +432,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.NodeDetail(
 		viewerFor(user),
 		node,
+		author.Username,
 		highlightedRows(feat),
 		displayGroups(out, in),
 		pin,

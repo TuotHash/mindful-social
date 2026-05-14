@@ -1474,24 +1474,29 @@ label.field {
   flex-direction: column;
 }
 .node-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
   border-top: 1px solid var(--border);
   margin: 0;
 }
 .node-list li:last-child {
   border-bottom: 1px solid var(--border);
 }
-.node-list a {
+.node-list li > a:not(.node-author) {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   padding: var(--s-3) 0;
   color: var(--text);
   text-decoration: none;
+  flex: 1;
+  min-width: 0;
   transition:
     padding-left 0.15s,
     color 0.15s;
 }
-.node-list a:hover {
+.node-list li > a:not(.node-author):hover {
   text-decoration: none;
   color: var(--text);
   padding-left: 6px;
@@ -1510,6 +1515,20 @@ label.field {
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   white-space: nowrap;
+}
+.node-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.node-author:hover {
+  color: var(--text);
+  text-decoration: none;
 }
 
 /* "argument graph — coming soon" promo (home page) */
@@ -2168,19 +2187,28 @@ header.node-header > .chip {
   border-bottom: 1px solid var(--border);
 }
 .search-hit {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.search-hit-link {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
   color: var(--text);
   font-weight: 500;
   font-size: var(--fs-md);
-  margin-bottom: 4px;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+.search-hit-link:hover {
+  color: var(--accent-strong);
   text-decoration: none;
 }
-.search-hit:hover {
-  color: var(--accent-strong);
-}
-.search-hit .title {
+.search-hit-link .title {
   font-weight: 500;
 }
 .search-excerpt {

@@ -354,9 +354,11 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
+SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
+FROM nodes n
+JOIN users u ON u.id = n.created_by
 WHERE node_visible_to(n.*, $2::uuid)
-ORDER BY created_at DESC
+ORDER BY n.created_at DESC
 LIMIT $1
 `
 
@@ -365,35 +367,33 @@ type ListRecentNodesForViewerParams struct {
 	ViewerID *uuid.UUID `json:"viewer_id"`
 }
 
+type ListRecentNodesForViewerRow struct {
+	ID             uuid.UUID          `json:"id"`
+	Slug           string             `json:"slug"`
+	Type           NodeType           `json:"type"`
+	Title          string             `json:"title"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	AuthorUsername string             `json:"author_username"`
+}
+
 // Home page feed. node_visible_to() handles the per-row visibility check;
 // viewer_id is NULL for logged-out users (only public nodes match).
-func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]Node, error) {
+func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listRecentNodesForViewer, arg.Limit, arg.ViewerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Node
+	var items []ListRecentNodesForViewerRow
 	for rows.Next() {
-		var i Node
+		var i ListRecentNodesForViewerRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Slug,
 			&i.Type,
 			&i.Title,
-			&i.Body,
-			&i.SourceUrl,
-			&i.CreatedBy,
 			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.SearchTsv,
-			&i.Slug,
-			&i.Visibility,
-			&i.VisibilityListID,
-			&i.EditPolicy,
-			&i.LinkPolicy,
-			&i.ParentNodeID,
-			&i.GroupID,
-			&i.VisibilityGroupID,
+			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
 		}
@@ -506,6 +506,7 @@ const searchNodes = `-- name: SearchNodes :many
 SELECT
     n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
+    u.username AS author_username,
     CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', $1::text)
          THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', $1::text))
          ELSE word_similarity($1::text, n.title)::real
@@ -513,6 +514,7 @@ SELECT
     ts_headline('english', n.body, websearch_to_tsquery('english', $1::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
 FROM nodes n
+JOIN users u ON u.id = n.created_by
 WHERE (n.search_tsv @@ websearch_to_tsquery('english', $1::text)
        OR n.title %> $1::text)
   AND node_visible_to(n.*, $2::uuid)
@@ -527,17 +529,18 @@ type SearchNodesParams struct {
 }
 
 type SearchNodesRow struct {
-	ID        uuid.UUID          `json:"id"`
-	Slug      string             `json:"slug"`
-	Type      NodeType           `json:"type"`
-	Title     string             `json:"title"`
-	Body      string             `json:"body"`
-	SourceUrl *string            `json:"source_url"`
-	CreatedBy uuid.UUID          `json:"created_by"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	Rank      float32            `json:"rank"`
-	Excerpt   string             `json:"excerpt"`
+	ID             uuid.UUID          `json:"id"`
+	Slug           string             `json:"slug"`
+	Type           NodeType           `json:"type"`
+	Title          string             `json:"title"`
+	Body           string             `json:"body"`
+	SourceUrl      *string            `json:"source_url"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	AuthorUsername string             `json:"author_username"`
+	Rank           float32            `json:"rank"`
+	Excerpt        string             `json:"excerpt"`
 }
 
 // Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
@@ -573,6 +576,7 @@ func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]Sea
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthorUsername,
 			&i.Rank,
 			&i.Excerpt,
 		); err != nil {

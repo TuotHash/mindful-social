@@ -275,7 +275,7 @@ templ nodeTypeChip(t db.NodeType) {
 	</span>
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
+templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -283,6 +283,10 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 					<h1 style="margin: 0; min-width: 0;">{ node.Title }</h1>
 					@nodeTypeChip(node.Type)
 				</header>
+				<a href={ templ.SafeURL("/users/" + authorUsername) } class="node-author" style="margin-top: 8px;">
+					@Avatar(authorUsername, 20)
+					{ authorUsername }
+				</a>
 				if nodeMarkdownHasText(node.Body) {
 					<section class="body markdown-body" style="margin-top: 14px;">
 						@NodeMarkdown(node.Body)

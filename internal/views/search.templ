@@ -11,11 +11,12 @@ import (
 // and matched parts so templ can escape each one and surround matches with
 // <mark> safely (without exposing user-authored HTML).
 type SearchHit struct {
-	ID      uuid.UUID
-	Slug    string
-	Type    db.NodeType
-	Title   string
-	Excerpt []ExcerptPart
+	ID             uuid.UUID
+	Slug           string
+	Type           db.NodeType
+	Title          string
+	AuthorUsername string
+	Excerpt        []ExcerptPart
 }
 
 // UserSearchHit is one person result on the /search page.
@@ -84,13 +85,19 @@ templ userSearchHitItem(u UserSearchHit) {
 
 templ searchHitItem(h SearchHit) {
 	<li>
-		<a href={ templ.SafeURL("/nodes/" + h.Slug) } class="search-hit">
-			<span class={ "chip", string(h.Type) }>
-				<span class="dot"></span>
-				{ string(h.Type) }
-			</span>
-			<span class="title">{ h.Title }</span>
-		</a>
+		<div class="search-hit">
+			<a href={ templ.SafeURL("/nodes/" + h.Slug) } class="search-hit-link">
+				<span class={ "chip", string(h.Type) }>
+					<span class="dot"></span>
+					{ string(h.Type) }
+				</span>
+				<span class="title">{ h.Title }</span>
+			</a>
+			<a href={ templ.SafeURL("/users/" + h.AuthorUsername) } class="node-author">
+				@Avatar(h.AuthorUsername, 18)
+				{ h.AuthorUsername }
+			</a>
+		</div>
 		if len(h.Excerpt) > 0 {
 			<p class="search-excerpt">
 				@searchExcerpt(h.Excerpt)

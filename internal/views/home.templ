@@ -14,10 +14,18 @@ templ Landing(viewer *Viewer) {
 	}
 }
 
+// FeedItem is a slim node row for the home feed — just what the list needs.
+type FeedItem struct {
+	Slug           string
+	Type           db.NodeType
+	Title          string
+	AuthorUsername string
+}
+
 // Feed renders the personal feed at /home for logged-in users.
-templ Feed(viewer *Viewer, recent []db.Node) {
+templ Feed(viewer *Viewer, items []FeedItem) {
 	@Layout("Home", viewer) {
-		@homeFeed(viewer, recent)
+		@homeFeed(viewer, items)
 	}
 }
 
@@ -155,7 +163,7 @@ templ landingMarketing(viewer *Viewer) {
 	@siteFooter(viewer)
 }
 
-templ homeFeed(viewer *Viewer, recent []db.Node) {
+templ homeFeed(viewer *Viewer, items []FeedItem) {
 	<div class="page">
 		<section class="col gap-16" style="margin-bottom: 32px;">
 			<span class="eyebrow">Welcome back, { viewer.Username }</span>
@@ -170,13 +178,13 @@ templ homeFeed(viewer *Viewer, recent []db.Node) {
 				<span class="eyebrow">Recent nodes</span>
 				<a class="muted" href="/tags" style="font-size: 13px; text-decoration: none;">All tags →</a>
 			</div>
-			if len(recent) == 0 {
+			if len(items) == 0 {
 				<div class="card muted" style="padding: 24px; text-align: center;">
 					The graph is empty. <a href="/nodes/new" style="color: var(--ink); font-weight: 500;">Be the first to add a node.</a>
 				</div>
 			} else {
 				<ul class="node-list">
-					for _, n := range recent {
+					for _, n := range items {
 						<li>
 							<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
 								<span class={ "chip", string(n.Type) }>
@@ -184,6 +192,10 @@ templ homeFeed(viewer *Viewer, recent []db.Node) {
 									{ string(n.Type) }
 								</span>
 								<span class="title">{ n.Title }</span>
+							</a>
+							<a href={ templ.SafeURL("/users/" + n.AuthorUsername) } class="node-author">
+								@Avatar(n.AuthorUsername, 18)
+								{ n.AuthorUsername }
 							</a>
 						</li>
 					}

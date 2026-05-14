@@ -29,9 +29,11 @@ WHERE n.id = $1;
 -- name: ListRecentNodesForViewer :many
 -- Home page feed. node_visible_to() handles the per-row visibility check;
 -- viewer_id is NULL for logged-out users (only public nodes match).
-SELECT * FROM nodes n
+SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
+FROM nodes n
+JOIN users u ON u.id = n.created_by
 WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
-ORDER BY created_at DESC
+ORDER BY n.created_at DESC
 LIMIT $1;
 
 -- name: ListNodesByType :many
@@ -160,6 +162,7 @@ LIMIT 50;
 SELECT
     n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,
     n.created_at, n.updated_at,
+    u.username AS author_username,
     CASE WHEN n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
          THEN 1.0 + ts_rank(n.search_tsv, websearch_to_tsquery('english', sqlc.arg(query)::text))
          ELSE word_similarity(sqlc.arg(query)::text, n.title)::real
@@ -167,6 +170,7 @@ SELECT
     ts_headline('english', n.body, websearch_to_tsquery('english', sqlc.arg(query)::text),
                 'StartSel=«HL», StopSel=«/HL», MaxFragments=1, MaxWords=24, MinWords=8')::text AS excerpt
 FROM nodes n
+JOIN users u ON u.id = n.created_by
 WHERE (n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
        OR n.title %> sqlc.arg(query)::text)
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)

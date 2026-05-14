@@ -45,11 +45,12 @@ func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
 	out := make([]views.SearchHit, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, views.SearchHit{
-			ID:      row.ID,
-			Slug:    row.Slug,
-			Type:    row.Type,
-			Title:   row.Title,
-			Excerpt: parseHighlightedExcerpt(row.Excerpt),
+			ID:             row.ID,
+			Slug:           row.Slug,
+			Type:           row.Type,
+			Title:          row.Title,
+			AuthorUsername: row.AuthorUsername,
+			Excerpt:        parseHighlightedExcerpt(row.Excerpt),
 		})
 	}
 	return out
