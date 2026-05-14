@@ -86,7 +86,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	csrfMw, err := csrfMiddleware(cfg.PublicBaseURL)
+	csrfMw, err := csrfMiddleware(logger, cfg.PublicBaseURL)
 	if err != nil {
 		pool.Close()
 		_ = sqlDB.Close()
@@ -154,6 +154,7 @@ func (s *Server) routes() {
 	// and persists changes on the way out.
 	r.Use(s.sessions.LoadAndSave)
 	r.Use(s.loadUser)
+	r.Use(s.requestLogger)
 	// gorilla/csrf double-submit cookie + token check on unsafe methods.
 	// The bridge inside csrfMiddleware copies the per-request token onto
 	// our ctx so templates can render the hidden input via views.CSRFField.

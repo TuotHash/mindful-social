@@ -3,8 +3,11 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"time"
 
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -85,6 +88,41 @@ func viewerID(r *http.Request) *uuid.UUID {
 		return &id
 	}
 	return nil
+}
+
+// requestLogger emits one structured log line per request. It runs after
+// loadUser so user_id is available in context. 4xx responses log at Warn,
+// 5xx at Error, everything else at Info.
+func (s *Server) requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(ww, r)
+
+		status := ww.Status()
+		if status == 0 {
+			status = http.StatusOK
+		}
+
+		attrs := []any{
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", status,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"request_id", chimw.GetReqID(r.Context()),
+		}
+		if u := currentUser(r); u != nil {
+			attrs = append(attrs, "user_id", u.ID)
+		}
+
+		level := slog.LevelInfo
+		if status >= 500 {
+			level = slog.LevelError
+		} else if status >= 400 {
+			level = slog.LevelWarn
+		}
+		s.logger.Log(r.Context(), level, "request", attrs...)
+	})
 }
 
 // viewerFor turns a *db.User into the slim Viewer struct templates render.

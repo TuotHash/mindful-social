@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -39,10 +40,9 @@ func cacheStatic(h http.Handler) http.Handler {
 // don't have to import templ directly.
 func render(w http.ResponseWriter, r *http.Request, c templ.Component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Render writes directly into w. If it fails mid-stream the response
-	// will already be partially flushed, so there's nothing useful we can
-	// recover; the request log will record the request id.
-	_ = c.Render(r.Context(), w)
+	if err := c.Render(r.Context(), w); err != nil {
+		slog.Default().Error("render failed", "err", err, "path", r.URL.Path)
+	}
 }
 
 // chiURLParam wraps chi.URLParam so feature-specific files don't have to
