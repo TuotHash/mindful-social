@@ -2,8 +2,11 @@ package views
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
@@ -225,6 +228,34 @@ type PinFinding struct {
 	Title string
 }
 
+// TopicView is one child view in a topic's thread feed.
+type TopicView struct {
+	ID                     uuid.UUID
+	Slug                   string
+	Title                  string
+	Body                   string
+	CreatedAt              pgtype.Timestamptz
+	AuthorUsername         string
+	AuthorProfileImagePath string
+	CommentCount           int64
+}
+
+// Comment is one rendered comment or one reply. Replies are populated only
+// for top-level comments; the server enforces a single reply level.
+type Comment struct {
+	ID                     uuid.UUID
+	AuthorID               uuid.UUID
+	AuthorUsername         string
+	AuthorProfileImagePath string
+	Body                   string
+	CreatedAt              pgtype.Timestamptz
+	EditedAt               pgtype.Timestamptz
+	DeletedAt              pgtype.Timestamptz
+	CanEdit                bool
+	CanDelete              bool
+	Replies                []Comment
+}
+
 // pinKindLabel turns a PinKind value into the verb shown in the UI banner
 // ("You support this", "You oppose this", "On your profile").
 func pinKindLabel(k db.PinKind) string {
@@ -267,6 +298,67 @@ func cascadePinLabel(n int64) string {
 	return fmt.Sprintf("%d other users' pins to this node will be removed.", n)
 }
 
+func commentCountLabel(n int64) string {
+	if n == 1 {
+		return "1 comment"
+	}
+	return fmt.Sprintf("%d comments", n)
+}
+
+func relativeTime(t time.Time) string {
+	d := time.Since(t)
+	if d < 0 {
+		return "just now"
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo ago", int(d.Hours()/(24*30)))
+	default:
+		return fmt.Sprintf("%dy ago", int(d.Hours()/(24*365)))
+	}
+}
+
+func timestampDatetime(ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return ""
+	}
+	return ts.Time.Format(time.RFC3339)
+}
+
+func timestampTitle(v *Viewer, ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return ""
+	}
+	return ts.Time.In(v.Location()).Format("Jan 2, 2006 15:04")
+}
+
+func timestampRelative(ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return ""
+	}
+	return relativeTime(ts.Time)
+}
+
+func topicViewExcerpt(body string) string {
+	plain := strings.Join(strings.Fields(body), " ")
+	if plain == "" {
+		return ""
+	}
+	r := []rune(plain)
+	if len(r) <= 180 {
+		return plain
+	}
+	return string(r[:180]) + "..."
+}
+
 // nodeTypeChip renders a chip with the node-type pastel.
 templ nodeTypeChip(t db.NodeType) {
 	<span class={ "chip", string(t) }>
@@ -275,7 +367,7 @@ templ nodeTypeChip(t db.NodeType) {
 	</span>
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
+templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -360,6 +452,10 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 				}
 			</article>
 
+			if node.Type == db.NodeTypeTopic {
+				@TopicViewFeed(viewer, topicViews)
+			}
+
 			if len(featured) > 0 {
 				<section class="featured">
 					<h2>Key findings</h2>
@@ -429,6 +525,153 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 					}
 				}
 			</aside>
+			if node.Type == db.NodeTypeView {
+				@CommentSection(viewer, node, comments, commentCount)
+			}
+		</div>
+	}
+}
+
+templ TopicViewFeed(viewer *Viewer, items []TopicView) {
+	<section class="topic-feed">
+		<div class="section-head">
+			<div>
+				<h2>Views</h2>
+				<p class="muted">Posts anchored to this topic.</p>
+			</div>
+		</div>
+		if len(items) == 0 {
+			<div class="card muted topic-empty">No views in this topic yet.</div>
+		} else {
+			<div class="topic-view-list">
+				for _, item := range items {
+					<article class="topic-view-row">
+						<header>
+							<a href={ templ.SafeURL("/nodes/" + item.Slug) } class="topic-view-title">{ item.Title }</a>
+							<span class="topic-view-comments">{ commentCountLabel(item.CommentCount) }</span>
+						</header>
+						<div class="topic-view-meta">
+							<a href={ templ.SafeURL("/users/" + item.AuthorUsername) } class="node-author">
+								@AvatarImage(item.AuthorUsername, item.AuthorProfileImagePath, 20)
+								{ item.AuthorUsername }
+							</a>
+							<span>·</span>
+							<time datetime={ timestampDatetime(item.CreatedAt) } title={ timestampTitle(viewer, item.CreatedAt) }>{ timestampRelative(item.CreatedAt) }</time>
+						</div>
+						if topicViewExcerpt(item.Body) != "" {
+							<p>{ topicViewExcerpt(item.Body) }</p>
+						}
+					</article>
+				}
+			</div>
+		}
+	</section>
+}
+
+templ CommentSection(viewer *Viewer, node db.Node, comments []Comment, count int64) {
+	<section id="comments" class="comments">
+		<div class="comments-head">
+			<h2>Comments</h2>
+			<span class="muted">{ commentCountLabel(count) }</span>
+		</div>
+		if viewer != nil {
+			@CommentForm(node, "", "Comment")
+		} else {
+			<p class="muted comment-login"><a href="/login">Sign in</a> to comment.</p>
+		}
+		if len(comments) == 0 {
+			<p class="muted comments-empty">No comments yet.</p>
+		} else {
+			<ol class="comment-list">
+				for _, c := range comments {
+					@CommentItem(viewer, node, c, false)
+				}
+			</ol>
+		}
+	</section>
+}
+
+templ CommentForm(node db.Node, parentID string, buttonText string) {
+	<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/comments") } class="comment-form">
+		@CSRFField()
+		if parentID != "" {
+			<input type="hidden" name="parent_id" value={ parentID }/>
+		}
+		<textarea name="body" rows="3" maxlength="5000" required placeholder="Write a comment" aria-label="Comment"></textarea>
+		<div class="form-row">
+			<button type="submit" class="btn accent sm"><span class="material-symbols-outlined">chat</span>{ buttonText }</button>
+		</div>
+	</form>
+}
+
+templ CommentItem(viewer *Viewer, node db.Node, c Comment, isReply bool) {
+	<li id={ "comment-" + c.ID.String() } class="comment-item">
+		<article class="comment-card">
+			<header class="comment-meta">
+				@AvatarImage(c.AuthorUsername, c.AuthorProfileImagePath, 22)
+				<a href={ templ.SafeURL("/users/" + c.AuthorUsername) }>{ c.AuthorUsername }</a>
+				<span>·</span>
+				<time datetime={ timestampDatetime(c.CreatedAt) } title={ timestampTitle(viewer, c.CreatedAt) }>{ timestampRelative(c.CreatedAt) }</time>
+				if c.EditedAt.Valid && !c.DeletedAt.Valid {
+					<span>·</span>
+					<time datetime={ timestampDatetime(c.EditedAt) } title={ timestampTitle(viewer, c.EditedAt) }>edited { timestampRelative(c.EditedAt) }</time>
+				}
+			</header>
+			if c.DeletedAt.Valid {
+				<div class="comment-body comment-removed">comment removed</div>
+			} else {
+				<div class="comment-body">{ c.Body }</div>
+			}
+			if c.CanEdit || c.CanDelete || (viewer != nil && !isReply && !c.DeletedAt.Valid) {
+				<div class="comment-actions">
+					if viewer != nil && !isReply && !c.DeletedAt.Valid {
+						<details class="comment-reply">
+							<summary class="btn ghost sm"><span class="material-symbols-outlined">reply</span>Reply</summary>
+							@CommentForm(node, c.ID.String(), "Reply")
+						</details>
+					}
+					if c.CanEdit {
+						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/comments/" + c.ID.String() + "/edit") } class="btn ghost sm"><span class="material-symbols-outlined">edit</span>Edit</a>
+					}
+					if c.CanDelete {
+						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/comments/" + c.ID.String() + "/delete") } class="inline">
+							@CSRFField()
+							<button type="submit" class="btn ghost sm"><span class="material-symbols-outlined">delete</span>Delete</button>
+						</form>
+					}
+				</div>
+			}
+		</article>
+		if len(c.Replies) > 0 {
+			<ol class="comment-replies">
+				for _, reply := range c.Replies {
+					@CommentItem(viewer, node, reply, true)
+				}
+			</ol>
+		}
+	</li>
+}
+
+templ CommentEdit(viewer *Viewer, node db.Node, comment Comment, flash, formBody string) {
+	@Layout("Edit comment", viewer) {
+		<div class="page narrow">
+			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
+				<span class="eyebrow">Comment</span>
+				@nodeTypeChip(node.Type)
+			</div>
+			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">Edit comment</h1>
+			@Flash(flash)
+			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/comments/" + comment.ID.String()) } class="form">
+				@CSRFField()
+				<label>
+					Comment
+					<textarea name="body" rows="6" maxlength="5000" required>{ formBody }</textarea>
+				</label>
+				<div class="form-row">
+					<button type="submit" class="btn accent"><span class="material-symbols-outlined">save</span>Save changes</button>
+					<a href={ templ.SafeURL("/nodes/" + node.Slug + "#comment-" + comment.ID.String()) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
+				</div>
+			</form>
 		</div>
 	}
 }

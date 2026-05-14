@@ -405,6 +405,76 @@ func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNo
 	return items, nil
 }
 
+const listViewsForTopic = `-- name: ListViewsForTopic :many
+SELECT
+    n.id,
+    n.slug,
+    n.title,
+    n.body,
+    n.created_at,
+    u.username AS author_username,
+    u.profile_image_path AS author_profile_image_path,
+    count(c.id) FILTER (WHERE c.deleted_at IS NULL)::bigint AS comment_count
+FROM nodes n
+JOIN users u ON u.id = n.created_by
+LEFT JOIN comments c ON c.node_id = n.id
+WHERE n.type = 'view'
+  AND n.parent_node_id = $1::uuid
+  AND node_visible_to(n.*, $2::uuid)
+GROUP BY n.id, n.slug, n.title, n.body, n.created_at, u.username, u.profile_image_path
+ORDER BY n.created_at DESC
+LIMIT $3
+`
+
+type ListViewsForTopicParams struct {
+	TopicID     uuid.UUID  `json:"topic_id"`
+	ViewerID    *uuid.UUID `json:"viewer_id"`
+	ResultLimit int32      `json:"result_limit"`
+}
+
+type ListViewsForTopicRow struct {
+	ID                     uuid.UUID          `json:"id"`
+	Slug                   string             `json:"slug"`
+	Title                  string             `json:"title"`
+	Body                   string             `json:"body"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	AuthorUsername         string             `json:"author_username"`
+	AuthorProfileImagePath string             `json:"author_profile_image_path"`
+	CommentCount           int64              `json:"comment_count"`
+}
+
+// Topic pages render their child views as a thread feed. parent_node_id is
+// the canonical hierarchy link; node_visible_to() keeps group/list/private
+// child views hidden from viewers outside their audience.
+func (q *Queries) ListViewsForTopic(ctx context.Context, arg ListViewsForTopicParams) ([]ListViewsForTopicRow, error) {
+	rows, err := q.db.Query(ctx, listViewsForTopic, arg.TopicID, arg.ViewerID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListViewsForTopicRow
+	for rows.Next() {
+		var i ListViewsForTopicRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Title,
+			&i.Body,
+			&i.CreatedAt,
+			&i.AuthorUsername,
+			&i.AuthorProfileImagePath,
+			&i.CommentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const pickerSearchNodes = `-- name: PickerSearchNodes :many
 SELECT n.id, n.type, n.title
 FROM nodes n

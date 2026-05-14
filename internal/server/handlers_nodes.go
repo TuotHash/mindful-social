@@ -429,12 +429,42 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var topicViews []views.TopicView
+	if node.Type == db.NodeTypeTopic {
+		rows, err := s.queries.ListViewsForTopic(r.Context(), db.ListViewsForTopicParams{
+			TopicID:     id,
+			ViewerID:    vid,
+			ResultLimit: 50,
+		})
+		if err != nil {
+			s.logger.Error("node detail: topic views", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		topicViews = topicViewsFromRows(rows)
+	}
+
+	var comments []views.Comment
+	var commentCount int64
+	if node.Type == db.NodeTypeView {
+		rows, err := s.queries.ListCommentsForNode(r.Context(), id)
+		if err != nil {
+			s.logger.Error("node detail: comments", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		comments, commentCount = commentThreadFromRows(rows, user)
+	}
+
 	render(w, r, views.NodeDetail(
 		viewerFor(user),
 		node,
 		author.Username,
 		highlightedRows(feat),
 		displayGroups(out, in),
+		topicViews,
+		comments,
+		commentCount,
 		pin,
 		tags,
 		canEdit,

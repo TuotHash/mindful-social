@@ -467,6 +467,17 @@ type AuthIdentity struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Comment struct {
+	ID        uuid.UUID          `json:"id"`
+	NodeID    uuid.UUID          `json:"node_id"`
+	ParentID  *uuid.UUID         `json:"parent_id"`
+	AuthorID  uuid.UUID          `json:"author_id"`
+	Body      string             `json:"body"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	EditedAt  pgtype.Timestamptz `json:"edited_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type Edge struct {
 	ID         uuid.UUID          `json:"id"`
 	FromNode   uuid.UUID          `json:"from_node"`

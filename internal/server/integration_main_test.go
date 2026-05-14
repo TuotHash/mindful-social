@@ -69,7 +69,7 @@ func truncateAll(t *testing.T) {
 	// CASCADE picks up the FK chains. sessions has no FKs but is included
 	// so logged-in state from a previous test doesn't leak.
 	const sql = `TRUNCATE TABLE
-		user_node_pins, node_tags, tags, edges, node_images, node_videos, nodes,
+		comments, user_node_pins, node_tags, tags, edges, node_images, node_videos, nodes,
 		group_invites, group_memberships, groups,
 		auth_identities, sessions, users
 		RESTART IDENTITY CASCADE`

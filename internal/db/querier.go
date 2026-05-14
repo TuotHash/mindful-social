@@ -47,6 +47,7 @@ type Querier interface {
 	// a friendly error.
 	CreateAudienceList(ctx context.Context, arg CreateAudienceListParams) (AudienceList, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
+	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
 	// Idempotent: re-following is a no-op rather than an error so the button
 	// handler doesn't need to disambiguate states.
@@ -80,6 +81,7 @@ type Querier interface {
 	// a malformed cycle would otherwise loop forever.
 	FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetAudienceList(ctx context.Context, id uuid.UUID) (AudienceList, error)
+	GetCommentForNode(ctx context.Context, arg GetCommentForNodeParams) (GetCommentForNodeRow, error)
 	// One round-trip lookup the profile page uses to render the button: does
 	// the viewer follow this profile, and does the profile follow the viewer
 	// back (mutual = connection)?
@@ -106,6 +108,7 @@ type Querier interface {
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	HardDeleteComment(ctx context.Context, arg HardDeleteCommentParams) (int64, error)
 	// Promote an edge into the highlights section from the perspective of
 	// `pov_node`, which must be one of the edge's endpoints. The rank is the
 	// next-highest across the existing highlights on that side, so the new
@@ -124,6 +127,7 @@ type Querier interface {
 	// Trusted list first, then custom lists alphabetically — order the visibility
 	// selector and the lists-management page both rely on.
 	ListAudienceLists(ctx context.Context, ownerID uuid.UUID) ([]AudienceList, error)
+	ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]ListCommentsForNodeRow, error)
 	// People the user has a mutual follow with — drives the "friends bubble"
 	// graph view. Alphabetical for stable rendering.
 	ListConnections(ctx context.Context, followerID uuid.UUID) ([]ListConnectionsRow, error)
@@ -183,6 +187,10 @@ type Querier interface {
 	// Roster for the admin /users page. Recent signups first; staff bubble to
 	// the top so they're easy to find.
 	ListUsersForAdmin(ctx context.Context) ([]User, error)
+	// Topic pages render their child views as a thread feed. parent_node_id is
+	// the canonical hierarchy link; node_visible_to() keeps group/list/private
+	// child views hidden from viewers outside their audience.
+	ListViewsForTopic(ctx context.Context, arg ListViewsForTopicParams) ([]ListViewsForTopicRow, error)
 	ListVisibleGroups(ctx context.Context, viewerID *uuid.UUID) ([]ListVisibleGroupsRow, error)
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
@@ -226,9 +234,11 @@ type Querier interface {
 	// update so the profile shows the most recent stance change first. Returns
 	// the pin's id so callers can attach findings to it.
 	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
+	SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentParams) (int64, error)
 	// Reverse of HighlightEdge: clears the rank on whichever side matches
 	// pov_node. No-op if pov_node isn't one of the edge's endpoints.
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error)
+	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Keeps the password identity's subject (an email mirror) aligned with the

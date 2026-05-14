@@ -176,3 +176,26 @@ WHERE (n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY rank DESC, n.created_at DESC
 LIMIT sqlc.arg(result_limit);
+
+-- name: ListViewsForTopic :many
+-- Topic pages render their child views as a thread feed. parent_node_id is
+-- the canonical hierarchy link; node_visible_to() keeps group/list/private
+-- child views hidden from viewers outside their audience.
+SELECT
+    n.id,
+    n.slug,
+    n.title,
+    n.body,
+    n.created_at,
+    u.username AS author_username,
+    u.profile_image_path AS author_profile_image_path,
+    count(c.id) FILTER (WHERE c.deleted_at IS NULL)::bigint AS comment_count
+FROM nodes n
+JOIN users u ON u.id = n.created_by
+LEFT JOIN comments c ON c.node_id = n.id
+WHERE n.type = 'view'
+  AND n.parent_node_id = sqlc.arg(topic_id)::uuid
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+GROUP BY n.id, n.slug, n.title, n.body, n.created_at, u.username, u.profile_image_path
+ORDER BY n.created_at DESC
+LIMIT sqlc.arg(result_limit);
