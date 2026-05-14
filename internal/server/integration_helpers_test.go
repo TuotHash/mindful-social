@@ -166,9 +166,11 @@ func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid
 
 // createNodeDirect inserts a node via the DB layer, bypassing the Post
 // form's topic/view restriction. Used by tests that need finding nodes —
-// findings are normally created by attachment, but the underlying schema
-// and edge system still support them. The signed-in user is identified by
-// scraping the home page nav for the user link.
+// the public Post path only creates topics and views; findings live
+// inside the Connect form. Findings carry a finding_requires_parent
+// constraint, so the helper auto-seeds a parent view through the Post
+// path before creating the finding. The signed-in user is identified
+// by scraping the home page nav for the user link.
 func createNodeDirect(t *testing.T, c *http.Client, nodeType, title, body string) uuid.UUID {
 	t.Helper()
 	homeBody := readBody(t, get(t, c, "/"))
@@ -186,14 +188,20 @@ func createNodeDirect(t *testing.T, c *http.Client, nodeType, title, body string
 	if err != nil {
 		t.Fatalf("createNodeDirect: lookup user %q: %v", rest[:end], err)
 	}
+	var parentID *uuid.UUID
+	if nodeType == "finding" {
+		viewID := createNode(t, c, "view", "Parent view for: "+title, "")
+		parentID = &viewID
+	}
 	node, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
-		Type:       db.NodeType(nodeType),
-		Title:      title,
-		Body:       body,
-		SourceUrl:  nil,
-		CreatedBy:  user.ID,
-		Slug:       "direct-" + uuid.NewString()[:8],
-		Visibility: db.VisibilityKindPublic,
+		Type:         db.NodeType(nodeType),
+		Title:        title,
+		Body:         body,
+		SourceUrl:    nil,
+		CreatedBy:    user.ID,
+		Slug:         "direct-" + uuid.NewString()[:8],
+		Visibility:   db.VisibilityKindPublic,
+		ParentNodeID: parentID,
 	})
 	if err != nil {
 		t.Fatalf("createNodeDirect: %v", err)

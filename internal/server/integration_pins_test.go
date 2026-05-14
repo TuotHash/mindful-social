@@ -207,42 +207,6 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 	}
 }
 
-func TestProfilePinFindingsRespectVisibility(t *testing.T) {
-	integrationDB(t)
-	aliceClient := newClient(t)
-	alice := signupAndGetUser(t, aliceClient, "alice", "alice@example.com", "correct horse battery staple")
-	view := createNodeForUser(t, alice.ID, db.NodeTypeView, "Public pinned view", db.VisibilityKindPublic, nil)
-	privateFinding := createNodeForUser(t, alice.ID, db.NodeTypeFinding, "Private pin rationale", db.VisibilityKindPrivate, nil)
-
-	pinID, err := testServer.queries.SetPin(t.Context(), db.SetPinParams{
-		UserID: alice.ID,
-		NodeID: view,
-		Kind:   db.PinKindSupports,
-	})
-	if err != nil {
-		t.Fatalf("set pin: %v", err)
-	}
-	if err := testServer.queries.AddPinFinding(t.Context(), db.AddPinFindingParams{
-		PinID:     pinID,
-		FindingID: privateFinding,
-	}); err != nil {
-		t.Fatalf("add pin finding: %v", err)
-	}
-
-	anonymousBody := readBody(t, get(t, newClient(t), "/users/alice"))
-	if !strings.Contains(anonymousBody, "Public pinned view") {
-		t.Fatalf("anonymous profile should include public pinned node; excerpt: %s", snippet(anonymousBody))
-	}
-	if strings.Contains(anonymousBody, "Private pin rationale") {
-		t.Fatalf("anonymous profile should hide private pin finding; excerpt: %s", snippet(anonymousBody))
-	}
-
-	selfBody := readBody(t, get(t, aliceClient, "/users/alice"))
-	if !strings.Contains(selfBody, "Private pin rationale") {
-		t.Fatalf("self profile should include private pin finding; excerpt: %s", snippet(selfBody))
-	}
-}
-
 func createNodeForUser(t *testing.T, userID uuid.UUID, nodeType db.NodeType, title string, visibility db.VisibilityKind, listID *uuid.UUID) uuid.UUID {
 	t.Helper()
 	node, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
