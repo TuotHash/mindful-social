@@ -6,7 +6,11 @@ Finding) connected by typed edges (supports / opposes / refines / cites /
 relates_to). Users commit to views and attach findings that explain their
 thinking.
 
-> **Status:** early development — MVP in progress.
+> **Status:** v1.0.0-alpha — argument graph, social layer, and groups are live;
+> threads, voting, and graph visualisation are on the roadmap.
+
+See [FEATURES.md](FEATURES.md) for the full current feature set and
+[ROADMAP.md](ROADMAP.md) for what's coming next.
 
 ## Quickstart
 
@@ -55,12 +59,17 @@ data tables between cases, so you don't need to reset between runs.
 ```
 cmd/server/         entry point
 internal/           private application code
+  auth/               session management, OAuth/OIDC providers, identity linking
   config/             env-var loading
   db/                 sqlc-generated query code (run `sqlc generate` to refresh)
-  server/             HTTP server, routes, middleware
+  migrate/            migration runner (goose, embedded)
+  server/             HTTP server, routes, middleware, handlers
+  views/              templ components (compiled to Go, run `templ generate`)
 migrations/         goose .sql migrations (numbered)
 queries/            SQL files consumed by sqlc to generate Go code
 scripts/            dev helpers (db-init, migrate-up, …)
+static/             CSS and vendored JS (htmx v2.0.4)
+uploads/            user-uploaded files (images, videos) — not committed
 flake.nix           reproducible dev shell + Nix package (flake users)
 default.nix         channels entrypoint (non-flake `nix-build`)
 nix/package.nix     buildGoModule recipe, shared by both
@@ -69,32 +78,42 @@ nix/module.nix      NixOS module (systemd service + optional Postgres)
 
 ## Tech stack
 
-| Layer          | Tool                                               |
-|----------------|----------------------------------------------------|
-| Language       | Go                                                 |
-| Router         | `chi`                                              |
-| Database       | Postgres                                           |
-| SQL → Go       | `sqlc` (write SQL, get type-safe Go)               |
-| Migrations     | `goose`                                            |
-| Templates      | `templ` (added when we have HTML pages)            |
-| Sessions / auth| `scs` + `bcrypt` (added when we add auth)          |
-| Interactivity  | HTMX (vendored at `static/htmx.min.js`, v2.0.4)    |
-| Graph view     | Svelte component (deferred)                        |
-| Dev env        | Nix flake                                          |
+| Layer | Tool |
+|-------|------|
+| Language | Go |
+| Router | `chi` |
+| Database | Postgres |
+| SQL → Go | `sqlc` (write SQL, get type-safe Go) |
+| Migrations | `goose` (embedded, auto-applied on startup) |
+| Templates | `templ` (type-safe HTML components compiled to Go) |
+| Sessions / auth | `scs` + `bcrypt`; OAuth/OIDC via `coreos/go-oidc` |
+| Interactivity | HTMX (vendored at `static/htmx.min.js`, v2.0.4) |
+| Markdown | `goldmark` (server-side render) + `bluemonday` (sanitise) |
+| Graph view | Svelte component (planned) |
+| Dev env | Nix flake |
 
 ## Domain model
 
 - **Node** — anything in the graph. `type` is one of `topic`, `view`,
-  `finding`. Free-form `tags` add further grouping (domain, nature)
-  without bloating the type system.
+  `finding`. Bodies are written in Markdown. Free-form `tags` add cross-cutting
+  grouping without bloating the type system.
 - **Edge** — directed, typed link between two nodes. `kind` is one of
-  `supports`, `opposes`, `refines`, `cites`, `relates_to`.
-- **Commitment** — a user pinning themselves to a View, optionally with
-  one or more Finding nodes that explain their stance. Shows on their
-  profile as a feed entry.
+  `supports`, `opposes`, `refines`, `cites`, `relates_to`. Edges can be
+  highlighted to surface key reasoning inline.
+- **Pin** — a user committing to a View with a three-way stance (Support /
+  Oppose / Feature), optionally with Finding nodes that explain their reasoning.
+  Displayed on their public profile.
+- **Follow / Connection** — users follow each other one-way; mutual follows
+  automatically become *connections* (mutuals).
+- **Audience list** — a named set of users the author curates for fine-grained
+  visibility. The built-in **Trusted** list plus any number of custom lists.
+- **Visibility** — every node has a level: `public`, `connections`, list,
+  `group`, or `private`. Child nodes inherit the parent's visibility ceiling.
+- **Group** — a collaborative space where members share nodes and discussions.
+  Distinct from audience lists: a list is a private recipient set; a group is
+  a shared canvas every member can see.
 
-See [`migrations/00001_initial_schema.sql`](migrations/00001_initial_schema.sql)
-for the full schema.
+See [`migrations/`](migrations/) for the full schema history.
 
 ## Configuration
 
@@ -108,6 +127,8 @@ The server is configured entirely through environment variables. Inside
 | `DATABASE_URL` | **yes** | — | Postgres connection string, e.g. `postgres:///mindful_social?host=/path/to/socket` |
 | `LISTEN_ADDR` | no | `127.0.0.1:8080` | TCP address the HTTP server binds to |
 | `PUBLIC_BASE_URL` | no* | `http://127.0.0.1:8080` | Absolute origin the browser sees. Required when any OAuth provider is configured, because callback URLs are derived from it. Set to your public domain, e.g. `https://mindful.example.org` |
+| `SIGNUP_ENABLED` | no | `true` | Set to `false` to close password sign-up while keeping OAuth/OIDC account creation open |
+| `ADMIN_USERS` | no | — | Comma-separated list of email addresses bootstrapped as admins on every startup (idempotent) |
 
 ### OAuth / SSO (all optional)
 
