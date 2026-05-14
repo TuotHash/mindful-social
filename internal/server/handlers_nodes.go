@@ -307,6 +307,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		rerender("Could not create post. Please try again.")
 		return
 	}
+	s.logger.Info("node created", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "visibility", node.Visibility)
 	// Connect the new node (view or sub-topic) to its parent topic automatically.
 	if parentTopicID != uuid.Nil {
 		if _, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
@@ -601,6 +602,7 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.logger.Info("node deleted", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID)
 	http.Redirect(w, r, "/users/"+user.Username, http.StatusSeeOther)
 }
 
@@ -800,6 +802,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists, groups, isAuthor, string(editPolicy), string(linkPolicy)))
 		return
 	}
+	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
 		s.logger.Error("update node: set tags", "err", err)
 	}
