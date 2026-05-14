@@ -1,6 +1,18 @@
 -- name: CreateNode :one
-INSERT INTO nodes (type, title, body, source_url, created_by, slug, visibility, visibility_list_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO nodes (
+    type,
+    title,
+    body,
+    source_url,
+    created_by,
+    slug,
+    visibility,
+    visibility_list_id,
+    visibility_group_id,
+    group_id,
+    parent_node_id
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: GetNode :one
@@ -8,6 +20,11 @@ SELECT * FROM nodes WHERE id = $1;
 
 -- name: GetNodeBySlug :one
 SELECT * FROM nodes WHERE slug = $1;
+
+-- name: CanViewNode :one
+SELECT node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)::bool AS visible
+FROM nodes n
+WHERE n.id = $1;
 
 -- name: ListRecentNodesForViewer :many
 -- Home page feed. node_visible_to() handles the per-row visibility check;
@@ -30,8 +47,10 @@ SET title = $2,
     source_url = $4,
     visibility = $5,
     visibility_list_id = $6,
-    edit_policy = $7,
-    link_policy = $8,
+    visibility_group_id = $7,
+    group_id = $8,
+    edit_policy = $9,
+    link_policy = $10,
     updated_at = now()
 WHERE id = $1
 RETURNING *;

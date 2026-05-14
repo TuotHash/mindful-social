@@ -44,8 +44,8 @@
   --container-narrow: 720px;
 
   /* node-type hues (used to derive badge color) */
-  --topic-h: 32; /* warm amber  */
-  --view-h: 250; /* indigo      */
+  --topic-h: 250; /* blue */
+  --view-h: 22; /* red */
   --finding-h: 332; /* rose        */
 
   /* edge-kind colors */
@@ -2142,6 +2142,25 @@ fieldset.toggle-group legend {
   background: var(--bg-elev-3);
   color: var(--text);
   border-color: var(--border-strong);
+}
+.visibility-public-label {
+  display: inline-grid;
+  grid-template-areas: "label";
+}
+.visibility-public-label > span {
+  grid-area: label;
+  transition: opacity 0.12s;
+}
+.visibility-label-hover {
+  opacity: 0;
+}
+.toggle-btn[data-visibility="public"]:hover .visibility-label-default,
+.toggle-btn[data-visibility="public"]:focus-within .visibility-label-default {
+  opacity: 0;
+}
+.toggle-btn[data-visibility="public"]:hover .visibility-label-hover,
+.toggle-btn[data-visibility="public"]:focus-within .visibility-label-hover {
+  opacity: 1;
 }
 .toggle-btn[data-kind="supports"]:has(input:checked) {
   background: var(--supports);

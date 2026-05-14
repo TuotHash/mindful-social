@@ -12,7 +12,7 @@ import (
 // Source URL is intentionally absent — only Topic and View are creatable
 // from the Post path; findings are created by attachment to an existing
 // topic or view.
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -22,7 +22,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/home" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -36,7 +36,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -58,7 +58,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -73,7 +73,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 // view-specific options (Support / Oppose pin) when Topic is selected, the
 // Position toggle when View is selected, and the topic picker when a root
 // topic is being created.
-templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
 	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
@@ -116,7 +116,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		<textarea name="body" rows="5">{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words.</small>
 	</label>
-	@visibilitySelect(formVisibility, lists)
+	@nodeVisibilitySelect(formVisibility, lists, groups)
 	<fieldset class="toggle-group">
 		<legend>Pin to my profile</legend>
 		<div class="toggle-btns">
@@ -419,7 +419,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, featured []FeaturedRow, groups []
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList, isAuthor bool, formEditPolicy, formLinkPolicy string) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, isAuthor bool, formEditPolicy, formLinkPolicy string) {
 	@Layout("Edit "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -451,7 +451,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				if isAuthor {
-					@visibilitySelect(formVisibility, lists)
+					@nodeVisibilitySelect(formVisibility, lists, groups)
 					@actionPolicySelect("edit_policy", "Who can edit this node", formEditPolicy)
 					@actionPolicySelect("link_policy", "Who can connect to this node", formLinkPolicy)
 				} else {
@@ -497,13 +497,20 @@ templ actionPolicySelect(fieldName, legend, selected string) {
 // "list:<uuid>" format keeps the form a single field while still
 // identifying which list governs visibility.
 templ visibilitySelect(selected string, lists []db.AudienceList) {
+	@nodeVisibilitySelect(selected, lists, nil)
+}
+
+templ nodeVisibilitySelect(selected string, lists []db.AudienceList, groups []db.ListGroupsForUserRow) {
 	<fieldset class="toggle-group">
 		<legend>Visibility</legend>
 		<div class="toggle-btns">
 			<label class="toggle-btn" data-visibility="public">
 				<input type="radio" name="visibility" value="public" checked?={ selected == "public" || selected == "" }/>
 				<span class="material-symbols-outlined">public</span>
-				Public
+				<span class="visibility-public-label">
+					<span class="visibility-label-default">Public</span>
+					<span class="visibility-label-hover" aria-hidden="true">Inherit</span>
+				</span>
 			</label>
 			<label class="toggle-btn" data-visibility="connections">
 				<input type="radio" name="visibility" value="connections" checked?={ selected == "connections" }/>
@@ -522,13 +529,24 @@ templ visibilitySelect(selected string, lists []db.AudienceList) {
 					}
 				</label>
 			}
+			for _, g := range groups {
+				<label class="toggle-btn" data-visibility="group">
+					<input type="radio" name="visibility" value={ "group:" + g.ID.String() } checked?={ selected == "group:"+g.ID.String() }/>
+					<span class="material-symbols-outlined">groups</span>
+					{ g.Name }
+				</label>
+			}
 			<label class="toggle-btn" data-visibility="private">
 				<input type="radio" name="visibility" value="private" checked?={ selected == "private" }/>
 				<span class="material-symbols-outlined">lock</span>
 				Private
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>.</small>
+		if len(groups) > 0 {
+			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>; manage communities in <a href="/groups">Groups</a>.</small>
+		} else {
+			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>.</small>
+		}
 	</fieldset>
 }
 

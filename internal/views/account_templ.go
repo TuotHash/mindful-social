@@ -219,7 +219,7 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div><div class=\"account-field-note muted\">Changing usernames isn't available yet — we still need rate limits to keep handle-cycling under control.</div></div><div class=\"account-field\"><div class=\"account-field-label\">Email</div><div class=\"account-field-value\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div><div class=\"account-field-note muted\">Changing usernames isn't available yet</div></div><div class=\"account-field\"><div class=\"account-field-label\">Email</div><div class=\"account-field-value\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -232,7 +232,7 @@ func Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPass
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div><div class=\"account-field-note muted\">Changing email isn't available yet — it needs a verified-email flow before we can let it loose.</div></div></section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Password</h2>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div><div class=\"account-field-note muted\">Changing email isn't available yet</div></div></section><section class=\"card\" style=\"padding: 20px; margin-top: 24px;\"><h2 style=\"margin-top: 0;\">Password</h2>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

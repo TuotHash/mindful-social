@@ -192,6 +192,8 @@ func (s *Server) routes() {
 	r.Get("/users/{username}", s.handleProfile)
 	r.Get("/tags", s.handleTagsIndex)
 	r.Get("/tags/{name}", s.handleTagDetail)
+	r.Get("/groups", s.handleGroupsIndex)
+	r.Get("/groups/{slug}", s.handleGroupDetail)
 	r.Get("/search", s.handleSearch)
 
 	// Routes that require an authenticated user.
@@ -222,6 +224,11 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}/unpin", s.handlePinDelete)
 		r.Post("/users/{username}/follow", s.handleFollow)
 		r.Post("/users/{username}/unfollow", s.handleUnfollow)
+		r.Post("/groups", s.handleGroupCreate)
+		r.Post("/groups/{slug}/join", s.handleGroupJoin)
+		r.Post("/groups/{slug}/leave", s.handleGroupLeave)
+		r.Post("/groups/{slug}/members", s.handleGroupAddMember)
+		r.Post("/groups/{slug}/members/{userID}/delete", s.handleGroupRemoveMember)
 		r.Get("/lists", s.handleListsIndex)
 		r.Post("/lists", s.handleListCreate)
 		r.Get("/lists/{id}", s.handleListDetail)

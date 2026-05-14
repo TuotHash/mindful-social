@@ -11,6 +11,8 @@ import (
 )
 
 type Querier interface {
+	AcceptGroupInvite(ctx context.Context, arg AcceptGroupInviteParams) (int64, error)
+	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
 	// Idempotent. The handler treats "already a member" the same as "now a
 	// member" so the form doesn't need to know which it was.
 	AddListMember(ctx context.Context, arg AddListMemberParams) error
@@ -25,11 +27,13 @@ type Querier interface {
 	// True when `viewer` is permitted to create an edge touching `node` under
 	// its link_policy.
 	CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error)
+	CanViewNode(ctx context.Context, arg CanViewNodeParams) (bool, error)
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
 	CountFollowers(ctx context.Context, followedID uuid.UUID) (int64, error)
 	CountFollowing(ctx context.Context, followerID uuid.UUID) (int64, error)
+	CountGroupMembers(ctx context.Context, groupID uuid.UUID) (int64, error)
 	CountIdentitiesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountListMembers(ctx context.Context, listID uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
@@ -47,6 +51,8 @@ type Querier interface {
 	// Idempotent: re-following is a no-op rather than an error so the button
 	// handler doesn't need to disambiguate states.
 	CreateFollow(ctx context.Context, arg CreateFollowParams) error
+	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
+	CreateGroupInvite(ctx context.Context, arg CreateGroupInviteParams) (GroupInvite, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Trusted lists can't be deleted; the WHERE clause enforces this without
@@ -71,6 +77,9 @@ type Querier interface {
 	// the viewer follow this profile, and does the profile follow the viewer
 	// back (mutual = connection)?
 	GetFollowState(ctx context.Context, arg GetFollowStateParams) (GetFollowStateRow, error)
+	GetGroup(ctx context.Context, id uuid.UUID) (Group, error)
+	GetGroupBySlug(ctx context.Context, slug string) (Group, error)
+	GetGroupMembership(ctx context.Context, arg GetGroupMembershipParams) (GroupMembership, error)
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetIdentityForUser(ctx context.Context, arg GetIdentityForUserParams) (AuthIdentity, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
@@ -97,6 +106,7 @@ type Querier interface {
 	// finding — the highlights section is for findings only. If either check
 	// fails the WHERE clause filters the row out and nothing changes.
 	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) (int64, error)
+	IsGroupMember(ctx context.Context, arg IsGroupMemberParams) (bool, error)
 	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
 	// Counts only nodes the viewer is allowed to see (public, plus connections-
@@ -131,6 +141,8 @@ type Querier interface {
 	ListFollowers(ctx context.Context, followedID uuid.UUID) ([]ListFollowersRow, error)
 	// Users that $1 follows.
 	ListFollowing(ctx context.Context, followerID uuid.UUID) ([]ListFollowingRow, error)
+	ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]ListGroupMembersRow, error)
+	ListGroupsForUser(ctx context.Context, userID uuid.UUID) ([]ListGroupsForUserRow, error)
 	// All edges where `node_id` is an endpoint AND that endpoint has marked
 	// the edge as highlighted (position when from_node, to_position when
 	// to_node). Returns the "other" endpoint regardless of direction so the
@@ -145,9 +157,11 @@ type Querier interface {
 	// sees nodes they're entitled to.
 	ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
+	ListNodesForGroupForViewer(ctx context.Context, arg ListNodesForGroupForViewerParams) ([]Node, error)
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
 	// Filtered through node_visible_to() so a viewer only sees nodes they can.
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
+	ListPendingGroupInvitesForUser(ctx context.Context, invitedUserID uuid.UUID) ([]ListPendingGroupInvitesForUserRow, error)
 	// A user's pins with the joined node — for the "On my profile" section on
 	// a profile page. Findings are loaded separately via ListFindingsForPins
 	// to avoid row-multiplying joins. node_visible_to() hides pins whose
@@ -160,6 +174,7 @@ type Querier interface {
 	// Roster for the admin /users page. Recent signups first; staff bubble to
 	// the top so they're easy to find.
 	ListUsersForAdmin(ctx context.Context) ([]User, error)
+	ListVisibleGroups(ctx context.Context, viewerID *uuid.UUID) ([]ListVisibleGroupsRow, error)
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
 	// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator
@@ -168,6 +183,7 @@ type Querier interface {
 	// and skips nodes the viewer can't see. Raw user text is safe here —
 	// pg_trgm operators take plain text, no query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
+	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
 	RemoveListMember(ctx context.Context, arg RemoveListMemberParams) error
 	// Finding picker for the pin form: same fuzzy + recency-fallback shape as
 	// SearchTopics, but filtered to type='finding'. Returns finding nodes the

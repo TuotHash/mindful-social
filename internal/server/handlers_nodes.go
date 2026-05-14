@@ -82,6 +82,12 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("node new: groups", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	initialTopics, err := s.queries.SearchTopics(r.Context(), db.SearchTopicsParams{
 		Query:    "",
 		ViewerID: viewerID(r),
@@ -93,10 +99,10 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 	topicCandidates := topicCandidateRows(initialTopics)
 	defaultVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, "", "", "root", topicCandidates))
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", topicCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, "", "", "root", topicCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", topicCandidates))
 }
 
 func (s *Server) handleTopicPicker(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +159,12 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
+	if groupsErr != nil {
+		s.logger.Error("create node: groups", "err", groupsErr)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	// topicCandidatesForRerender returns a single pre-selected candidate so
 	// the picker re-renders with the user's selection intact after a validation
@@ -175,16 +187,18 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rerender := func(flash string) {
 		tc := topicCandidatesForRerender()
 		if isHTMX(r) {
-			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
 			return
 		}
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
 	}
 
 	flash := ""
 	nt := db.NodeType(rawType)
 	var pinKind db.PinKind
 	var parentTopicID uuid.UUID
+	var parentNodeID *uuid.UUID
+	var parentGroupID *uuid.UUID
 	switch {
 	// The Post path only creates topics or views. Findings are created
 	// later as connections off an existing topic or view.
@@ -217,6 +231,16 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 				case err != nil || parentNode.Type != db.NodeTypeTopic:
 					flash = "The selected parent must be a topic."
 				default:
+					visible, verr := s.canViewNode(r.Context(), parentNode, viewerID(r))
+					if verr != nil {
+						s.logger.Error("create node: parent visibility", "err", verr)
+						flash = "Could not check parent topic permissions. Please try again."
+						break
+					}
+					if !visible {
+						flash = "The selected parent topic was not found."
+						break
+					}
 					if ok, perr := s.canLinkToNode(r.Context(), parentNode, user); perr != nil {
 						s.logger.Error("create node: parent link policy", "err", perr)
 						flash = "Could not check parent topic permissions. Please try again."
@@ -224,6 +248,11 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 						flash = rejectMsg
 					} else {
 						parentTopicID = tid
+						parentNodeID = &parentTopicID
+						parentGroupID = parentNode.GroupID
+						if parentGroupID == nil {
+							parentGroupID = parentNode.VisibilityGroupID
+						}
 					}
 				}
 			}
@@ -236,9 +265,13 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			flash = pinErr
 		}
 	}
-	visKind, visListID, visErr := parseVisibility(rawVisibility, user.ID, lists)
+	visKind, visListID, visGroupID, visErr := parseNodeVisibility(rawVisibility, user.ID, lists, groups)
 	if flash == "" && visErr != "" {
 		flash = visErr
+	}
+	groupID := visGroupID
+	if groupID == nil {
+		groupID = parentGroupID
 	}
 	if flash != "" {
 		rerender(flash)
@@ -253,14 +286,17 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	node, err := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
-		Type:             nt,
-		Title:            title,
-		Body:             body,
-		SourceUrl:        nil,
-		CreatedBy:        user.ID,
-		Slug:             slug,
-		Visibility:       visKind,
-		VisibilityListID: visListID,
+		Type:              nt,
+		Title:             title,
+		Body:              body,
+		SourceUrl:         nil,
+		CreatedBy:         user.ID,
+		Slug:              slug,
+		Visibility:        visKind,
+		VisibilityListID:  visListID,
+		VisibilityGroupID: visGroupID,
+		GroupID:           groupID,
+		ParentNodeID:      parentNodeID,
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
@@ -591,8 +627,14 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("node edit: groups", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	isAuthor := node.CreatedBy == user.ID
-	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatVisibility(node.Visibility, node.VisibilityListID), lists, isAuthor, string(node.EditPolicy), string(node.LinkPolicy)))
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID), lists, groups, isAuthor, string(node.EditPolicy), string(node.LinkPolicy)))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -639,7 +681,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
 	if rawVisibility == "" || !isAuthor {
 		// Visibility is author-only; non-author edits keep the existing setting.
-		rawVisibility = formatVisibility(node.Visibility, node.VisibilityListID)
+		rawVisibility = formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID)
 	}
 	rawEditPolicy := strings.TrimSpace(r.PostFormValue("edit_policy"))
 	rawLinkPolicy := strings.TrimSpace(r.PostFormValue("link_policy"))
@@ -647,6 +689,12 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
 	if listsErr != nil {
 		s.logger.Error("update node: lists", "err", listsErr)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
+	if groupsErr != nil {
+		s.logger.Error("update node: groups", "err", groupsErr)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -658,9 +706,17 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
 	}
-	visKind, visListID, visErr := parseVisibility(rawVisibility, node.CreatedBy, lists)
-	if flash == "" && visErr != "" {
-		flash = visErr
+	visKind := node.Visibility
+	visListID := node.VisibilityListID
+	visGroupID := node.VisibilityGroupID
+	groupID := node.GroupID
+	if isAuthor {
+		var visErr string
+		visKind, visListID, visGroupID, visErr = parseNodeVisibility(rawVisibility, node.CreatedBy, lists, groups)
+		if flash == "" && visErr != "" {
+			flash = visErr
+		}
+		groupID = visGroupID
 	}
 	// Policies are author-only: non-author edits silently keep the existing
 	// values, so the form re-renders with the author's settings even after
@@ -676,7 +732,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if flash != "" {
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists, isAuthor, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, lists, groups, isAuthor, string(editPolicy), string(linkPolicy)))
 		return
 	}
 
@@ -686,18 +742,20 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
-		ID:               id,
-		Title:            title,
-		Body:             body,
-		SourceUrl:        srcPtr,
-		Visibility:       visKind,
-		VisibilityListID: visListID,
-		EditPolicy:       editPolicy,
-		LinkPolicy:       linkPolicy,
+		ID:                id,
+		Title:             title,
+		Body:              body,
+		SourceUrl:         srcPtr,
+		Visibility:        visKind,
+		VisibilityListID:  visListID,
+		VisibilityGroupID: visGroupID,
+		GroupID:           groupID,
+		EditPolicy:        editPolicy,
+		LinkPolicy:        linkPolicy,
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists, isAuthor, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, lists, groups, isAuthor, string(editPolicy), string(linkPolicy)))
 		return
 	}
 	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {

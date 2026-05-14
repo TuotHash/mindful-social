@@ -70,6 +70,7 @@ func truncateAll(t *testing.T) {
 	// so logged-in state from a previous test doesn't leak.
 	const sql = `TRUNCATE TABLE
 		user_node_pins, node_tags, tags, edges, nodes,
+		group_invites, group_memberships, groups,
 		auth_identities, sessions, users
 		RESTART IDENTITY CASCADE`
 	if _, err := testServer.db.Exec(ctx, sql); err != nil {

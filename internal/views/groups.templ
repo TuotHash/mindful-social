@@ -1,0 +1,211 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
+
+func groupMemberCountLabel(n int64) string {
+	if n == 1 {
+		return "1 member"
+	}
+	return fmt.Sprintf("%d members", n)
+}
+
+func groupVisibilityLabel(v db.GroupVisibilityKind) string {
+	switch v {
+	case db.GroupVisibilityKindPublic:
+		return "public"
+	case db.GroupVisibilityKindInvite:
+		return "invite-only"
+	case db.GroupVisibilityKindClosed:
+		return "closed"
+	}
+	return string(v)
+}
+
+func groupRoleLabel(r db.GroupMemberRole) string {
+	switch r {
+	case db.GroupMemberRoleOwner:
+		return "owner"
+	case db.GroupMemberRoleAdmin:
+		return "admin"
+	case db.GroupMemberRoleMember:
+		return "member"
+	}
+	return string(r)
+}
+
+templ GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow) {
+	@Layout("Groups", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Communities</span>
+				<h1 class="h-1">Groups</h1>
+				<p class="muted" style="margin: 0;">Shared spaces for people building a graph together. Group-only nodes are visible to members, and child nodes inherit the parent node's audience ceiling.</p>
+			</div>
+			@Flash(flash)
+			<section class="card" style="padding: 20px;">
+				<h2 style="margin-top: 0;">Browse groups</h2>
+				if len(groups) == 0 {
+					<p class="muted">No groups are visible yet.</p>
+				} else {
+					<ul class="list-rows">
+						for _, g := range groups {
+							<li class="list-row">
+								<a href={ templ.SafeURL("/groups/" + g.Slug) } class="list-row-main">
+									<span class="list-name">{ g.Name }</span>
+									<span class="badge">{ groupVisibilityLabel(g.Visibility) }</span>
+									if g.IsMember {
+										<span class="badge accent">member</span>
+									}
+									<span class="muted">{ groupMemberCountLabel(g.MemberCount) }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+
+			if viewer != nil {
+				<section class="card" style="padding: 20px; margin-top: 24px;">
+					<h2 style="margin-top: 0;">New group</h2>
+					<form method="post" action="/groups" class="form">
+						@CSRFField()
+						<label>
+							Name
+							<input type="text" name="name" required maxlength="80" placeholder="Research circle"/>
+						</label>
+						<label>
+							Description
+							<textarea name="description" rows="3" maxlength="600"></textarea>
+						</label>
+						<fieldset class="toggle-group">
+							<legend>Visibility</legend>
+							<div class="toggle-btns">
+								<label class="toggle-btn">
+									<input type="radio" name="visibility" value="public"/>
+									<span class="material-symbols-outlined">public</span>
+									Public
+								</label>
+								<label class="toggle-btn">
+									<input type="radio" name="visibility" value="invite" checked/>
+									<span class="material-symbols-outlined">mail</span>
+									Invite-only
+								</label>
+								<label class="toggle-btn">
+									<input type="radio" name="visibility" value="closed"/>
+									<span class="material-symbols-outlined">lock</span>
+									Closed
+								</label>
+							</div>
+						</fieldset>
+						<div class="form-row">
+							<button type="submit" class="btn accent">Create group</button>
+						</div>
+					</form>
+				</section>
+			}
+		</div>
+	}
+}
+
+templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage bool) {
+	@Layout(group.Name+" — group", viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<a href="/groups" class="muted" style="font-size: 13px;">← All groups</a>
+				<div class="row gap-8 wrap">
+					<span class="badge">{ groupVisibilityLabel(group.Visibility) }</span>
+					if membership != nil {
+						<span class="badge accent">{ groupRoleLabel(membership.Role) }</span>
+					}
+				</div>
+				<h1 class="h-1">{ group.Name }</h1>
+				if group.Description != "" {
+					<p class="muted" style="margin: 0;">{ group.Description }</p>
+				}
+				<div class="row gap-12 wrap">
+					if viewer != nil && membership == nil && group.Visibility == db.GroupVisibilityKindPublic {
+						<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/join") } class="inline">
+							@CSRFField()
+							<button type="submit" class="btn accent">Join</button>
+						</form>
+					}
+					if viewer != nil && membership != nil && membership.Role != db.GroupMemberRoleOwner {
+						<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/leave") } class="inline">
+							@CSRFField()
+							<button type="submit" class="btn ghost">Leave</button>
+						</form>
+					}
+				</div>
+			</div>
+			@Flash(flash)
+			<section class="card" style="padding: 20px;">
+				<div class="row between wrap gap-12" style="margin-bottom: 12px;">
+					<h2 style="margin: 0;">Group nodes</h2>
+					if membership != nil {
+						<a class="btn ghost sm" href="/nodes/new">Post</a>
+					}
+				</div>
+				if len(nodes) == 0 {
+					<p class="muted">No visible nodes in this group yet.</p>
+				} else {
+					<ul class="node-list">
+						for _, n := range nodes {
+							<li>
+								<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
+									<span class={ "chip", string(n.Type) }>
+										<span class="dot"></span>
+										{ string(n.Type) }
+									</span>
+									<span class="title">{ n.Title }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Members</h2>
+				if len(members) == 0 {
+					<p class="muted">No members yet.</p>
+				} else {
+					<ul class="list-rows">
+						for _, m := range members {
+							<li class="list-row">
+								<a href={ templ.SafeURL("/users/" + m.Username) } class="list-row-main">
+									@Avatar(m.Username, 28)
+									<span>{ m.Username }</span>
+									<span class="badge">{ groupRoleLabel(m.Role) }</span>
+								</a>
+								if canManage && m.Role != db.GroupMemberRoleOwner {
+									<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/members/" + m.ID.String() + "/delete") } class="inline">
+										@CSRFField()
+										<button type="submit" class="btn ghost sm">Remove</button>
+									</form>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</section>
+			if canManage {
+				<section class="card" style="padding: 20px; margin-top: 24px;">
+					<h2 style="margin-top: 0;">Add member</h2>
+					<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/members") } class="form">
+						@CSRFField()
+						<label>
+							Username
+							<input type="text" name="username" required placeholder="username"/>
+						</label>
+						<div class="form-row">
+							<button type="submit" class="btn accent">Add</button>
+						</div>
+					</form>
+				</section>
+			}
+		</div>
+	}
+}

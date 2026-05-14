@@ -15,6 +15,12 @@ Topics are the centre of the graph — the source around which nodes and discuss
   - **Finding** → must connect to a parent **View** or another **Finding** (a finding argues for or against a specific claim, or refines another finding)
   - Topics have no required parent; they are root nodes.
 
+- **Parent-scoped visibility** *(after Groups & Communities)* — Once groups exist, child nodes must inherit the parent's visibility ceiling. A child cannot be more open than its parent:
+  - On sub-nodes, `public` means **inherit parent visibility**, not "visible to everyone".
+  - Any explicit child restriction is combined with the parent restriction rather than replacing it.
+  - Example: a group-only topic plus a connections-only view is visible only to viewers who are both group members and mutual connections.
+  - Private parents keep descendants private unless a future explicit promotion flow widens the parent first.
+
 - **Featured topic bundles** *(deferred)* — Rather than featuring individual nodes, surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
 
 ### Social Foundation
@@ -93,6 +99,10 @@ Topics are the centre of the graph — the source around which nodes and discuss
 - **Shared spaces** — A group is a multi-member home for views, discussions, and findings that members share with each other rather than with the wider public. Friends, study groups, research teams, or any cluster of people who want a shared canvas can have one. Distinct from audience lists: a list is a *recipient set* you control privately; a group is a *collaborative space* every member sees.
 
 - **Membership & visibility** — Each group has an owner (or co-owners), a roster of members, and per-group visibility for the group itself (public, invite-only, closed). Nodes posted into a group default to group-scope visibility — visible to members only — but a member can also publish a node beyond the group if they choose.
+
+- **Audience groups as first-class restrictions** — Groups become one of the visibility predicates used by nodes, alongside public, connections, custom lists, and private. The long-term visibility model should treat each restriction as a set of allowed viewers and resolve access by intersecting all applicable sets: parent node scope, child node scope, group membership, list membership, author/private rules, and moderation state.
+
+- **Implementation sketch** — Add `groups`, `group_memberships`, and `group_invites` tables first, then add optional `group_id`/group visibility support to nodes. Start with owner/member roles, member-only posting, a group detail page, and a group feed. After that, implement effective node visibility as a shared query/helper so feeds, profiles, search, tags, and edge listings all use the same parent-and-group-aware access check.
 
 - **Group-scoped permissions** — Group owners can pick per-group defaults for the edit/link policies on nodes posted into the group (e.g. "members can edit any group node", "only the author can edit"). Individual nodes can override the default.
 

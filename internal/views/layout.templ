@@ -102,6 +102,7 @@ templ TopNav(currentUser *Viewer) {
 					<a class="nav-link" href="/">Home</a>
 				}
 				<a class="nav-link" href="/tags">Browse</a>
+				<a class="nav-link" href="/groups">Groups</a>
 				if currentUser != nil {
 					<a
 						class="nav-link"
@@ -133,6 +134,7 @@ templ TopNav(currentUser *Viewer) {
 						<a class="user-menu-item" href="/account" role="menuitem">Account</a>
 						<a class="user-menu-item" href="#" role="menuitem">Settings</a>
 						<a class="user-menu-item" href="/lists" role="menuitem">Audiences</a>
+						<a class="user-menu-item" href="/groups" role="menuitem">Groups</a>
 						if currentUser.IsAdmin {
 							<div class="user-menu-divider"></div>
 							<a class="user-menu-item" href="/admin" role="menuitem">Admin</a>

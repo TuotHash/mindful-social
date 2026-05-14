@@ -45,6 +45,27 @@ func parseVisibility(raw string, ownerID uuid.UUID, lists []db.AudienceList) (db
 	return "", nil, "Invalid visibility option."
 }
 
+// parseNodeVisibility extends parseVisibility with first-class group
+// audiences. It returns both possible target ids; only one may be non-nil.
+func parseNodeVisibility(raw string, ownerID uuid.UUID, lists []db.AudienceList, groups []db.ListGroupsForUserRow) (db.VisibilityKind, *uuid.UUID, *uuid.UUID, string) {
+	if strings.HasPrefix(raw, "group:") {
+		idStr := strings.TrimPrefix(raw, "group:")
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return "", nil, nil, "Invalid group selection."
+		}
+		for _, g := range groups {
+			if g.ID == id {
+				idCopy := id
+				return db.VisibilityKindGroup, nil, &idCopy, ""
+			}
+		}
+		return "", nil, nil, "Pick one of your groups."
+	}
+	kind, listID, msg := parseVisibility(raw, ownerID, lists)
+	return kind, listID, nil, msg
+}
+
 // formatVisibility is the inverse of parseVisibility: turns a stored
 // (kind, list_id) pair back into the form value the selector expects.
 func formatVisibility(kind db.VisibilityKind, listID *uuid.UUID) string {
@@ -60,47 +81,24 @@ func formatVisibility(kind db.VisibilityKind, listID *uuid.UUID) string {
 	return "public"
 }
 
-// canViewNode mirrors the SQL node_visible_to() function for use on the
+func formatNodeVisibility(kind db.VisibilityKind, listID, groupID *uuid.UUID) string {
+	if kind == db.VisibilityKindGroup {
+		if groupID == nil {
+			return "public"
+		}
+		return "group:" + groupID.String()
+	}
+	return formatVisibility(kind, listID)
+}
+
+// canViewNode delegates to the SQL node_visible_to() function for use on the
 // node-detail page where we fetch the row first and then decide whether to
-// show it. Listings already filter at the DB layer; this helper exists so
-// the detail page doesn't need a second round-trip.
-//
-// viewerID is nil for logged-out visitors. The author can always see their
-// own nodes regardless of visibility.
+// show it. Listings already filter at the DB layer. The SQL function is the
+// source of truth because it also walks parent_node_id and intersects all
+// ancestor visibility restrictions.
 func (s *Server) canViewNode(ctx context.Context, node db.Node, viewerID *uuid.UUID) (bool, error) {
-	if node.Visibility == db.VisibilityKindPublic {
-		return true, nil
-	}
-	if viewerID == nil {
-		return false, nil
-	}
-	if *viewerID == node.CreatedBy {
-		return true, nil
-	}
-	switch node.Visibility {
-	case db.VisibilityKindConnections:
-		state, err := s.queries.GetFollowState(ctx, db.GetFollowStateParams{
-			ViewerID:  *viewerID,
-			ProfileID: node.CreatedBy,
-		})
-		if err != nil {
-			return false, err
-		}
-		return state.ViewerFollows && state.FollowsViewer, nil
-	case db.VisibilityKindList:
-		if node.VisibilityListID == nil {
-			return false, nil
-		}
-		row, err := s.queries.IsListMember(ctx, db.IsListMemberParams{
-			ListID:       *node.VisibilityListID,
-			MemberUserID: *viewerID,
-		})
-		if err != nil {
-			return false, err
-		}
-		return row, nil
-	case db.VisibilityKindPrivate:
-		return false, nil
-	}
-	return false, nil
+	return s.queries.CanViewNode(ctx, db.CanViewNodeParams{
+		ID:       node.ID,
+		ViewerID: viewerID,
+	})
 }

@@ -69,6 +69,112 @@ func (e EdgeKind) Valid() bool {
 	return false
 }
 
+type GroupMemberRole string
+
+const (
+	GroupMemberRoleOwner  GroupMemberRole = "owner"
+	GroupMemberRoleAdmin  GroupMemberRole = "admin"
+	GroupMemberRoleMember GroupMemberRole = "member"
+)
+
+func (e *GroupMemberRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GroupMemberRole(s)
+	case string:
+		*e = GroupMemberRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GroupMemberRole: %T", src)
+	}
+	return nil
+}
+
+type NullGroupMemberRole struct {
+	GroupMemberRole GroupMemberRole `json:"group_member_role"`
+	Valid           bool            `json:"valid"` // Valid is true if GroupMemberRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGroupMemberRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.GroupMemberRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GroupMemberRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGroupMemberRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GroupMemberRole), nil
+}
+
+func (e GroupMemberRole) Valid() bool {
+	switch e {
+	case GroupMemberRoleOwner,
+		GroupMemberRoleAdmin,
+		GroupMemberRoleMember:
+		return true
+	}
+	return false
+}
+
+type GroupVisibilityKind string
+
+const (
+	GroupVisibilityKindPublic GroupVisibilityKind = "public"
+	GroupVisibilityKindInvite GroupVisibilityKind = "invite"
+	GroupVisibilityKindClosed GroupVisibilityKind = "closed"
+)
+
+func (e *GroupVisibilityKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GroupVisibilityKind(s)
+	case string:
+		*e = GroupVisibilityKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GroupVisibilityKind: %T", src)
+	}
+	return nil
+}
+
+type NullGroupVisibilityKind struct {
+	GroupVisibilityKind GroupVisibilityKind `json:"group_visibility_kind"`
+	Valid               bool                `json:"valid"` // Valid is true if GroupVisibilityKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGroupVisibilityKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.GroupVisibilityKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GroupVisibilityKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGroupVisibilityKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GroupVisibilityKind), nil
+}
+
+func (e GroupVisibilityKind) Valid() bool {
+	switch e {
+	case GroupVisibilityKindPublic,
+		GroupVisibilityKindInvite,
+		GroupVisibilityKindClosed:
+		return true
+	}
+	return false
+}
+
 type NodeActionPolicy string
 
 const (
@@ -287,6 +393,7 @@ const (
 	VisibilityKindPublic      VisibilityKind = "public"
 	VisibilityKindConnections VisibilityKind = "connections"
 	VisibilityKindList        VisibilityKind = "list"
+	VisibilityKindGroup       VisibilityKind = "group"
 	VisibilityKindPrivate     VisibilityKind = "private"
 )
 
@@ -330,6 +437,7 @@ func (e VisibilityKind) Valid() bool {
 	case VisibilityKindPublic,
 		VisibilityKindConnections,
 		VisibilityKindList,
+		VisibilityKindGroup,
 		VisibilityKindPrivate:
 		return true
 	}
@@ -376,21 +484,50 @@ type Follow struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type Group struct {
+	ID          uuid.UUID           `json:"id"`
+	Slug        string              `json:"slug"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	OwnerID     uuid.UUID           `json:"owner_id"`
+	Visibility  GroupVisibilityKind `json:"visibility"`
+	CreatedAt   pgtype.Timestamptz  `json:"created_at"`
+}
+
+type GroupInvite struct {
+	ID            uuid.UUID          `json:"id"`
+	GroupID       uuid.UUID          `json:"group_id"`
+	InvitedUserID uuid.UUID          `json:"invited_user_id"`
+	InvitedBy     uuid.UUID          `json:"invited_by"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	AcceptedAt    pgtype.Timestamptz `json:"accepted_at"`
+}
+
+type GroupMembership struct {
+	GroupID  uuid.UUID          `json:"group_id"`
+	UserID   uuid.UUID          `json:"user_id"`
+	Role     GroupMemberRole    `json:"role"`
+	JoinedAt pgtype.Timestamptz `json:"joined_at"`
+}
+
 type Node struct {
-	ID               uuid.UUID          `json:"id"`
-	Type             NodeType           `json:"type"`
-	Title            string             `json:"title"`
-	Body             string             `json:"body"`
-	SourceUrl        *string            `json:"source_url"`
-	CreatedBy        uuid.UUID          `json:"created_by"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	SearchTsv        interface{}        `json:"search_tsv"`
-	Slug             string             `json:"slug"`
-	Visibility       VisibilityKind     `json:"visibility"`
-	VisibilityListID *uuid.UUID         `json:"visibility_list_id"`
-	EditPolicy       NodeActionPolicy   `json:"edit_policy"`
-	LinkPolicy       NodeActionPolicy   `json:"link_policy"`
+	ID                uuid.UUID          `json:"id"`
+	Type              NodeType           `json:"type"`
+	Title             string             `json:"title"`
+	Body              string             `json:"body"`
+	SourceUrl         *string            `json:"source_url"`
+	CreatedBy         uuid.UUID          `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	SearchTsv         interface{}        `json:"search_tsv"`
+	Slug              string             `json:"slug"`
+	Visibility        VisibilityKind     `json:"visibility"`
+	VisibilityListID  *uuid.UUID         `json:"visibility_list_id"`
+	EditPolicy        NodeActionPolicy   `json:"edit_policy"`
+	LinkPolicy        NodeActionPolicy   `json:"link_policy"`
+	ParentNodeID      *uuid.UUID         `json:"parent_node_id"`
+	GroupID           *uuid.UUID         `json:"group_id"`
+	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
 }
 
 type NodeTag struct {

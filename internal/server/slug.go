@@ -47,3 +47,18 @@ func (s *Server) uniqueSlug(ctx context.Context, base string) (string, error) {
 	}
 	return "", errors.New("exhausted slug candidates")
 }
+
+func (s *Server) uniqueGroupSlug(ctx context.Context, base string) (string, error) {
+	candidate := base
+	for i := 2; i < 1000; i++ {
+		_, err := s.queries.GetGroupBySlug(ctx, candidate)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+		candidate = fmt.Sprintf("%s-%d", base, i)
+	}
+	return "", errors.New("exhausted group slug candidates")
+}
