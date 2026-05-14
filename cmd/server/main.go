@@ -20,7 +20,7 @@ func main() {
 	slog.SetDefault(logger)
 	logger.Info("mindful-social starting", "version", mindfulsocial.Version)
 
-	cfg, err := config.Load()
+	cfg, err := config.Load(logger)
 	if err != nil {
 		logger.Error("loading config", "err", err)
 		os.Exit(1)

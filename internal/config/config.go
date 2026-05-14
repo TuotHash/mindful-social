@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,19 +44,28 @@ type Config struct {
 
 // Load reads configuration from environment variables.
 // DATABASE_URL is required; everything else has sensible defaults.
-func Load() (Config, error) {
+// The logger receives warnings for misconfigured values that get
+// silently replaced with defaults (e.g. an unrecognised boolean), so a
+// typo in production at least leaves a trace in the log stream.
+func Load(logger *slog.Logger) (Config, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	dataDir := envOr("DATA_DIR", ".")
 	cfg := Config{
 		ListenAddr:    envOr("LISTEN_ADDR", "127.0.0.1:8080"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
-		SignupEnabled: envBool("SIGNUP_ENABLED", true),
+		SignupEnabled: envBool(logger, "SIGNUP_ENABLED", true),
 		AdminUsers:    envList("ADMIN_USERS"),
 		DataDir:       dataDir,
 		UploadDir:     envOr("UPLOAD_DIR", filepath.Join(dataDir, "uploads")),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+	if os.Getenv("PUBLIC_BASE_URL") == "" {
+		logger.Warn("config: PUBLIC_BASE_URL unset, using default", "default", cfg.PublicBaseURL)
 	}
 	return cfg, nil
 }
@@ -86,10 +96,11 @@ func envList(key string) []string {
 }
 
 // envBool parses common true/false spellings; anything unrecognised falls
-// back to the default so a typo doesn't silently flip a flag.
-func envBool(key string, fallback bool) bool {
-	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
-	switch v {
+// back to the default and logs a warning so a typo doesn't silently flip
+// a flag — the prior behaviour was to swallow it.
+func envBool(logger *slog.Logger, key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	switch strings.ToLower(raw) {
 	case "":
 		return fallback
 	case "1", "true", "yes", "on":
@@ -97,5 +108,6 @@ func envBool(key string, fallback bool) bool {
 	case "0", "false", "no", "off":
 		return false
 	}
+	logger.Warn("config: unrecognised boolean, using default", "key", key, "value", raw, "default", fallback)
 	return fallback
 }
