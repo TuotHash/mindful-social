@@ -113,8 +113,14 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 	</label>
 	<label>
 		Body
-		<textarea name="body" rows="5" class="markdown-editor">{ formBody }</textarea>
-		<small>Optional. Describe the node in your own words.</small>
+		<textarea
+			name="body"
+			rows="5"
+			class="markdown-editor"
+			data-image-endpoint-template="/nodes/{id}/images"
+			data-image-endpoint-source="parent_topic_id"
+		>{ formBody }</textarea>
+		<small>Optional. Describe the node in your own words. Drop or paste an image to attach it to the root topic.</small>
 	</label>
 	@nodeVisibilitySelect(formVisibility, lists, groups)
 	<fieldset class="toggle-group">
@@ -439,8 +445,13 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 				</label>
 				<label>
 					Body
-					<textarea name="body" rows="6" class="markdown-editor">{ formBody }</textarea>
-					<small>Optional. Describe the node in your own words.</small>
+					<textarea
+						name="body"
+						rows="6"
+						class="markdown-editor"
+						data-image-endpoint={ "/nodes/" + node.Slug + "/images" }
+					>{ formBody }</textarea>
+					<small>Optional. Describe the node in your own words. Drop or paste an image to attach it to the root topic.</small>
 				</label>
 				if node.Type == db.NodeTypeFinding {
 					<label>

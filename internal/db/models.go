@@ -530,6 +530,16 @@ type Node struct {
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
 }
 
+type NodeImage struct {
+	ID          uuid.UUID          `json:"id"`
+	RootTopicID uuid.UUID          `json:"root_topic_id"`
+	UploadedBy  uuid.UUID          `json:"uploaded_by"`
+	StoredPath  string             `json:"stored_path"`
+	ContentType string             `json:"content_type"`
+	ByteSize    int64              `json:"byte_size"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type NodeTag struct {
 	NodeID uuid.UUID `json:"node_id"`
 	TagID  uuid.UUID `json:"tag_id"`

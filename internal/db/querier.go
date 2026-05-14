@@ -54,6 +54,7 @@ type Querier interface {
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	CreateGroupInvite(ctx context.Context, arg CreateGroupInviteParams) (GroupInvite, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	CreateNodeImage(ctx context.Context, arg CreateNodeImageParams) (NodeImage, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Trusted lists can't be deleted; the WHERE clause enforces this without
 	// the caller having to remember.
@@ -72,6 +73,11 @@ type Querier interface {
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.
 	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error
+	// Walk the parent chain to the topmost ancestor. Returns the id only when
+	// that ancestor is a topic; otherwise no row (callers reject the upload).
+	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —
+	// a malformed cycle would otherwise loop forever.
+	FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetAudienceList(ctx context.Context, id uuid.UUID) (AudienceList, error)
 	// One round-trip lookup the profile page uses to render the button: does
 	// the viewer follow this profile, and does the profile follow the viewer
@@ -152,6 +158,7 @@ type Querier interface {
 	ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
+	ListNodeImagesForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeImagesForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
 	// on a profile page. Filtered through node_visible_to() so a visitor only
 	// sees nodes they're entitled to.

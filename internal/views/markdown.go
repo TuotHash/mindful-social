@@ -26,9 +26,15 @@ var nodeMarkdownPolicy = newNodeMarkdownPolicy()
 func newNodeMarkdownPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowURLSchemes("http", "https", "mailto")
+	p.AllowRelativeURLs(true)
 	p.AllowAttrs("href", "title").OnElements("a")
 	p.RequireNoFollowOnLinks(true)
 	p.RequireNoReferrerOnLinks(true)
+	// Inline images come from the editor's upload pipeline (relative
+	// /uploads/topics/<root>/<file>.<ext>) or any http(s) source the
+	// author types in. Width/height stay locked to CSS; only src, alt
+	// and title are exposed.
+	p.AllowAttrs("src", "alt", "title").OnElements("img")
 	p.AllowElements(
 		"a",
 		"blockquote",
@@ -42,6 +48,7 @@ func newNodeMarkdownPolicy() *bluemonday.Policy {
 		"h5",
 		"h6",
 		"hr",
+		"img",
 		"li",
 		"ol",
 		"p",
