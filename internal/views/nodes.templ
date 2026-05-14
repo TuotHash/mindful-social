@@ -734,7 +734,7 @@ templ TopicCandidatePicker(find, selectedID string, candidates []TopicCandidate)
 				<legend>Pick a topic</legend>
 				for _, c := range candidates {
 					<label class="radio">
-						<input type="radio" name="parent_topic_id" value={ c.ID.String() } required?={ selectedID == "" } checked?={ c.ID.String() == selectedID }/>
+						<input type="radio" name="parent_topic_id" value={ c.ID.String() } checked?={ c.ID.String() == selectedID }/>
 						@nodeTypeChip(db.NodeTypeTopic)
 						<span>{ c.Title }</span>
 					</label>
