@@ -114,6 +114,78 @@ func TestEdgeCreate_DuplicateRejected(t *testing.T) {
 	}
 }
 
+func TestEdgeCreate_InlineFindingCreatesFindingAndEdge(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	from := createNode(t, c, "view", "View A", "")
+
+	resp := formPost(t, c, "/nodes/"+from.String()+"/edges", url.Values{
+		"kind":              {"supports"},
+		"to_mode":           {"new"},
+		"new_finding_title": {"The 2023 IPCC synthesis report"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("inline finding edge: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	body := readBody(t, get(t, c, "/nodes/"+from.String()))
+	if !strings.Contains(body, "The 2023 IPCC synthesis report") {
+		t.Fatalf("source page missing the new finding; excerpt: %s", snippet(body))
+	}
+
+	// The new finding exists, is a finding, and is parented to the source.
+	// The source view also carries an auto-created relates_to edge to its
+	// parent topic (set up by createNode for view-type seeds), so we look
+	// for the supports edge specifically.
+	rows, err := testServer.queries.ListEdgesFromNodeForViewer(t.Context(), db.ListEdgesFromNodeForViewerParams{
+		FromNode: from,
+		ViewerID: nil,
+	})
+	if err != nil {
+		t.Fatalf("list edges: %v", err)
+	}
+	var supportsTarget *uuid.UUID
+	for _, row := range rows {
+		if row.Kind == db.EdgeKindSupports {
+			id := row.ToID
+			supportsTarget = &id
+			break
+		}
+	}
+	if supportsTarget == nil {
+		t.Fatalf("expected one supports edge from source, found none in %d edges", len(rows))
+	}
+	finding, err := testServer.queries.GetNode(t.Context(), *supportsTarget)
+	if err != nil {
+		t.Fatalf("get created finding: %v", err)
+	}
+	if finding.Type != db.NodeTypeFinding {
+		t.Fatalf("created node type = %q, want finding", finding.Type)
+	}
+	if finding.ParentNodeID == nil || *finding.ParentNodeID != from {
+		t.Fatalf("created finding parent_node_id = %v, want %v", finding.ParentNodeID, from)
+	}
+}
+
+func TestEdgeCreate_InlineFindingRequiresTitle(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	from := createNode(t, c, "view", "View A", "")
+
+	resp := formPost(t, c, "/nodes/"+from.String()+"/edges", url.Values{
+		"kind":              {"supports"},
+		"to_mode":           {"new"},
+		"new_finding_title": {""},
+	})
+	body := readBody(t, resp)
+	if !strings.Contains(body, "Type a title for the new finding.") {
+		t.Fatalf("expected missing-title flash; got: %s", snippet(body))
+	}
+}
+
 func TestEdgeCreate_RejectsSelfEdge(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)

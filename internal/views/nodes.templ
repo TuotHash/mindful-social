@@ -1037,7 +1037,7 @@ type EdgeCandidate struct {
 	Title string
 }
 
-templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, candidates []EdgeCandidate) {
+templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, formToMode, find, formNewFindingTitle string, candidates []EdgeCandidate) {
 	@Layout("Add connection", viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -1051,7 +1051,7 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 			</p>
 			@Flash(flash)
 			<form method="post" action={ templ.SafeURL("/nodes/" + fromNode.Slug + "/edges") } class="form">
-				@edgeFormFields(fromNode, formKind, find, candidates)
+				@edgeFormFields(fromNode, formKind, formToMode, find, formNewFindingTitle, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">conversion_path</span>Add connection</button>
 					<a href={ templ.SafeURL("/nodes/" + fromNode.Slug) } class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -1066,7 +1066,7 @@ templ EdgeNew(viewer *Viewer, fromNode db.Node, flash, formKind, find string, ca
 // in-place). Form submit is htmx-driven against the same /edges POST; on
 // validation error the server re-renders this fragment, on success it sets
 // HX-Redirect so htmx does a full page navigation.
-templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []EdgeCandidate) {
+templ EdgeNewModal(fromNode db.Node, flash, formKind, formToMode, find, formNewFindingTitle string, candidates []EdgeCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -1089,7 +1089,7 @@ templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@edgeFormFields(fromNode, formKind, find, candidates)
+				@edgeFormFields(fromNode, formKind, formToMode, find, formNewFindingTitle, candidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">conversion_path</span>Add connection</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -1099,7 +1099,7 @@ templ EdgeNewModal(fromNode db.Node, flash, formKind, find string, candidates []
 	</div>
 }
 
-templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeCandidate) {
+templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindingTitle string, candidates []EdgeCandidate) {
 	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Relationship kind</legend>
@@ -1132,6 +1132,22 @@ templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeC
 		</div>
 		<small class="muted" style="font-size: 12px;">How the source relates to the target — supports backs it, opposes argues against, refines clarifies, cites references, relates_to is a loose link.</small>
 	</fieldset>
+	<fieldset class="toggle-group">
+		<legend>Target</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-to-mode="existing">
+				<input type="radio" name="to_mode" value="existing" checked?={ formToMode != "new" }/>
+				<span class="material-symbols-outlined">search</span>
+				Existing node
+			</label>
+			<label class="toggle-btn" data-to-mode="new">
+				<input type="radio" name="to_mode" value="new" checked?={ formToMode == "new" }/>
+				<span class="material-symbols-outlined">add_circle</span>
+				New finding
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new finding attached to this one. The new finding inherits visibility from this node.</small>
+	</fieldset>
 	<label>
 		Find target node
 		<input
@@ -1144,9 +1160,20 @@ templ edgeFormFields(fromNode db.Node, formKind, find string, candidates []EdgeC
 			hx-target="#picker-target"
 			hx-swap="outerHTML"
 		/>
-		<small>Results update as you type.</small>
+		<small>Used when target is "Existing node". Results update as you type.</small>
 	</label>
 	@CandidatePicker(find, candidates)
+	<label>
+		New finding title
+		<input
+			type="text"
+			name="new_finding_title"
+			value={ formNewFindingTitle }
+			maxlength="200"
+			placeholder="e.g. The 2023 IPCC synthesis report"
+		/>
+		<small>Used when target is "New finding". The finding is created with this title and attached by the chosen relationship kind.</small>
+	</label>
 }
 
 templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {

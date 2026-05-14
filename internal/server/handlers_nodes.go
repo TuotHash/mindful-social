@@ -874,10 +874,10 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 	// htmx-driven Connect button opens the form in a modal; direct URL
 	// hits (and no-JS clients) get the standalone full page.
 	if isHTMX(r) {
-		render(w, r, views.EdgeNewModal(node, "", "", find, candidates))
+		render(w, r, views.EdgeNewModal(node, "", "", "existing", find, "", candidates))
 		return
 	}
-	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", find, candidates))
+	render(w, r, views.EdgeNew(viewerFor(currentUser(r)), node, "", "", "existing", find, "", candidates))
 }
 
 // handleEdgePicker returns just the candidate-picker fragment, used by HTMX
@@ -942,6 +942,11 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 
 	rawKind := strings.TrimSpace(r.PostFormValue("kind"))
 	rawToID := strings.TrimSpace(r.PostFormValue("to_id"))
+	rawToMode := strings.TrimSpace(r.PostFormValue("to_mode"))
+	rawNewFindingTitle := strings.TrimSpace(r.PostFormValue("new_finding_title"))
+	if rawToMode != "new" {
+		rawToMode = "existing"
+	}
 
 	find := strings.TrimSpace(r.PostFormValue("find"))
 	// rerender re-displays the form with a flash. When the request came
@@ -956,10 +961,10 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if isHTMX(r) {
-			render(w, r, views.EdgeNewModal(fromNode, flash, rawKind, find, candidates))
+			render(w, r, views.EdgeNewModal(fromNode, flash, rawKind, rawToMode, find, rawNewFindingTitle, candidates))
 			return
 		}
-		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, find, candidates))
+		render(w, r, views.EdgeNew(viewerFor(user), fromNode, flash, rawKind, rawToMode, find, rawNewFindingTitle, candidates))
 	}
 
 	ek := db.EdgeKind(rawKind)
@@ -977,30 +982,73 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toID, err := uuid.Parse(rawToID)
-	if err != nil {
-		rerender("Select a target node.")
-		return
-	}
-	if toID == fromID {
-		rerender("A node cannot connect to itself.")
-		return
-	}
-	toNode, err := s.queries.GetNode(r.Context(), toID)
-	if err != nil {
-		rerender("Target node not found.")
-		return
-	}
-	if ok, err := s.canLinkToNode(r.Context(), toNode, user); err != nil {
-		s.logger.Error("edge create: link policy to", "err", err)
-		rerender("Could not create connection. Please try again.")
-		return
-	} else if !ok {
-		rerender("That target doesn't accept new links from you.")
-		return
+	// Branch: pick an existing target, or create a new finding inline.
+	// The "new" branch always produces a finding parented to fromNode and
+	// inheriting its visibility/group; that scoping is the whole reason
+	// we don't expose a free-form node creator at the same spot.
+	var toID uuid.UUID
+	if rawToMode == "new" {
+		if rawNewFindingTitle == "" {
+			rerender("Type a title for the new finding.")
+			return
+		}
+		if len(rawNewFindingTitle) > 200 {
+			rerender("Finding title is too long (max 200 characters).")
+			return
+		}
+		slug, slugErr := s.uniqueSlug(r.Context(), slugify(rawNewFindingTitle))
+		if slugErr != nil {
+			s.logger.Error("edge create: unique slug", "err", slugErr)
+			rerender("Could not create the finding. Please try again.")
+			return
+		}
+		newNode, createErr := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
+			Type:              db.NodeTypeFinding,
+			Title:             rawNewFindingTitle,
+			Body:              "",
+			SourceUrl:         nil,
+			CreatedBy:         user.ID,
+			Slug:              slug,
+			Visibility:        fromNode.Visibility,
+			VisibilityListID:  fromNode.VisibilityListID,
+			VisibilityGroupID: fromNode.VisibilityGroupID,
+			GroupID:           fromNode.GroupID,
+			ParentNodeID:      &fromID,
+		})
+		if createErr != nil {
+			s.logger.Error("edge create: new finding", "err", createErr)
+			rerender("Could not create the finding. Please try again.")
+			return
+		}
+		s.logger.Info("node created", "node_id", newNode.ID, "slug", newNode.Slug, "type", newNode.Type, "user_id", user.ID, "via", "edge_inline", "parent_node_id", fromID)
+		toID = newNode.ID
+	} else {
+		parsed, parseErr := uuid.Parse(rawToID)
+		if parseErr != nil {
+			rerender("Select a target node.")
+			return
+		}
+		if parsed == fromID {
+			rerender("A node cannot connect to itself.")
+			return
+		}
+		toNode, getErr := s.queries.GetNode(r.Context(), parsed)
+		if getErr != nil {
+			rerender("Target node not found.")
+			return
+		}
+		if ok, err := s.canLinkToNode(r.Context(), toNode, user); err != nil {
+			s.logger.Error("edge create: link policy to", "err", err)
+			rerender("Could not create connection. Please try again.")
+			return
+		} else if !ok {
+			rerender("That target doesn't accept new links from you.")
+			return
+		}
+		toID = parsed
 	}
 
-	_, err = s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
+	_, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
 		FromNode:  fromID,
 		ToNode:    toID,
 		Kind:      ek,
