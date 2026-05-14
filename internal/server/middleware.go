@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -88,6 +89,36 @@ func viewerID(r *http.Request) *uuid.UUID {
 		return &id
 	}
 	return nil
+}
+
+// recoverer catches panics from downstream handlers, logs them through
+// s.logger with the request id and stack, and writes a 500. Replaces
+// chi's middleware.Recoverer, which dumps a colored stack to stderr and
+// bypasses the structured log stream entirely. http.ErrAbortHandler is
+// re-panicked so the server still aborts the connection as intended.
+func (s *Server) recoverer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			rvr := recover()
+			if rvr == nil {
+				return
+			}
+			if rvr == http.ErrAbortHandler {
+				panic(rvr)
+			}
+			s.logger.Error("panic recovered",
+				"panic", rvr,
+				"method", r.Method,
+				"path", r.URL.Path,
+				"request_id", chimw.GetReqID(r.Context()),
+				"stack", string(debug.Stack()),
+			)
+			if r.Header.Get("Connection") != "Upgrade" {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 // requestLogger emits one structured log line per request. It runs after

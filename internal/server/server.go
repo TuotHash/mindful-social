@@ -148,7 +148,7 @@ func (s *Server) routes() {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
+	r.Use(s.recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 	// scs LoadAndSave wraps the request in a session-aware response writer
 	// and persists changes on the way out.
