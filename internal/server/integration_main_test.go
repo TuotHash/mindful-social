@@ -37,11 +37,14 @@ func integrationDB(t *testing.T) *Server {
 			return
 		}
 		cfg := config.Config{
-			ListenAddr:    "127.0.0.1:0",
-			DatabaseURL:   url,
-			PublicBaseURL: "http://127.0.0.1",
-			SignupEnabled: true,
-			UploadDir:     uploadDir,
+			ListenAddr:                 "127.0.0.1:0",
+			DatabaseURL:                url,
+			PublicBaseURL:              "http://127.0.0.1",
+			SignupEnabled:              true,
+			UploadDir:                  uploadDir,
+			NodeImageMaxUploadBytes:    8 << 20,
+			NodeImageMaxDimension:      1920,
+			NodeImageBytesPerMegapixel: 500 * 1024,
 		}
 		// Discard logs in tests; failures surface via assertions.
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))

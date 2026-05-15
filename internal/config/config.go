@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -41,6 +42,20 @@ type Config struct {
 	// Defaults to $DATA_DIR/uploads; override UPLOAD_DIR to point
 	// elsewhere (e.g. a mounted object-storage bucket).
 	UploadDir string
+
+	// NodeImageMaxUploadBytes is the raw request-body ceiling for node
+	// image uploads, enforced via http.MaxBytesReader before decoding.
+	NodeImageMaxUploadBytes int64
+
+	// NodeImageMaxDimension caps the longest side (in pixels) of stored
+	// node images. Anything larger is downscaled, preserving aspect ratio.
+	NodeImageMaxDimension int
+
+	// NodeImageBytesPerMegapixel is the per-megapixel byte budget the
+	// JPEG re-encoder targets. With the default 512000 bytes (~500 KiB)
+	// a 1920x1080 frame aims for ~1.06 MB before quality stepping kicks
+	// in. GIFs bypass recompression to preserve animation.
+	NodeImageBytesPerMegapixel int64
 }
 
 // Load reads configuration from environment variables.
@@ -54,14 +69,17 @@ func Load(logger *slog.Logger) (Config, error) {
 	}
 	dataDir := envOr("DATA_DIR", ".")
 	cfg := Config{
-		ListenAddr:    envOr("LISTEN_ADDR", "127.0.0.1:8080"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		LogLevel:      envLogLevel(logger, "LOG_LEVEL", slog.LevelInfo),
-		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
-		SignupEnabled: envBool(logger, "SIGNUP_ENABLED", true),
-		AdminUsers:    envList("ADMIN_USERS"),
-		DataDir:       dataDir,
-		UploadDir:     envOr("UPLOAD_DIR", filepath.Join(dataDir, "uploads")),
+		ListenAddr:                 envOr("LISTEN_ADDR", "127.0.0.1:8080"),
+		DatabaseURL:                os.Getenv("DATABASE_URL"),
+		LogLevel:                   envLogLevel(logger, "LOG_LEVEL", slog.LevelInfo),
+		PublicBaseURL:              envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
+		SignupEnabled:              envBool(logger, "SIGNUP_ENABLED", true),
+		AdminUsers:                 envList("ADMIN_USERS"),
+		DataDir:                    dataDir,
+		UploadDir:                  envOr("UPLOAD_DIR", filepath.Join(dataDir, "uploads")),
+		NodeImageMaxUploadBytes:    envInt64(logger, "NODE_IMAGE_MAX_UPLOAD_BYTES", 8<<20),
+		NodeImageMaxDimension:      envPositiveInt(logger, "NODE_IMAGE_MAX_DIMENSION", 1920),
+		NodeImageBytesPerMegapixel: envInt64(logger, "NODE_IMAGE_BYTES_PER_MEGAPIXEL", 500*1024),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -132,6 +150,38 @@ func parseLogLevel(raw string) (slog.Level, bool) {
 		return slog.LevelError, true
 	}
 	return slog.LevelInfo, false
+}
+
+// envInt64 parses a base-10 int64; anything unrecognised or non-positive
+// falls back to the default and logs a warning, mirroring envBool. A zero
+// or negative value would disable the limit it represents, which is
+// almost certainly a misconfiguration rather than the operator's intent.
+func envInt64(logger *slog.Logger, key string, fallback int64) int64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v <= 0 {
+		logger.Warn("config: invalid int64, using default", "key", key, "value", raw, "default", fallback)
+		return fallback
+	}
+	return v
+}
+
+// envPositiveInt is the int-typed sibling of envInt64 for values that
+// naturally fit in an int (pixel dimensions, queue depths, etc.).
+func envPositiveInt(logger *slog.Logger, key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		logger.Warn("config: invalid positive int, using default", "key", key, "value", raw, "default", fallback)
+		return fallback
+	}
+	return v
 }
 
 // envBool parses common true/false spellings; anything unrecognised falls

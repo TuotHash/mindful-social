@@ -1107,6 +1107,13 @@ label.field {
   margin: var(--s-3) 0;
   background: black;
 }
+.markdown-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin: var(--s-3) 0;
+}
 
 .form-fieldset {
   border: 1px solid var(--border);
