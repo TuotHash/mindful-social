@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -73,90 +74,16 @@ func (s *Server) handleNodeVideoUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxNodeVideoBytes+1024)
-	file, _, err := r.FormFile(nodeVideoFormField)
-	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
-			return
-		}
-		writeNodeImageError(w, http.StatusBadRequest, "noFileGiven")
-		return
-	}
-	defer file.Close()
-
-	tmpDir := filepath.Join(s.cfg.UploadDir, "tmp")
-	if err := os.MkdirAll(tmpDir, nodeImageDirPerm); err != nil {
-		s.logger.Error("node video upload: mkdir tmp", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+	publicPath, info, targetW, targetH, durationMs, ok := s.storeNodeVideoUpload(
+		w,
+		r,
+		filepath.Join(s.cfg.UploadDir, "topics", rootID.String()),
+		"/uploads/topics/"+rootID.String(),
+	)
+	if !ok {
 		return
 	}
 
-	inFile, err := os.CreateTemp(tmpDir, "in-*.bin")
-	if err != nil {
-		s.logger.Error("node video upload: create temp", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-	inPath := inFile.Name()
-	defer os.Remove(inPath)
-	if _, err := io.Copy(inFile, file); err != nil {
-		inFile.Close()
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
-			return
-		}
-		s.logger.Error("node video upload: stash input", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-	if err := inFile.Close(); err != nil {
-		s.logger.Error("node video upload: close input", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-
-	probe, err := probeNodeVideo(r.Context(), inPath)
-	if err != nil {
-		writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
-		return
-	}
-
-	targetW, targetH := targetVideoSize(probe.Width, probe.Height, nodeVideoShortSideCap)
-
-	dir := filepath.Join(s.cfg.UploadDir, "topics", rootID.String())
-	if err := os.MkdirAll(dir, nodeImageDirPerm); err != nil {
-		s.logger.Error("node video upload: mkdir", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-
-	name, err := randomImageName(".mp4")
-	if err != nil {
-		s.logger.Error("node video upload: name", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-	storedPath := filepath.Join(dir, name)
-
-	if err := transcodeNodeVideo(r.Context(), inPath, storedPath, targetW, targetH); err != nil {
-		_ = os.Remove(storedPath)
-		s.logger.Error("node video upload: transcode", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-
-	info, err := os.Stat(storedPath)
-	if err != nil {
-		_ = os.Remove(storedPath)
-		s.logger.Error("node video upload: stat output", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-
-	publicPath := "/uploads/topics/" + rootID.String() + "/" + name
 	if _, err := s.queries.CreateNodeVideo(r.Context(), db.CreateNodeVideoParams{
 		RootTopicID: rootID,
 		UploadedBy:  user.ID,
@@ -165,15 +92,121 @@ func (s *Server) handleNodeVideoUpload(w http.ResponseWriter, r *http.Request) {
 		ByteSize:    info.Size(),
 		Width:       int32(targetW),
 		Height:      int32(targetH),
-		DurationMs:  int32(probe.DurationMs),
+		DurationMs:  int32(durationMs),
 	}); err != nil {
-		_ = os.Remove(storedPath)
+		relPath := strings.TrimPrefix(publicPath, "/uploads/")
+		_ = os.Remove(filepath.Join(s.cfg.UploadDir, relPath))
 		s.logger.Error("node video upload: insert", "err", err)
 		writeNodeImageError(w, http.StatusInternalServerError, "importError")
 		return
 	}
 
 	writeNodeImageSuccess(w, publicPath)
+}
+
+func (s *Server) handleNewNodeVideoUpload(w http.ResponseWriter, r *http.Request) {
+	if currentUser(r) == nil {
+		writeNodeImageError(w, http.StatusForbidden, "noPermission")
+		return
+	}
+
+	publicPath, _, _, _, _, ok := s.storeNodeVideoUpload(
+		w,
+		r,
+		filepath.Join(s.cfg.UploadDir, "drafts"),
+		"/uploads/drafts",
+	)
+	if !ok {
+		return
+	}
+
+	writeNodeImageSuccess(w, publicPath)
+}
+
+func (s *Server) storeNodeVideoUpload(w http.ResponseWriter, r *http.Request, dir, publicPrefix string) (string, os.FileInfo, int, int, int, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxNodeVideoBytes+1024)
+	file, _, err := r.FormFile(nodeVideoFormField)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
+			return "", nil, 0, 0, 0, false
+		}
+		writeNodeImageError(w, http.StatusBadRequest, "noFileGiven")
+		return "", nil, 0, 0, 0, false
+	}
+	defer file.Close()
+
+	tmpDir := filepath.Join(s.cfg.UploadDir, "tmp")
+	if err := os.MkdirAll(tmpDir, nodeImageDirPerm); err != nil {
+		s.logger.Error("node video upload: mkdir tmp", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+
+	inFile, err := os.CreateTemp(tmpDir, "in-*.bin")
+	if err != nil {
+		s.logger.Error("node video upload: create temp", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+	inPath := inFile.Name()
+	defer os.Remove(inPath)
+	if _, err := io.Copy(inFile, file); err != nil {
+		inFile.Close()
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
+			return "", nil, 0, 0, 0, false
+		}
+		s.logger.Error("node video upload: stash input", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+	if err := inFile.Close(); err != nil {
+		s.logger.Error("node video upload: close input", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+
+	probe, err := probeNodeVideo(r.Context(), inPath)
+	if err != nil {
+		writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
+		return "", nil, 0, 0, 0, false
+	}
+
+	targetW, targetH := targetVideoSize(probe.Width, probe.Height, nodeVideoShortSideCap)
+
+	if err := os.MkdirAll(dir, nodeImageDirPerm); err != nil {
+		s.logger.Error("node video upload: mkdir", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+
+	name, err := randomImageName(".mp4")
+	if err != nil {
+		s.logger.Error("node video upload: name", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+	storedPath := filepath.Join(dir, name)
+
+	if err := transcodeNodeVideo(r.Context(), inPath, storedPath, targetW, targetH); err != nil {
+		_ = os.Remove(storedPath)
+		s.logger.Error("node video upload: transcode", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+
+	info, err := os.Stat(storedPath)
+	if err != nil {
+		_ = os.Remove(storedPath)
+		s.logger.Error("node video upload: stat output", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return "", nil, 0, 0, 0, false
+	}
+
+	return publicPrefix + "/" + name, info, targetW, targetH, probe.DurationMs, true
 }
 
 // videoProbe is the slice of ffprobe output we actually use.

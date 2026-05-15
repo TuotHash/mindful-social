@@ -288,18 +288,17 @@
   // resolveEndpoint inspects the textarea's data-<kind>-* attributes and
   // returns the URL the editor should POST uploads to. The "template" form
   // ("/nodes/{id}/images") is paired with a form-input name that supplies
-  // the id at runtime — used on the New-post composer where the parent
-  // topic isn't known until the user picks one.
+  // the id at runtime. When the form has no selected parent yet, a direct
+  // endpoint can act as the draft-upload fallback for the New-post composer.
   function resolveEndpoint(textarea, kind) {
-    var direct = textarea.dataset[kind + "Endpoint"];
-    if (direct) return direct;
     var template = textarea.dataset[kind + "EndpointTemplate"];
     var sourceName = textarea.dataset[kind + "EndpointSource"];
-    if (!template || !sourceName || !textarea.form) return "";
-    var checked = textarea.form.querySelector('input[name="' + sourceName + '"]:checked');
-    var value = checked ? checked.value : "";
-    if (!value) return "";
-    return template.replace("{id}", encodeURIComponent(value));
+    if (template && sourceName && textarea.form) {
+      var checked = textarea.form.querySelector('input[name="' + sourceName + '"]:checked');
+      var value = checked ? checked.value : "";
+      if (value) return template.replace("{id}", encodeURIComponent(value));
+    }
+    return textarea.dataset[kind + "Endpoint"] || "";
   }
 
   function resolveImageEndpoint(textarea) { return resolveEndpoint(textarea, "image"); }

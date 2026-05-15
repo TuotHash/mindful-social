@@ -38,15 +38,15 @@ func newNodeMarkdownPolicy() *bluemonday.Policy {
 	p.RequireNoFollowOnLinks(true)
 	p.RequireNoReferrerOnLinks(true)
 	// Inline images come from the editor's upload pipeline (relative
-	// /uploads/topics/<root>/<file>.<ext>) or any http(s) source the
-	// author types in. Width/height stay locked to CSS; only src, alt
-	// and title are exposed.
+	// /uploads/topics/... or /uploads/drafts/...) or any http(s) source
+	// the author types in. Width/height stay locked to CSS; only src,
+	// alt and title are exposed.
 	p.AllowAttrs("src", "alt", "title").OnElements("img")
 	// Inline videos come from the editor's video-upload pipeline, which
-	// always produces /uploads/topics/<root>/<file>.mp4. Restricting the
-	// attribute surface to src/controls/playsinline/preload/poster keeps
-	// the rendered HTML close to what the editor inserts and blocks
-	// drive-by exploits via crafted markdown.
+	// produces /uploads/topics/... or /uploads/drafts/... mp4s.
+	// Restricting the attribute surface keeps the rendered HTML close to
+	// what the editor inserts and blocks drive-by exploits via crafted
+	// markdown.
 	p.AllowAttrs("src", "controls", "playsinline", "preload", "poster").OnElements("video")
 	p.AllowElements(
 		"a",

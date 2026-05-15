@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -49,6 +50,12 @@ type nodeImageUploadResponse struct {
 
 type nodeImageUploadData struct {
 	FilePath string `json:"filePath"`
+}
+
+type preparedNodeImage struct {
+	data        []byte
+	ext         string
+	contentType string
 }
 
 // handleNodeImageUpload accepts a multipart image upload from the markdown
@@ -94,6 +101,64 @@ func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prepared, ok := s.prepareNodeImageUpload(w, r, "node", node.ID, "root", rootID)
+	if !ok {
+		return
+	}
+
+	dir := filepath.Join(s.cfg.UploadDir, "topics", rootID.String())
+	publicPrefix := "/uploads/topics/" + rootID.String()
+	publicPath, err := s.storePreparedNodeImage(dir, publicPrefix, prepared)
+	if err != nil {
+		s.logger.Error("node image upload: write", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return
+	}
+
+	if _, err := s.queries.CreateNodeImage(r.Context(), db.CreateNodeImageParams{
+		RootTopicID: rootID,
+		UploadedBy:  user.ID,
+		StoredPath:  publicPath,
+		ContentType: prepared.contentType,
+		ByteSize:    int64(len(prepared.data)),
+	}); err != nil {
+		relPath := strings.TrimPrefix(publicPath, "/uploads/")
+		_ = os.Remove(filepath.Join(s.cfg.UploadDir, relPath))
+		s.logger.Error("node image upload: insert", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return
+	}
+
+	writeNodeImageSuccess(w, publicPath)
+}
+
+func (s *Server) handleNewNodeImageUpload(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		writeNodeImageError(w, http.StatusForbidden, "noPermission")
+		return
+	}
+
+	prepared, ok := s.prepareNodeImageUpload(w, r, "scope", "draft", "user_id", user.ID)
+	if !ok {
+		return
+	}
+
+	publicPath, err := s.storePreparedNodeImage(
+		filepath.Join(s.cfg.UploadDir, "drafts"),
+		"/uploads/drafts",
+		prepared,
+	)
+	if err != nil {
+		s.logger.Error("node image upload: write draft", "err", err)
+		writeNodeImageError(w, http.StatusInternalServerError, "importError")
+		return
+	}
+
+	writeNodeImageSuccess(w, publicPath)
+}
+
+func (s *Server) prepareNodeImageUpload(w http.ResponseWriter, r *http.Request, logAttrs ...any) (preparedNodeImage, bool) {
 	maxUpload := s.cfg.NodeImageMaxUploadBytes
 	r.Body = http.MaxBytesReader(w, r.Body, maxUpload+1024)
 	file, header, err := r.FormFile(nodeImageFormField)
@@ -101,10 +166,10 @@ func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
 			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
-			return
+			return preparedNodeImage{}, false
 		}
 		writeNodeImageError(w, http.StatusBadRequest, "noFileGiven")
-		return
+		return preparedNodeImage{}, false
 	}
 	defer file.Close()
 
@@ -113,40 +178,40 @@ func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
 			writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
-			return
+			return preparedNodeImage{}, false
 		}
 		s.logger.Error("node image upload: read", "err", err)
 		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
+		return preparedNodeImage{}, false
 	}
 	if len(data) == 0 {
 		writeNodeImageError(w, http.StatusBadRequest, "noFileGiven")
-		return
+		return preparedNodeImage{}, false
 	}
 
 	uploadedName := ""
 	if header != nil {
 		uploadedName = header.Filename
 	}
-	s.logger.Debug("node image upload: received",
-		"node", node.ID,
-		"root", rootID,
+	receivedAttrs := append([]any(nil), logAttrs...)
+	receivedAttrs = append(receivedAttrs,
 		"filename", uploadedName,
 		"bytes", len(data),
 		"max_upload_bytes", maxUpload,
 	)
+	s.logger.Debug("node image upload: received", receivedAttrs...)
 
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		s.logger.Debug("node image upload: decode failed", "err", err)
 		writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
-		return
+		return preparedNodeImage{}, false
 	}
 	ext, contentType, supported := nodeImageFormatMeta(format)
 	if !supported {
 		s.logger.Debug("node image upload: format not supported", "format", format)
 		writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
-		return
+		return preparedNodeImage{}, false
 	}
 	srcBounds := img.Bounds()
 	srcW, srcH := srcBounds.Dx(), srcBounds.Dy()
@@ -173,7 +238,7 @@ func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.logger.Error("node image upload: compress", "err", err)
 			writeNodeImageError(w, http.StatusInternalServerError, "importError")
-			return
+			return preparedNodeImage{}, false
 		}
 		if processed != nil {
 			storedData = processed
@@ -194,42 +259,24 @@ func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 		"bytes_out", len(storedData),
 	)
 
-	dir := filepath.Join(s.cfg.UploadDir, "topics", rootID.String())
+	return preparedNodeImage{data: storedData, ext: storedExt, contentType: storedContentType}, true
+}
+
+func (s *Server) storePreparedNodeImage(dir, publicPrefix string, prepared preparedNodeImage) (string, error) {
 	if err := os.MkdirAll(dir, nodeImageDirPerm); err != nil {
-		s.logger.Error("node image upload: mkdir", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
+		return "", err
 	}
 
-	name, err := randomImageName(storedExt)
+	name, err := randomImageName(prepared.ext)
 	if err != nil {
-		s.logger.Error("node image upload: name", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
+		return "", err
 	}
 	storedPath := filepath.Join(dir, name)
-	if err := os.WriteFile(storedPath, storedData, nodeImageUploadPerm); err != nil {
-		s.logger.Error("node image upload: write", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
+	if err := os.WriteFile(storedPath, prepared.data, nodeImageUploadPerm); err != nil {
+		return "", err
 	}
 
-	publicPath := "/uploads/topics/" + rootID.String() + "/" + name
-	if _, err := s.queries.CreateNodeImage(r.Context(), db.CreateNodeImageParams{
-		RootTopicID: rootID,
-		UploadedBy:  user.ID,
-		StoredPath:  publicPath,
-		ContentType: storedContentType,
-		ByteSize:    int64(len(storedData)),
-	}); err != nil {
-		// Best-effort filesystem cleanup so the DB and disk don't disagree.
-		_ = os.Remove(storedPath)
-		s.logger.Error("node image upload: insert", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-
-	writeNodeImageSuccess(w, publicPath)
+	return publicPrefix + "/" + name, nil
 }
 
 // compressNodeImage downsizes src to fit the configured max dimension and,

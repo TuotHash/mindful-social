@@ -77,6 +77,51 @@ func TestNodeVideoUpload_TranscodesAndSaves(t *testing.T) {
 	}
 }
 
+func TestNodeVideoUpload_SavesDraftForNewNode(t *testing.T) {
+	requireFFmpeg(t)
+	s := integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	input := synthVideo(t, 320, 180)
+	resp := uploadVideo(t, c, "/nodes/new/videos", "clip.mp4", input)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("upload: status %d body %s", resp.StatusCode, body)
+	}
+
+	var body struct {
+		Data  *struct{ FilePath string } `json:"data"`
+		Error string                     `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error != "" {
+		t.Fatalf("upload error: %s", body.Error)
+	}
+	if body.Data == nil || body.Data.FilePath == "" {
+		t.Fatalf("upload response missing filePath: %+v", body)
+	}
+	if !strings.HasPrefix(body.Data.FilePath, "/uploads/drafts/") {
+		t.Fatalf("filePath %q missing draft prefix", body.Data.FilePath)
+	}
+	if !strings.HasSuffix(body.Data.FilePath, ".mp4") {
+		t.Fatalf("stored path %q not normalized to .mp4", body.Data.FilePath)
+	}
+
+	relPath := strings.TrimPrefix(body.Data.FilePath, "/uploads/")
+	diskPath := filepath.Join(s.cfg.UploadDir, relPath)
+	info, err := os.Stat(diskPath)
+	if err != nil {
+		t.Fatalf("stat %q: %v", diskPath, err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("stored video is empty: %s", diskPath)
+	}
+}
+
 // TestNodeVideoUpload_RejectsNonVideo confirms the format gate: a text
 // blob should come back as a JSON error, not a 200 with a filePath.
 func TestNodeVideoUpload_RejectsNonVideo(t *testing.T) {
@@ -98,8 +143,8 @@ func TestNodeVideoUpload_RejectsNonVideo(t *testing.T) {
 // installed on the host.
 func TestTargetVideoSize_CapsShorterSide(t *testing.T) {
 	cases := []struct {
-		name       string
-		w, h, cap  int
+		name         string
+		w, h, cap    int
 		wantW, wantH int
 	}{
 		{"4k landscape", 3840, 2160, 1080, 1920, 1080},
@@ -209,4 +254,3 @@ func uploadVideo(t *testing.T, c *http.Client, path, filename string, data []byt
 	}
 	return resp
 }
-

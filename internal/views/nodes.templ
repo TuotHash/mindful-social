@@ -145,8 +145,10 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			name="body"
 			rows="5"
 			class="markdown-editor"
+			data-image-endpoint="/nodes/new/images"
 			data-image-endpoint-template="/nodes/{id}/images"
 			data-image-endpoint-source="parent_node_id"
+			data-video-endpoint="/nodes/new/videos"
 			data-video-endpoint-template="/nodes/{id}/videos"
 			data-video-endpoint-source="parent_node_id"
 		>{ formBody }</textarea>

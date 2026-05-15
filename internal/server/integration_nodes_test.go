@@ -24,6 +24,24 @@ func TestNodeCreate_RendersOnDetail(t *testing.T) {
 	}
 }
 
+func TestNodeNewForm_HasDraftUploadEndpoints(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	body := readBody(t, get(t, c, "/nodes/new"))
+	for _, want := range []string{
+		`data-image-endpoint="/nodes/new/images"`,
+		`data-image-endpoint-template="/nodes/{id}/images"`,
+		`data-video-endpoint="/nodes/new/videos"`,
+		`data-video-endpoint-template="/nodes/{id}/videos"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("new node form missing %q; excerpt: %s", want, snippet(body))
+		}
+	}
+}
+
 func TestNodeCreate_RendersMarkdownBodySafely(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)
