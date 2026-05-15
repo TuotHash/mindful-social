@@ -673,23 +673,26 @@
       function filteredNodes() {
         var active = activeTypes();
         var query = currentQuery();
-        var textFilter = !!(query && query !== serverQuery);
 
-        if (!textFilter) {
+        if (!query) {
           return data.nodes.filter(function (node) {
             return !!active[node.type];
           });
         }
 
-        // Seed the BFS with direct matches that pass the type filter.
-        // Inactive-type nodes can never be direct matches, but the BFS
-        // expansion below ignores type so a path through a hidden node
-        // still reaches the visible side of the graph.
+        // Trust the server's match flag once its response has caught up
+        // with the user's typing; until then fall back to a local
+        // substring match against the previous response. This keeps the
+        // depth-slider BFS working both during typing and after settle —
+        // the prior code disabled the client filter as soon as the
+        // server query matched, which left the slider with nothing to do.
+        var useMatchFlags = (query === serverQuery);
         var keep = {};
         var frontier = [];
         data.nodes.forEach(function (node) {
           if (!active[node.type]) return;
-          if (matchesQuery(node, query)) {
+          var seed = useMatchFlags ? node.match === true : matchesQuery(node, query);
+          if (seed) {
             keep[node.id] = true;
             frontier.push(node.id);
           }

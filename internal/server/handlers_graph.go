@@ -93,8 +93,10 @@ func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.Argum
 	}
 
 	seedIDs := make([]uuid.UUID, 0, len(matchRows))
+	matchedIDs := make(map[string]struct{}, len(matchRows))
 	for _, row := range matchRows {
 		seedIDs = append(seedIDs, row.ID)
+		matchedIDs[row.ID.String()] = struct{}{}
 	}
 
 	neighborhoodRows, err := s.queries.ListArgumentGraphNeighborhood(r.Context(), db.ListArgumentGraphNeighborhoodParams{
@@ -125,7 +127,7 @@ func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.Argum
 		return views.ArgumentGraphData{}, err
 	}
 	return views.ArgumentGraphData{
-		Nodes: argumentGraphNodesFromNeighborhoodRows(neighborhoodRows),
+		Nodes: argumentGraphNodesFromNeighborhoodRows(neighborhoodRows, matchedIDs),
 		Edges: argumentGraphEdgesFromNodeIDRows(edgeRows),
 	}, nil
 }
@@ -144,15 +146,17 @@ func argumentGraphNodesFromRows(rows []db.ListArgumentGraphNodesForViewerRow) []
 	return out
 }
 
-func argumentGraphNodesFromNeighborhoodRows(rows []db.ListArgumentGraphNeighborhoodRow) []views.ArgumentGraphNode {
+func argumentGraphNodesFromNeighborhoodRows(rows []db.ListArgumentGraphNeighborhoodRow, matchedIDs map[string]struct{}) []views.ArgumentGraphNode {
 	out := make([]views.ArgumentGraphNode, 0, len(rows))
 	for _, row := range rows {
+		_, isMatch := matchedIDs[row.ID]
 		out = append(out, views.ArgumentGraphNode{
 			ID:             row.ID,
 			Slug:           row.Slug,
 			Type:           row.NodeType,
 			Title:          row.Title,
 			AuthorUsername: row.AuthorUsername,
+			Match:          isMatch,
 		})
 	}
 	return out

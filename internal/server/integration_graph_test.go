@@ -109,11 +109,19 @@ func TestArgumentGraphData_SearchIncludesNeighborhood(t *testing.T) {
 	for _, node := range data.Nodes {
 		byID[node.ID] = node
 	}
-	if _, ok := byID[match.String()]; !ok {
+	matchedNode, matchedOK := byID[match.String()]
+	if !matchedOK {
 		t.Fatalf("response missing search match; nodes: %+v", data.Nodes)
 	}
-	if _, ok := byID[neighbour.String()]; !ok {
+	if !matchedNode.Match {
+		t.Fatalf("direct match should have match=true; node: %+v", matchedNode)
+	}
+	neighbourNode, neighbourOK := byID[neighbour.String()]
+	if !neighbourOK {
 		t.Fatalf("response missing 1-hop neighbour; nodes: %+v", data.Nodes)
+	}
+	if neighbourNode.Match {
+		t.Fatalf("neighbour should have match=false; node: %+v", neighbourNode)
 	}
 	if _, ok := byID[unrelated.String()]; ok {
 		t.Fatalf("response leaked unrelated node; nodes: %+v", data.Nodes)

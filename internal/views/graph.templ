@@ -11,6 +11,12 @@ type ArgumentGraphNode struct {
 	Type           string `json:"type"`
 	Title          string `json:"title"`
 	AuthorUsername string `json:"authorUsername"`
+	// Match is true for nodes that directly matched the active search
+	// query. Neighbourhood-expansion nodes leave it false. The client
+	// uses this to seed the depth-slider BFS — without it the browser
+	// can't distinguish "matched 'nuclear'" from "happens to be next to
+	// something that did".
+	Match bool `json:"match,omitempty"`
 }
 
 type ArgumentGraphEdge struct {
