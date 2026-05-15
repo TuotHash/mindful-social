@@ -190,6 +190,8 @@ func (s *Server) routes() {
 	r.Get("/auth/callback/{provider}", s.handleOAuthCallback)
 
 	r.Get("/nodes/{id}", s.handleNodeDetail)
+	r.Get("/graph", s.handleArgumentGraph)
+	r.Get("/graph/data", s.handleArgumentGraphData)
 	r.Get("/users/{username}", s.handleProfile)
 	r.Get("/tags", s.handleTagsIndex)
 	r.Get("/tags/{name}", s.handleTagDetail)

@@ -61,7 +61,7 @@ templ landingMarketing(viewer *Viewer) {
 								<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 							</a>
 						}
-						<a class="btn lg" href="/tags">Read the graph</a>
+						<a class="btn lg" href="/graph">Read the graph</a>
 					</div>
 					<div class="row gap-24 wrap" style="margin-top: 12px; color: var(--ink-3); font-size: 13px;">
 						<span class="row gap-8">@checkIcon() Open source · AGPL</span>
@@ -75,17 +75,18 @@ templ landingMarketing(viewer *Viewer) {
 					<div class="hero-graph-card">
 						<div class="row between" style="margin-bottom: 8px; padding: 0 6px;">
 							<span class="eyebrow">Argument graph</span>
-							<span class="chip" style="font-size: 10px; padding: 2px 8px; background: var(--accent); color: var(--accent-ink); border: 0;">Coming soon</span>
+							<span class="chip" style="font-size: 10px; padding: 2px 8px; background: var(--accent); color: var(--accent-ink); border: 0;">Live</span>
 						</div>
 						<div class="hero-graph-inner">
 							<div class="col gap-12" style="text-align: center; max-width: 320px; padding: 24px;">
 								@bloom(120, 105, "margin: 0 auto; opacity: 0.5;")
 								<div class="h-3" style="font-family: var(--serif); font-size: 22px; color: var(--ink-2);">
-									Interactive graph view in development
+									Explore the graph
 								</div>
 								<p class="muted" style="font-size: 14px; margin: 0;">
-									The argument graph will let you explore connections between topics, views, and findings — all in one visual space.
+									Trace visible topics, views, and findings in one visual space.
 								</p>
+								<a class="btn accent sm" href="/graph" style="align-self: center;">Open graph</a>
 							</div>
 						</div>
 					</div>
@@ -168,6 +169,7 @@ templ homeFeed(viewer *Viewer, items []FeedItem) {
 			<h1 class="h-1">What do you want to commit to today?</h1>
 			<div class="row gap-12 wrap">
 				<a class="btn accent" href="/nodes/new">Add a node</a>
+				<a class="btn" href="/graph">Open graph</a>
 				<a class="btn" href="/tags">Browse by tag</a>
 			</div>
 		</section>
@@ -204,16 +206,14 @@ templ homeFeed(viewer *Viewer, items []FeedItem) {
 	</div>
 }
 
-// argumentGraphPromo is the "coming soon: argument graph" callout used on the
-// logged-in home feed and (eventually) the landing page. Markup mirrors the
-// redesign prototype: a card-like surface with copy on the left and an
-// illustrative SVG cluster of glossy nodes on the right.
+// argumentGraphPromo is the home-feed callout for the visual graph.
 templ argumentGraphPromo() {
-	<section class="promo" aria-label="Coming soon: Argument graph" style="margin-top: 56px;">
+	<section class="promo" aria-label="Argument graph" style="margin-top: 56px;">
 		<div class="promo-inner">
-			<span class="badge">Coming soon</span>
+			<span class="badge accent">Live graph</span>
 			<h2>The argument graph</h2>
 			<p>See how topics, views, and findings connect — and trace any claim back to what supports or opposes it.</p>
+			<a class="btn accent" href="/graph">Open graph</a>
 		</div>
 		<div class="promo-graph" aria-hidden="true">
 			<svg viewBox="0 0 360 280" preserveAspectRatio="xMaxYMid meet">

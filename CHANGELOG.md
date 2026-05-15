@@ -101,8 +101,8 @@ visualisation are on the roadmap and will land in later alphas.
 
 - No threading or discussion on nodes yet.
 - No voting system yet.
-- No graph visualisation yet (the Svelte + svelte-flow component is
-  scoped but unimplemented).
+- Graph visualisation is an initial recent-node slice; personal,
+  friends-of, and trending graph modes are still future work.
 - No trust score, flagging, or moderator queue yet — admins have full
   manual powers in the meantime.
 - No version history or rollback for wiki edits yet.

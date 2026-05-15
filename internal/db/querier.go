@@ -118,6 +118,16 @@ type Querier interface {
 	// node count is zero are dropped so we don't leak the existence of tags that
 	// only live on private nodes.
 	ListAllTagsForViewer(ctx context.Context, viewerID *uuid.UUID) ([]ListAllTagsForViewerRow, error)
+	// Edges among a known set of visible graph nodes, used by server-side graph
+	// search results.
+	ListArgumentGraphEdgesForNodeIDs(ctx context.Context, arg ListArgumentGraphEdgesForNodeIDsParams) ([]ListArgumentGraphEdgesForNodeIDsRow, error)
+	// Edges whose endpoints are both present in the same recent visible-node
+	// slice. Endpoint visibility gates edge visibility because edges do not carry
+	// separate visibility policy.
+	ListArgumentGraphEdgesForViewer(ctx context.Context, arg ListArgumentGraphEdgesForViewerParams) ([]ListArgumentGraphEdgesForViewerRow, error)
+	// Recent visible nodes for the graph canvas. The graph viewer is intentionally
+	// bounded so a public instance cannot ship an unbounded graph into the page.
+	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)
 	// Trusted list first, then custom lists alphabetically — order the visibility
 	// selector and the lists-management page both rely on.
 	ListAudienceLists(ctx context.Context, ownerID uuid.UUID) ([]AudienceList, error)

@@ -1594,6 +1594,348 @@ label.field {
 }
 
 /* =========================================================================
+   Argument graph
+   ========================================================================= */
+
+.graph-page {
+  width: min(var(--container-wide), calc(100vw - 2 * var(--s-8)));
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+.argument-graph-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+}
+
+.argument-graph-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.argument-graph-stats span,
+.argument-graph-current {
+  border: 1px solid var(--border);
+  background: var(--bg-elev-1);
+  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.argument-graph-tool {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elev-1);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.argument-graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev-2);
+}
+
+.argument-graph-search {
+  min-width: 220px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  border: 1px solid var(--border-input);
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+}
+
+.argument-graph-search .material-symbols-outlined {
+  color: var(--text-subtle);
+}
+
+.argument-graph-search input[type="search"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 0;
+}
+
+.argument-graph-current {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  background: var(--bg-inset);
+}
+
+.argument-graph-types {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.argument-graph-types legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.argument-graph-types .chip {
+  cursor: pointer;
+  user-select: none;
+}
+
+.argument-graph-types input {
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+.argument-graph-types .chip:has(input:not(:checked)) {
+  background: var(--bg-elev-3);
+  border-color: var(--border);
+  color: var(--text-subtle);
+  opacity: 0.55;
+}
+
+.argument-graph-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--s-1);
+  border-left: 1px solid var(--border);
+}
+
+.argument-graph-zoom .btn {
+  width: 31px;
+  height: 31px;
+  padding: 0;
+}
+
+.argument-graph-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  min-height: 620px;
+}
+
+.argument-graph-stage {
+  position: relative;
+  background:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px),
+    var(--bg-inset);
+  background-size: 36px 36px;
+  overflow: hidden;
+}
+
+.argument-graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: var(--s-6);
+  text-align: center;
+  z-index: 2;
+  background: color-mix(in oklab, var(--bg-inset) 88%, transparent);
+}
+
+.argument-graph-svg {
+  display: block;
+  width: 100%;
+  height: min(72vh, 740px);
+  min-height: 620px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.argument-graph-svg:active {
+  cursor: grabbing;
+}
+
+.argument-graph-background {
+  fill: transparent;
+}
+
+.argument-graph-edge {
+  fill: none;
+  stroke: var(--edge, var(--relates));
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.72;
+  transition: opacity 0.12s;
+}
+
+.argument-graph-edge.is-dim {
+  opacity: 0.16;
+}
+
+.argument-graph-arrow.edge-supports path {
+  fill: var(--supports);
+}
+
+.argument-graph-arrow.edge-opposes path {
+  fill: var(--opposes);
+}
+
+.argument-graph-arrow.edge-related path {
+  fill: var(--relates);
+}
+
+.argument-graph-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.argument-graph-node circle {
+  fill: var(--node-bg, var(--bg-elev-3));
+  stroke: var(--node-ink, var(--text-muted));
+  stroke-width: 2;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.22));
+  transition:
+    stroke-width 0.12s,
+    opacity 0.12s,
+    filter 0.12s;
+}
+
+.argument-graph-node.node-topic {
+  --node-bg: var(--topic-bg);
+  --node-ink: var(--topic-ink);
+}
+
+.argument-graph-node.node-view {
+  --node-bg: var(--view-bg);
+  --node-ink: var(--view-ink);
+}
+
+.argument-graph-node.node-finding {
+  --node-bg: var(--finding-bg);
+  --node-ink: var(--finding-ink);
+}
+
+.argument-graph-node.is-selected circle,
+.argument-graph-node:focus-visible circle {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--node-ink) 48%, transparent));
+}
+
+.argument-graph-node.is-dim {
+  opacity: 0.3;
+}
+
+.argument-graph-label-box {
+  fill: color-mix(in oklab, var(--bg-elev-1) 92%, transparent);
+  stroke: var(--border);
+}
+
+.argument-graph-label {
+  fill: var(--text);
+  font: 500 13px var(--font-sans);
+  pointer-events: none;
+}
+
+.argument-graph-inspector {
+  border-left: 1px solid var(--border);
+  background: var(--bg-elev-1);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.argument-graph-inspector h2 {
+  font-size: var(--fs-xl);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.argument-graph-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.argument-graph-legend {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.argument-graph-legend > div {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.argument-graph-noscript {
+  border-top: 1px solid var(--border);
+  padding: var(--s-5);
+}
+
+@media (max-width: 900px) {
+  .argument-graph-toolbar {
+    flex-wrap: wrap;
+  }
+  .argument-graph-search {
+    flex-basis: 100%;
+  }
+  .argument-graph-workspace {
+    grid-template-columns: 1fr;
+  }
+  .argument-graph-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 720px) {
+  .graph-page {
+    width: min(var(--container-wide), calc(100vw - 2 * var(--s-4)));
+  }
+  .argument-graph-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .argument-graph-types,
+  .argument-graph-zoom {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .argument-graph-zoom {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .argument-graph-svg {
+    min-height: 520px;
+  }
+  .argument-graph-workspace {
+    min-height: 520px;
+  }
+}
+
+/* =========================================================================
    Node detail page
    ========================================================================= */
 
@@ -1749,6 +2091,9 @@ header.node-header > .chip {
 .featured-card.edge-cites::before {
   background: var(--cites);
 }
+.featured-card.edge-related::before {
+  background: var(--relates);
+}
 .featured-head {
   display: flex;
   align-items: center;
@@ -1811,7 +2156,8 @@ header.node-header > .chip {
   border-left-color: var(--cites);
   --edge: var(--cites);
 }
-.edge-group.edge-relates_to {
+.edge-group.edge-relates_to,
+.edge-group.edge-related {
   border-left-color: var(--relates);
   --edge: var(--relates);
 }
@@ -1885,7 +2231,8 @@ header.node-header > .chip {
 .edge-cites {
   --edge: var(--cites);
 }
-.edge-relates_to {
+.edge-relates_to,
+.edge-related {
   --edge: var(--relates);
 }
 .edge-dot {

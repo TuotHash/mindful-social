@@ -243,11 +243,477 @@
     });
   }
 
+  function initArgumentGraphs(root) {
+    root.querySelectorAll("[data-argument-graph]").forEach(function (graph) {
+      if (graph.dataset.argumentGraphReady === "true") return;
+      graph.dataset.argumentGraphReady = "true";
+
+      var dataEl = graph.querySelector("[data-argument-graph-data]");
+      var svg = graph.querySelector("[data-graph-svg]");
+      if (!dataEl || !svg) return;
+
+      var data = { nodes: [], edges: [] };
+      try {
+        data = JSON.parse(dataEl.textContent || "{}") || data;
+      } catch (e) {
+        data = { nodes: [], edges: [] };
+      }
+      var nodesByID = {};
+      var edges = [];
+      var adjacency = {};
+
+      function normalizeGraphData(next) {
+        data = next || { nodes: [], edges: [] };
+        data.nodes = Array.isArray(data.nodes) ? data.nodes : [];
+        data.edges = Array.isArray(data.edges) ? data.edges : [];
+
+        nodesByID = {};
+        data.nodes.forEach(function (node) {
+          nodesByID[node.id] = node;
+        });
+
+        edges = data.edges.filter(function (edge) {
+          edge.kind = edge.kind === "relates_to" ? "related" : edge.kind;
+          return nodesByID[edge.from] && nodesByID[edge.to];
+        });
+
+        adjacency = {};
+        edges.forEach(function (edge) {
+          adjacency[edge.from] = adjacency[edge.from] || {};
+          adjacency[edge.to] = adjacency[edge.to] || {};
+          adjacency[edge.from][edge.to] = true;
+          adjacency[edge.to][edge.from] = true;
+        });
+      }
+
+      normalizeGraphData(data);
+
+      var search = graph.querySelector("[data-graph-search]");
+      var typeInputs = Array.from(graph.querySelectorAll("[data-graph-type]"));
+      var visibleCount = graph.querySelector("[data-graph-visible-count]");
+      var titleEl = graph.querySelector("[data-graph-title]");
+      var metaEl = graph.querySelector("[data-graph-meta]");
+      var openEl = graph.querySelector("[data-graph-open]");
+      var graphEndpoint = graph.dataset.argumentGraphEndpoint || "/graph/data";
+      var serverQuery = ((search && search.value) || "").trim().toLowerCase();
+      var searchTimer = null;
+      var searchSeq = 0;
+      var markerPrefix = "argument-graph-arrow-" + Math.random().toString(36).slice(2);
+      var selectedID = "";
+      var viewport = null;
+      var viewHeight = 560;
+      var zoom = 1;
+      var pan = { x: 0, y: 0 };
+      var dragging = false;
+      var lastPointer = null;
+
+      function svgEl(name, attrs) {
+        var el = document.createElementNS("http://www.w3.org/2000/svg", name);
+        Object.keys(attrs || {}).forEach(function (key) {
+          el.setAttribute(key, attrs[key]);
+        });
+        return el;
+      }
+
+      function hashString(value) {
+        var hash = 0;
+        for (var i = 0; i < value.length; i++) {
+          hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+        }
+        return hash;
+      }
+
+      function truncate(value, max) {
+        value = value || "";
+        if (value.length <= max) return value;
+        return value.slice(0, Math.max(0, max - 1)) + "…";
+      }
+
+      function activeTypes() {
+        var active = {};
+        typeInputs.forEach(function (input) {
+          active[input.value] = input.checked;
+        });
+        return active;
+      }
+
+      function matchesQuery(node, query) {
+        if (!query) return true;
+        var haystack = [
+          node.title || "",
+          node.authorUsername || "",
+          node.type || "",
+        ].join(" ").toLowerCase();
+        return haystack.indexOf(query) >= 0;
+      }
+
+      function currentQuery() {
+        return ((search && search.value) || "").trim().toLowerCase();
+      }
+
+      function filteredNodes() {
+        var active = activeTypes();
+        var query = currentQuery();
+        var textFilter = !!(query && query !== serverQuery);
+        var direct = {};
+        var keep = {};
+
+        if (!textFilter) {
+          return data.nodes.filter(function (node) {
+            return !!active[node.type];
+          });
+        }
+
+        data.nodes.forEach(function (node) {
+          if (!active[node.type]) return;
+          if (matchesQuery(node, query)) {
+            direct[node.id] = true;
+            keep[node.id] = true;
+          }
+        });
+
+        edges.forEach(function (edge) {
+          if (direct[edge.from] || direct[edge.to]) {
+            keep[edge.from] = true;
+            keep[edge.to] = true;
+          }
+        });
+
+        return data.nodes.filter(function (node) {
+          if (!active[node.type]) return false;
+          return keep[node.id];
+        });
+      }
+
+      function layout(nodes) {
+        var grouped = { topic: [], view: [], finding: [], other: [] };
+        nodes.forEach(function (node) {
+          (grouped[node.type] || grouped.other).push(node);
+        });
+        Object.keys(grouped).forEach(function (key) {
+          grouped[key].sort(function (a, b) {
+            return (a.title || "").localeCompare(b.title || "");
+          });
+        });
+
+        var maxCount = Math.max(grouped.topic.length, grouped.view.length, grouped.finding.length, grouped.other.length, 1);
+        viewHeight = Math.max(560, maxCount * 92 + 120);
+        var columns = { topic: 210, view: 600, finding: 990, other: 600 };
+
+        Object.keys(grouped).forEach(function (type) {
+          var list = grouped[type];
+          var gap = viewHeight / (list.length + 1);
+          list.forEach(function (node, index) {
+            var jitter = (hashString(node.id) % 45) - 22;
+            node.x = columns[type] + jitter;
+            node.y = Math.round((index + 1) * gap);
+          });
+        });
+      }
+
+      function markerID(kind) {
+        return markerPrefix + "-" + kind;
+      }
+
+      function appendMarkers(defs) {
+        ["supports", "opposes", "related"].forEach(function (kind) {
+          var marker = svgEl("marker", {
+            id: markerID(kind),
+            viewBox: "0 0 10 10",
+            refX: "9",
+            refY: "5",
+            markerWidth: "7",
+            markerHeight: "7",
+            orient: "auto",
+            class: "argument-graph-arrow edge-" + kind,
+          });
+          marker.appendChild(svgEl("path", { d: "M0,0 L10,5 L0,10 z" }));
+          defs.appendChild(marker);
+        });
+      }
+
+      function edgePath(from, to) {
+        var dx = to.x - from.x;
+        var bend = Math.max(70, Math.min(190, Math.abs(dx) * 0.45));
+        if (dx < 0) bend = -bend;
+        return [
+          "M", from.x, from.y,
+          "C", from.x + bend, from.y,
+          to.x - bend, to.y,
+          to.x, to.y,
+        ].join(" ");
+      }
+
+      function nodeRadius(node) {
+        if (node.type === "topic") return 29;
+        if (node.type === "view") return 24;
+        return 20;
+      }
+
+      function renderInspector() {
+        var node = nodesByID[selectedID];
+        if (!titleEl || !metaEl || !openEl) return;
+        titleEl.textContent = node ? node.title : "Choose a node";
+        metaEl.replaceChildren();
+
+        if (!node) {
+          openEl.hidden = true;
+          openEl.setAttribute("href", "#");
+          return;
+        }
+
+        var chip = document.createElement("span");
+        chip.className = "chip " + node.type;
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        chip.appendChild(dot);
+        chip.appendChild(document.createTextNode(node.type));
+
+        var author = document.createElement("span");
+        author.textContent = "by " + node.authorUsername;
+
+        var degree = edges.filter(function (edge) {
+          return edge.from === node.id || edge.to === node.id;
+        }).length;
+        var connections = document.createElement("span");
+        connections.textContent = degree === 1 ? "1 connection" : degree + " connections";
+
+        metaEl.appendChild(chip);
+        metaEl.appendChild(author);
+        metaEl.appendChild(connections);
+
+        openEl.hidden = false;
+        openEl.setAttribute("href", "/nodes/" + node.slug);
+      }
+
+      function applyTransform() {
+        if (!viewport) return;
+        viewport.setAttribute("transform", "translate(" + pan.x + " " + pan.y + ") scale(" + zoom + ")");
+      }
+
+      function render() {
+        var nodes = filteredNodes();
+        var visible = {};
+        nodes.forEach(function (node) {
+          visible[node.id] = true;
+        });
+        var visibleEdges = edges.filter(function (edge) {
+          return visible[edge.from] && visible[edge.to];
+        });
+
+        if (selectedID && !visible[selectedID]) {
+          selectedID = "";
+        }
+
+        layout(nodes);
+        svg.setAttribute("viewBox", "0 0 1200 " + viewHeight);
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+        var defs = svgEl("defs");
+        appendMarkers(defs);
+        svg.appendChild(defs);
+
+        viewport = svgEl("g", { class: "argument-graph-viewport" });
+        viewport.appendChild(svgEl("rect", {
+          class: "argument-graph-background",
+          x: "0",
+          y: "0",
+          width: "1200",
+          height: String(viewHeight),
+        }));
+
+        var edgeLayer = svgEl("g", { class: "argument-graph-edges" });
+        visibleEdges.forEach(function (edge) {
+          var from = nodesByID[edge.from];
+          var to = nodesByID[edge.to];
+          if (!from || !to) return;
+          var path = svgEl("path", {
+            class: "argument-graph-edge edge-" + edge.kind + (selectedID && edge.from !== selectedID && edge.to !== selectedID ? " is-dim" : ""),
+            d: edgePath(from, to),
+            "marker-end": "url(#" + markerID(edge.kind) + ")",
+          });
+          var title = svgEl("title");
+          title.textContent = (from.title || "") + " " + edge.kind + " " + (to.title || "");
+          path.appendChild(title);
+          edgeLayer.appendChild(path);
+        });
+        viewport.appendChild(edgeLayer);
+
+        var nodeLayer = svgEl("g", { class: "argument-graph-nodes" });
+        nodes.forEach(function (node) {
+          var radius = nodeRadius(node);
+          var related = selectedID && (node.id === selectedID || (adjacency[selectedID] && adjacency[selectedID][node.id]));
+          var cls = "argument-graph-node node-" + node.type;
+          if (node.id === selectedID) cls += " is-selected";
+          if (selectedID && !related) cls += " is-dim";
+
+          var groupEl = svgEl("g", {
+            class: cls,
+            transform: "translate(" + node.x + " " + node.y + ")",
+            tabindex: "0",
+            role: "button",
+            "aria-label": node.title,
+          });
+          var title = svgEl("title");
+          title.textContent = node.title + " by " + node.authorUsername;
+          groupEl.appendChild(title);
+          groupEl.appendChild(svgEl("circle", { r: String(radius), cx: "0", cy: "0" }));
+          groupEl.appendChild(svgEl("rect", {
+            class: "argument-graph-label-box",
+            x: "-84",
+            y: String(radius + 10),
+            width: "168",
+            height: "31",
+            rx: "7",
+          }));
+          var text = svgEl("text", {
+            class: "argument-graph-label",
+            x: "0",
+            y: String(radius + 30),
+            "text-anchor": "middle",
+          });
+          text.textContent = truncate(node.title, 25);
+          groupEl.appendChild(text);
+          groupEl.addEventListener("click", function (event) {
+            event.stopPropagation();
+            selectedID = node.id;
+            render();
+          });
+          groupEl.addEventListener("dblclick", function () {
+            window.location.href = "/nodes/" + node.slug;
+          });
+          groupEl.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            selectedID = node.id;
+            render();
+          });
+          nodeLayer.appendChild(groupEl);
+        });
+        viewport.appendChild(nodeLayer);
+        svg.appendChild(viewport);
+        applyTransform();
+
+        if (visibleCount) {
+          var noun = nodes.length === 1 ? "node" : "nodes";
+          visibleCount.textContent = nodes.length + " " + noun + " visible";
+        }
+        renderInspector();
+      }
+
+      function resetView() {
+        zoom = 1;
+        pan = { x: 0, y: 0 };
+        applyTransform();
+      }
+
+      function renderFromFilter() {
+        resetView();
+        render();
+      }
+
+      function graphDataURL(query) {
+        var url = new URL(graphEndpoint, window.location.href);
+        if (query) url.searchParams.set("q", query);
+        return url.toString();
+      }
+
+      function fetchServerGraph(query) {
+        if (!window.fetch) return;
+        var seq = ++searchSeq;
+        fetch(graphDataURL(query), {
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin",
+        }).then(function (response) {
+          if (!response.ok) throw new Error("graph search failed");
+          return response.json();
+        }).then(function (nextData) {
+          if (seq !== searchSeq || query !== currentQuery()) return;
+          normalizeGraphData(nextData);
+          serverQuery = query;
+          selectedID = "";
+          resetView();
+          render();
+        }).catch(function () {
+          if (seq === searchSeq) serverQuery = "";
+        });
+      }
+
+      function queueServerSearch() {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          fetchServerGraph(currentQuery());
+        }, 220);
+      }
+
+      if (search) search.addEventListener("input", function () {
+        renderFromFilter();
+        queueServerSearch();
+      });
+      typeInputs.forEach(function (input) {
+        input.addEventListener("change", renderFromFilter);
+      });
+
+      graph.querySelectorAll("[data-graph-zoom]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var action = button.dataset.graphZoom;
+          if (action === "reset") {
+            resetView();
+          } else {
+            zoom = Math.max(0.55, Math.min(2.4, zoom * (action === "in" ? 1.2 : 0.84)));
+            applyTransform();
+          }
+        });
+      });
+
+      svg.addEventListener("click", function (event) {
+        if (!event.target.classList || !event.target.classList.contains("argument-graph-background")) return;
+        selectedID = "";
+        render();
+      });
+
+      svg.addEventListener("pointerdown", function (event) {
+        if (event.target.closest && event.target.closest(".argument-graph-node")) return;
+        dragging = true;
+        lastPointer = { x: event.clientX, y: event.clientY };
+        svg.setPointerCapture && svg.setPointerCapture(event.pointerId);
+      });
+      svg.addEventListener("pointermove", function (event) {
+        if (!dragging || !lastPointer) return;
+        var rect = svg.getBoundingClientRect();
+        var dx = event.clientX - lastPointer.x;
+        var dy = event.clientY - lastPointer.y;
+        pan.x += (dx * 1200) / Math.max(1, rect.width) / zoom;
+        pan.y += (dy * viewHeight) / Math.max(1, rect.height) / zoom;
+        lastPointer = { x: event.clientX, y: event.clientY };
+        applyTransform();
+      });
+      svg.addEventListener("pointerup", function (event) {
+        dragging = false;
+        lastPointer = null;
+        svg.releasePointerCapture && svg.releasePointerCapture(event.pointerId);
+      });
+      svg.addEventListener("pointercancel", function () {
+        dragging = false;
+        lastPointer = null;
+      });
+      svg.addEventListener("wheel", function (event) {
+        event.preventDefault();
+        zoom = Math.max(0.55, Math.min(2.4, zoom * (event.deltaY < 0 ? 1.08 : 0.92)));
+        applyTransform();
+      }, { passive: false });
+
+      render();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initMarkdownEditors(document);
+    initArgumentGraphs(document);
   });
 
   document.addEventListener("htmx:afterSwap", function (event) {
     initMarkdownEditors(event.target || document);
+    initArgumentGraphs(event.target || document);
   });
 })();

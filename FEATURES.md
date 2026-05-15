@@ -47,6 +47,7 @@ Edge highlighting marks key reasoning inline on the node page.
 ## Discovery
 
 - **Full-text search** — Postgres `tsvector` with stemming; returns results with highlighted excerpts and an author byline beside each hit.
+- **Argument graph view** — `/graph` visualises visible topics, views, findings, and typed edges with node search and type filters.
 - **Fuzzy title search** — trigram similarity on node titles for typo and partial-match tolerance.
 - **Live search** — HTMX-powered picker in edge and topic forms; results update as you type.
 - **Tags** — public tag index and per-tag listings.

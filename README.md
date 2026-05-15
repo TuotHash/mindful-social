@@ -5,8 +5,8 @@ discussion with a structured **argument graph**: typed nodes (Topic / View /
 Finding) connected by typed edges (supports / opposes / related). Users
 commit to views and attach findings that explain their thinking.
 
-> **Status:** v1.0.0-alpha — argument graph, social layer, and groups are live;
-> threads, voting, and graph visualisation are on the roadmap.
+> **Status:** v1.0.0-alpha — argument graph, graph visualisation, social layer,
+> and groups are live; threads and voting are on the roadmap.
 
 See [FEATURES.md](FEATURES.md) for the full current feature set and
 [ROADMAP.md](ROADMAP.md) for what's coming next.
@@ -88,7 +88,7 @@ nix/module.nix      NixOS module (systemd service + optional Postgres)
 | Sessions / auth | `scs` + `bcrypt`; OAuth/OIDC via `coreos/go-oidc` |
 | Interactivity | HTMX (vendored at `static/htmx.min.js`, v2.0.4) |
 | Markdown | `goldmark` (server-side render) + `bluemonday` (sanitise) |
-| Graph view | Svelte component (planned) |
+| Graph view | Server-rendered page + vanilla SVG |
 | Dev env | Nix flake |
 
 ## Domain model

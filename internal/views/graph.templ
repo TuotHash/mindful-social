@@ -1,0 +1,145 @@
+package views
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type ArgumentGraphNode struct {
+	ID             string `json:"id"`
+	Slug           string `json:"slug"`
+	Type           string `json:"type"`
+	Title          string `json:"title"`
+	AuthorUsername string `json:"authorUsername"`
+}
+
+type ArgumentGraphEdge struct {
+	ID     string `json:"id"`
+	FromID string `json:"from"`
+	ToID   string `json:"to"`
+	Kind   string `json:"kind"`
+}
+
+type ArgumentGraphData struct {
+	Nodes []ArgumentGraphNode `json:"nodes"`
+	Edges []ArgumentGraphEdge `json:"edges"`
+}
+
+func argumentGraphDataJSON(data ArgumentGraphData) string {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return `{"nodes":[],"edges":[]}`
+	}
+	return string(b)
+}
+
+func graphCount(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q string) {
+	@Layout("Argument graph", viewer) {
+		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data">
+			<template data-argument-graph-data>{ argumentGraphDataJSON(data) }</template>
+			<header class="argument-graph-head">
+				<div class="col gap-12">
+					<span class="eyebrow">Graph</span>
+					<h1 class="h-1">Argument graph</h1>
+				</div>
+				<div class="argument-graph-stats" aria-label="Graph size">
+					<span>{ graphCount(len(data.Nodes), "node") }</span>
+					<span>{ graphCount(len(data.Edges), "connection") }</span>
+				</div>
+			</header>
+			<section class="argument-graph-tool">
+				<div class="argument-graph-toolbar">
+					<label class="argument-graph-search" aria-label="Search graph">
+						<span class="material-symbols-outlined">search</span>
+						<input type="search" data-graph-search value={ q } placeholder="Search graph" autocomplete="off"/>
+					</label>
+					<div class="argument-graph-current" data-graph-visible-count>{ graphCount(len(data.Nodes), "node") } visible</div>
+					<fieldset class="argument-graph-types">
+						<legend>Types</legend>
+						<label class="chip topic">
+							<input type="checkbox" value="topic" data-graph-type checked/>
+							<span class="dot"></span>
+							Topic
+						</label>
+						<label class="chip view">
+							<input type="checkbox" value="view" data-graph-type checked/>
+							<span class="dot"></span>
+							View
+						</label>
+						<label class="chip finding">
+							<input type="checkbox" value="finding" data-graph-type checked/>
+							<span class="dot"></span>
+							Finding
+						</label>
+					</fieldset>
+					<div class="argument-graph-zoom" aria-label="Graph zoom controls">
+						<button type="button" class="btn ghost sm" data-graph-zoom="out" title="Zoom out" aria-label="Zoom out">
+							<span class="material-symbols-outlined">remove</span>
+						</button>
+						<button type="button" class="btn ghost sm" data-graph-zoom="reset" title="Reset view" aria-label="Reset view">
+							<span class="material-symbols-outlined">center_focus_strong</span>
+						</button>
+						<button type="button" class="btn ghost sm" data-graph-zoom="in" title="Zoom in" aria-label="Zoom in">
+							<span class="material-symbols-outlined">add</span>
+						</button>
+					</div>
+				</div>
+				<div class="argument-graph-workspace">
+					<div class="argument-graph-stage">
+						if len(data.Nodes) == 0 {
+							<div class="argument-graph-empty">
+								<div class="h-3">No visible nodes yet.</div>
+								if viewer != nil {
+									<a class="btn accent" href="/nodes/new">Add a node</a>
+								}
+							</div>
+						}
+						<svg class="argument-graph-svg" data-graph-svg role="img" aria-label="Argument graph"></svg>
+					</div>
+					<aside class="argument-graph-inspector" aria-live="polite">
+						<span class="eyebrow">Selected</span>
+						<h2 data-graph-title>Choose a node</h2>
+						<div class="argument-graph-meta" data-graph-meta></div>
+						<a class="btn accent" href="#" data-graph-open hidden>
+							<span class="material-symbols-outlined">open_in_new</span>
+							Open node
+						</a>
+						<div class="argument-graph-legend" aria-label="Relationship kinds">
+							<div class="edge-supports"><span class="edge-dot"></span>Supports</div>
+							<div class="edge-opposes"><span class="edge-dot"></span>Opposes</div>
+							<div class="edge-related"><span class="edge-dot"></span>Related</div>
+						</div>
+					</aside>
+				</div>
+				<noscript>
+					<div class="argument-graph-noscript">
+						if len(data.Nodes) == 0 {
+							<p class="muted">No visible nodes yet.</p>
+						} else {
+							<ul class="node-list">
+								for _, n := range data.Nodes {
+									<li>
+										<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
+											<span class={ "chip", n.Type }>
+												<span class="dot"></span>
+												{ n.Type }
+											</span>
+											<span class="title">{ n.Title }</span>
+										</a>
+									</li>
+								}
+							</ul>
+						}
+					</div>
+				</noscript>
+			</section>
+		</div>
+	}
+}

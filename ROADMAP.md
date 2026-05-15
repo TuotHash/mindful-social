@@ -22,7 +22,7 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 ### Graphs & Visualisation
 
-- **Central graph engine** — a single interactive viewer that renders different slices of the argument graph (personal, friends-of, trending) depending on the active filters. All graph modes below share this engine.
+- **Expanded graph modes** — the initial graph viewer is live; personal, friends-of, and trending slices should build on the same visual surface.
 
 - **Personal graph view** — a user's own nodes, pins, and finding threads.
 
