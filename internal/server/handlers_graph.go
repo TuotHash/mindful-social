@@ -15,6 +15,12 @@ const (
 	argumentGraphNodeLimit int32 = 120
 	argumentGraphEdgeLimit int32 = 320
 
+	// argumentGraphAuthorSeedLimit caps how many of an author's nodes are
+	// used as seeds for the neighborhood walk. Keeping it at the canvas
+	// budget avoids feeding the recursive CTE a giant input that would
+	// then be trimmed by the outer LIMIT anyway.
+	argumentGraphAuthorSeedLimit int32 = argumentGraphNodeLimit
+
 	// argumentGraphSearchMaxHops bounds how far we expand around each
 	// search match before shipping the result to the browser. It must
 	// keep up with the maximum the client-side depth slider can request
@@ -24,18 +30,20 @@ const (
 
 func (s *Server) handleArgumentGraph(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	data, err := s.loadArgumentGraph(r, q)
+	author := strings.TrimSpace(r.URL.Query().Get("author"))
+	data, err := s.loadArgumentGraph(r, q, author)
 	if err != nil {
 		s.logger.Error("argument graph: load", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, q))
+	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, q, author))
 }
 
 func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	data, err := s.loadArgumentGraph(r, q)
+	author := strings.TrimSpace(r.URL.Query().Get("author"))
+	data, err := s.loadArgumentGraph(r, q, author)
 	if err != nil {
 		s.logger.Error("argument graph data: load", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -45,9 +53,9 @@ func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request)
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *Server) loadArgumentGraph(r *http.Request, query string) (views.ArgumentGraphData, error) {
-	if query != "" {
-		return s.searchArgumentGraph(r, query)
+func (s *Server) loadArgumentGraph(r *http.Request, query, author string) (views.ArgumentGraphData, error) {
+	if query != "" || author != "" {
+		return s.searchArgumentGraph(r, query, author)
 	}
 
 	vid := viewerID(r)
@@ -72,31 +80,74 @@ func (s *Server) loadArgumentGraph(r *http.Request, query string) (views.Argumen
 	}, nil
 }
 
-// searchArgumentGraph hits the full-text/fuzzy node search for `query`,
-// then walks the edges table out from each match to argumentGraphSearchMaxHops
-// hops. Without that expansion the client receives a lonely match and no
-// edges, so the depth slider has nothing to walk and the inspector
-// (correctly!) reports zero connections. The outer LIMIT in the SQL
-// guarantees we never ship more nodes than the canvas can usefully render.
-func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.ArgumentGraphData, error) {
+// searchArgumentGraph collects seed node ids from the active filters
+// (full-text query, author username, or both) and walks the edges table out
+// from each seed up to argumentGraphSearchMaxHops hops. Without that
+// expansion the client receives lonely matches and no edges, so the depth
+// slider has nothing to walk and the inspector (correctly!) reports zero
+// connections. The outer LIMIT in the SQL guarantees we never ship more
+// nodes than the canvas can usefully render.
+//
+// When both filters are set the seeds are intersected: the result is the
+// nodes by `author` that also match `query`. That keeps the combined filter
+// behaving like an AND from the user's perspective.
+func (s *Server) searchArgumentGraph(r *http.Request, query, author string) (views.ArgumentGraphData, error) {
 	vid := viewerID(r)
-	matchRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
-		Query:       query,
-		ResultLimit: searchResultLimit,
-		ViewerID:    vid,
-	})
-	if err != nil {
-		return views.ArgumentGraphData{}, err
-	}
-	if len(matchRows) == 0 {
-		return views.ArgumentGraphData{Nodes: []views.ArgumentGraphNode{}, Edges: []views.ArgumentGraphEdge{}}, nil
+
+	var (
+		seedIDs    []uuid.UUID
+		matchedIDs = map[string]struct{}{}
+	)
+
+	if query != "" {
+		matchRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
+			Query:       query,
+			ResultLimit: searchResultLimit,
+			ViewerID:    vid,
+		})
+		if err != nil {
+			return views.ArgumentGraphData{}, err
+		}
+		seedIDs = make([]uuid.UUID, 0, len(matchRows))
+		for _, row := range matchRows {
+			seedIDs = append(seedIDs, row.ID)
+			matchedIDs[row.ID.String()] = struct{}{}
+		}
 	}
 
-	seedIDs := make([]uuid.UUID, 0, len(matchRows))
-	matchedIDs := make(map[string]struct{}, len(matchRows))
-	for _, row := range matchRows {
-		seedIDs = append(seedIDs, row.ID)
-		matchedIDs[row.ID.String()] = struct{}{}
+	if author != "" {
+		authorIDs, err := s.queries.ListArgumentGraphSeedsByAuthor(r.Context(), db.ListArgumentGraphSeedsByAuthorParams{
+			AuthorUsername: author,
+			ViewerID:       vid,
+			ResultLimit:    argumentGraphAuthorSeedLimit,
+		})
+		if err != nil {
+			return views.ArgumentGraphData{}, err
+		}
+		if query == "" {
+			seedIDs = authorIDs
+			for _, id := range authorIDs {
+				matchedIDs[id.String()] = struct{}{}
+			}
+		} else {
+			authorSet := make(map[uuid.UUID]struct{}, len(authorIDs))
+			for _, id := range authorIDs {
+				authorSet[id] = struct{}{}
+			}
+			filtered := seedIDs[:0]
+			matchedIDs = map[string]struct{}{}
+			for _, id := range seedIDs {
+				if _, ok := authorSet[id]; ok {
+					filtered = append(filtered, id)
+					matchedIDs[id.String()] = struct{}{}
+				}
+			}
+			seedIDs = filtered
+		}
+	}
+
+	if len(seedIDs) == 0 {
+		return views.ArgumentGraphData{Nodes: []views.ArgumentGraphNode{}, Edges: []views.ArgumentGraphEdge{}}, nil
 	}
 
 	neighborhoodRows, err := s.queries.ListArgumentGraphNeighborhood(r.Context(), db.ListArgumentGraphNeighborhoodParams{

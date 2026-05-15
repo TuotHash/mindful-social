@@ -261,3 +261,44 @@ func (q *Queries) ListArgumentGraphNodesForViewer(ctx context.Context, arg ListA
 	}
 	return items, nil
 }
+
+const listArgumentGraphSeedsByAuthor = `-- name: ListArgumentGraphSeedsByAuthor :many
+SELECT n.id
+FROM nodes n
+JOIN users u ON u.id = n.created_by
+WHERE u.username = $1::text
+  AND node_visible_to(n.*, $2::uuid)
+ORDER BY n.created_at DESC
+LIMIT $3
+`
+
+type ListArgumentGraphSeedsByAuthorParams struct {
+	AuthorUsername string     `json:"author_username"`
+	ViewerID       *uuid.UUID `json:"viewer_id"`
+	ResultLimit    int32      `json:"result_limit"`
+}
+
+// Visible node IDs authored by a given username. Used by the graph viewer's
+// author filter so the neighborhood walk can expand around that author's
+// contributions while still respecting per-node visibility for the viewer.
+// The cap mirrors the search seed budget: the canvas can't render more than
+// a few hundred nodes regardless of how prolific the author is.
+func (q *Queries) ListArgumentGraphSeedsByAuthor(ctx context.Context, arg ListArgumentGraphSeedsByAuthorParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listArgumentGraphSeedsByAuthor, arg.AuthorUsername, arg.ViewerID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

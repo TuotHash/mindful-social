@@ -66,6 +66,20 @@ JOIN users u ON u.id = n.created_by
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 
+-- name: ListArgumentGraphSeedsByAuthor :many
+-- Visible node IDs authored by a given username. Used by the graph viewer's
+-- author filter so the neighborhood walk can expand around that author's
+-- contributions while still respecting per-node visibility for the viewer.
+-- The cap mirrors the search seed budget: the canvas can't render more than
+-- a few hundred nodes regardless of how prolific the author is.
+SELECT n.id
+FROM nodes n
+JOIN users u ON u.id = n.created_by
+WHERE u.username = sqlc.arg(author_username)::text
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+ORDER BY n.created_at DESC
+LIMIT sqlc.arg(result_limit);
+
 -- name: ListArgumentGraphEdgesForNodeIDs :many
 -- Edges among a known set of visible graph nodes, used by server-side graph
 -- search results.

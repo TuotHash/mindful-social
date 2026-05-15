@@ -140,6 +140,107 @@ func TestArgumentGraphData_SearchIncludesNeighborhood(t *testing.T) {
 	}
 }
 
+// TestArgumentGraphData_AuthorFilter pins the contract of the author
+// filter on /graph/data: when ?author=username is set, only nodes
+// authored by that user (and their neighborhood) come back. A node by
+// another author with no edge to the filtered author's nodes must not
+// leak through.
+func TestArgumentGraphData_AuthorFilter(t *testing.T) {
+	integrationDB(t)
+
+	alice := newClient(t)
+	signup(t, alice, "alicegraph", "alicegraph@example.com", "correct horse battery staple")
+	aliceNode := createNode(t, alice, "view", "Alice graph view "+uuid.NewString()[:8], "")
+
+	bob := newClient(t)
+	signup(t, bob, "bobgraph", "bobgraph@example.com", "correct horse battery staple")
+	bobNode := createNode(t, bob, "view", "Bob graph view "+uuid.NewString()[:8], "")
+
+	resp := get(t, alice, "/graph/data?"+url.Values{"author": {"alicegraph"}}.Encode())
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/graph/data status = %d", resp.StatusCode)
+	}
+	var data views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("decode graph data: %v", err)
+	}
+
+	byID := make(map[string]views.ArgumentGraphNode, len(data.Nodes))
+	for _, node := range data.Nodes {
+		byID[node.ID] = node
+	}
+	aliceSeen, aliceOK := byID[aliceNode.String()]
+	if !aliceOK {
+		t.Fatalf("response missing alice's node; nodes: %+v", data.Nodes)
+	}
+	if !aliceSeen.Match {
+		t.Fatalf("alice's node should be a seed (Match=true) under author filter; node: %+v", aliceSeen)
+	}
+	if _, ok := byID[bobNode.String()]; ok {
+		t.Fatalf("response leaked bob's unrelated node under author=alicegraph; nodes: %+v", data.Nodes)
+	}
+
+	// Unknown username returns an empty result rather than an error.
+	resp2 := get(t, alice, "/graph/data?"+url.Values{"author": {"nobody-here-" + uuid.NewString()[:6]}}.Encode())
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("/graph/data unknown-author status = %d", resp2.StatusCode)
+	}
+	var emptyData views.ArgumentGraphData
+	if err := json.NewDecoder(resp2.Body).Decode(&emptyData); err != nil {
+		t.Fatalf("decode empty data: %v", err)
+	}
+	if len(emptyData.Nodes) != 0 {
+		t.Fatalf("unknown author should yield zero nodes, got %d", len(emptyData.Nodes))
+	}
+}
+
+// TestArgumentGraphData_AuthorAndQueryIntersect verifies that combining
+// ?q= and ?author= behaves as an AND: only nodes by `author` whose
+// title/body matches `q` are seeded. The control node (same author,
+// non-matching title) and the unrelated node (matching title, different
+// author) must both be excluded.
+func TestArgumentGraphData_AuthorAndQueryIntersect(t *testing.T) {
+	integrationDB(t)
+
+	alice := newClient(t)
+	signup(t, alice, "alicequery", "alicequery@example.com", "correct horse battery staple")
+	aliceMatch := createNode(t, alice, "view", "Wind energy alice match", "")
+	aliceMiss := createNode(t, alice, "view", "Solar arrays elsewhere", "")
+
+	bob := newClient(t)
+	signup(t, bob, "bobquery", "bobquery@example.com", "correct horse battery staple")
+	bobNoise := createNode(t, bob, "view", "Wind energy bob noise", "")
+
+	resp := get(t, alice, "/graph/data?"+url.Values{
+		"q":      {"wind"},
+		"author": {"alicequery"},
+	}.Encode())
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/graph/data status = %d", resp.StatusCode)
+	}
+	var data views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("decode graph data: %v", err)
+	}
+
+	byID := make(map[string]views.ArgumentGraphNode, len(data.Nodes))
+	for _, node := range data.Nodes {
+		byID[node.ID] = node
+	}
+	if _, ok := byID[aliceMatch.String()]; !ok {
+		t.Fatalf("intersection should include alice's matching node; nodes: %+v", data.Nodes)
+	}
+	if _, ok := byID[aliceMiss.String()]; ok {
+		t.Fatalf("intersection should exclude alice's non-matching node; nodes: %+v", data.Nodes)
+	}
+	if _, ok := byID[bobNoise.String()]; ok {
+		t.Fatalf("intersection should exclude bob's matching-but-wrong-author node; nodes: %+v", data.Nodes)
+	}
+}
+
 func TestArgumentGraph_RespectsVisibility(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)

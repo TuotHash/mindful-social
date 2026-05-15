@@ -46,9 +46,9 @@ func graphCount(n int, noun string) string {
 	return fmt.Sprintf("%d %ss", n, noun)
 }
 
-templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q string) {
+templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 	@Layout("Argument graph", viewer) {
-		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data">
+		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data" data-graph-author-current={ author }>
 			<template data-argument-graph-data>{ argumentGraphDataJSON(data) }</template>
 			<header class="argument-graph-head">
 				<div class="col gap-12">
@@ -65,6 +65,13 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q string) {
 					<label class="argument-graph-search" aria-label="Search graph">
 						<span class="material-symbols-outlined">search</span>
 						<input type="search" data-graph-search value={ q } placeholder="Search graph" autocomplete="off"/>
+					</label>
+					<label class="argument-graph-author" aria-label="Filter by author">
+						<span class="material-symbols-outlined">person</span>
+						<input type="search" data-graph-author value={ author } placeholder="Filter by author" autocomplete="off"/>
+						<button type="button" class="argument-graph-author-clear" data-graph-author-clear hidden aria-label="Clear author filter">
+							<span class="material-symbols-outlined">close</span>
+						</button>
 					</label>
 					<div class="argument-graph-current" data-graph-visible-count>{ graphCount(len(data.Nodes), "node") } visible</div>
 					<fieldset class="argument-graph-types">
@@ -126,6 +133,10 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q string) {
 						<span class="eyebrow">Selected</span>
 						<h2 data-graph-title>Choose a node</h2>
 						<div class="argument-graph-meta" data-graph-meta></div>
+						<button type="button" class="btn ghost sm" data-graph-author-pin hidden>
+							<span class="material-symbols-outlined">filter_alt</span>
+							<span data-graph-author-pin-label>Filter by author</span>
+						</button>
 						<a class="btn accent" href="#" data-graph-open hidden>
 							<span class="material-symbols-outlined">open_in_new</span>
 							Open node

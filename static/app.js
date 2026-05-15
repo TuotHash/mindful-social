@@ -598,6 +598,10 @@
       normalizeGraphData(data);
 
       var search = graph.querySelector("[data-graph-search]");
+      var authorInput = graph.querySelector("[data-graph-author]");
+      var authorClear = graph.querySelector("[data-graph-author-clear]");
+      var authorPinBtn = graph.querySelector("[data-graph-author-pin]");
+      var authorPinLabel = graph.querySelector("[data-graph-author-pin-label]");
       var typeInputs = Array.from(graph.querySelectorAll("[data-graph-type]"));
       var depthInput = graph.querySelector("[data-graph-depth]");
       var depthValueEl = graph.querySelector("[data-graph-depth-value]");
@@ -607,6 +611,7 @@
       var openEl = graph.querySelector("[data-graph-open]");
       var graphEndpoint = graph.dataset.argumentGraphEndpoint || "/graph/data";
       var serverQuery = ((search && search.value) || "").trim().toLowerCase();
+      var serverAuthor = ((authorInput && authorInput.value) || "").trim();
       var searchTimer = null;
       var searchSeq = 0;
       var markerPrefix = "argument-graph-arrow-" + Math.random().toString(36).slice(2);
@@ -662,6 +667,10 @@
         return ((search && search.value) || "").trim().toLowerCase();
       }
 
+      function currentAuthor() {
+        return ((authorInput && authorInput.value) || "").trim();
+      }
+
       // currentDepth reads the connection-depth slider — the number of
       // extra hops to include around each direct match. Default 2 keeps
       // a node's neighbours and their neighbours visible without dragging
@@ -676,25 +685,33 @@
       function filteredNodes() {
         var active = activeTypes();
         var query = currentQuery();
+        var author = currentAuthor().toLowerCase();
 
-        if (!query) {
+        if (!query && !author) {
           return data.nodes.filter(function (node) {
             return !!active[node.type];
           });
         }
 
-        // Trust the server's match flag once its response has caught up
-        // with the user's typing; until then fall back to a local
-        // substring match against the previous response. This keeps the
-        // depth-slider BFS working both during typing and after settle —
-        // the prior code disabled the client filter as soon as the
-        // server query matched, which left the slider with nothing to do.
-        var useMatchFlags = (query === serverQuery);
+        // Trust the server's match flags once its response has caught up
+        // with the user's typing; until then fall back to a local match
+        // against the previous response. This keeps the depth-slider BFS
+        // working both during typing and after settle — disabling the
+        // client filter as soon as the server inputs matched would leave
+        // the slider with nothing to do.
+        var useMatchFlags = (query === serverQuery && author === serverAuthor.toLowerCase());
         var keep = {};
         var frontier = [];
         data.nodes.forEach(function (node) {
           if (!active[node.type]) return;
-          var seed = useMatchFlags ? node.match === true : matchesQuery(node, query);
+          var seed;
+          if (useMatchFlags) {
+            seed = node.match === true;
+          } else {
+            var qOK = !query || matchesQuery(node, query);
+            var aOK = !author || (node.authorUsername || "").toLowerCase() === author;
+            seed = qOK && aOK;
+          }
           if (seed) {
             keep[node.id] = true;
             frontier.push(node.id);
@@ -798,7 +815,18 @@
         if (!node) {
           openEl.hidden = true;
           openEl.setAttribute("href", "#");
+          if (authorPinBtn) authorPinBtn.hidden = true;
           return;
+        }
+
+        if (authorPinBtn) {
+          authorPinBtn.hidden = false;
+          var pinned = currentAuthor().toLowerCase() === (node.authorUsername || "").toLowerCase() && currentAuthor() !== "";
+          if (authorPinLabel) {
+            authorPinLabel.textContent = pinned
+              ? "Clear author filter"
+              : "Filter by " + node.authorUsername;
+          }
         }
 
         var chip = document.createElement("span");
@@ -987,41 +1015,80 @@
         render();
       }
 
-      function graphDataURL(query) {
+      function graphDataURL(query, author) {
         var url = new URL(graphEndpoint, window.location.href);
         if (query) url.searchParams.set("q", query);
+        if (author) url.searchParams.set("author", author);
         return url.toString();
       }
 
-      function fetchServerGraph(query) {
+      function fetchServerGraph(query, author) {
         if (!window.fetch) return;
         var seq = ++searchSeq;
-        fetch(graphDataURL(query), {
+        fetch(graphDataURL(query, author), {
           headers: { "Accept": "application/json" },
           credentials: "same-origin",
         }).then(function (response) {
           if (!response.ok) throw new Error("graph search failed");
           return response.json();
         }).then(function (nextData) {
-          if (seq !== searchSeq || query !== currentQuery()) return;
+          if (seq !== searchSeq || query !== currentQuery() || author !== currentAuthor()) return;
           normalizeGraphData(nextData);
           serverQuery = query;
+          serverAuthor = author;
           selectedID = "";
           resetView();
           render();
         }).catch(function () {
-          if (seq === searchSeq) serverQuery = "";
+          if (seq === searchSeq) {
+            serverQuery = "";
+            serverAuthor = "";
+          }
         });
       }
 
       function queueServerSearch() {
         if (searchTimer) clearTimeout(searchTimer);
         searchTimer = setTimeout(function () {
-          fetchServerGraph(currentQuery());
+          fetchServerGraph(currentQuery(), currentAuthor());
         }, 220);
       }
 
+      function syncAuthorClear() {
+        if (!authorClear) return;
+        authorClear.hidden = currentAuthor() === "";
+      }
+
       if (search) search.addEventListener("input", function () {
+        renderFromFilter();
+        queueServerSearch();
+      });
+      if (authorInput) {
+        syncAuthorClear();
+        authorInput.addEventListener("input", function () {
+          syncAuthorClear();
+          renderFromFilter();
+          queueServerSearch();
+        });
+      }
+      if (authorClear) authorClear.addEventListener("click", function () {
+        if (!authorInput) return;
+        authorInput.value = "";
+        syncAuthorClear();
+        renderFromFilter();
+        queueServerSearch();
+        authorInput.focus();
+      });
+      if (authorPinBtn) authorPinBtn.addEventListener("click", function () {
+        var node = nodesByID[selectedID];
+        if (!node || !authorInput) return;
+        var current = currentAuthor().toLowerCase();
+        // Toggle: clicking the chip while already filtered by this
+        // author clears the filter, matching the visual cue from the
+        // pin/unpin button label.
+        authorInput.value = current === (node.authorUsername || "").toLowerCase() ? "" : (node.authorUsername || "");
+        syncAuthorClear();
+        renderInspector();
         renderFromFilter();
         queueServerSearch();
       });

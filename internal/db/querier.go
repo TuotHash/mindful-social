@@ -117,6 +117,12 @@ type Querier interface {
 	// Recent visible nodes for the graph canvas. The graph viewer is intentionally
 	// bounded so a public instance cannot ship an unbounded graph into the page.
 	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)
+	// Visible node IDs authored by a given username. Used by the graph viewer's
+	// author filter so the neighborhood walk can expand around that author's
+	// contributions while still respecting per-node visibility for the viewer.
+	// The cap mirrors the search seed budget: the canvas can't render more than
+	// a few hundred nodes regardless of how prolific the author is.
+	ListArgumentGraphSeedsByAuthor(ctx context.Context, arg ListArgumentGraphSeedsByAuthorParams) ([]uuid.UUID, error)
 	ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]ListCommentsForNodeRow, error)
 	// People the user has a mutual follow with — drives the "friends bubble"
 	// graph view. Alphabetical for stable rendering.

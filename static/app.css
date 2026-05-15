@@ -1690,6 +1690,43 @@ label.field {
   padding: 8px 0;
 }
 
+.argument-graph-author {
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  border: 1px solid var(--border-input);
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+}
+
+.argument-graph-author .material-symbols-outlined {
+  color: var(--text-subtle);
+}
+
+.argument-graph-author input[type="search"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.argument-graph-author-clear {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-subtle);
+}
+
+.argument-graph-author-clear:hover {
+  color: var(--text);
+}
+
 .argument-graph-current {
   color: var(--text-muted);
   font-size: var(--fs-xs);
