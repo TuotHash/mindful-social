@@ -125,6 +125,12 @@ type Querier interface {
 	// slice. Endpoint visibility gates edge visibility because edges do not carry
 	// separate visibility policy.
 	ListArgumentGraphEdgesForViewer(ctx context.Context, arg ListArgumentGraphEdgesForViewerParams) ([]ListArgumentGraphEdgesForViewerRow, error)
+	// Returns every visible node within max_hops edges of any seed_id, including
+	// the seeds themselves. Used by the graph search path so a single direct
+	// match still arrives at the browser with enough surrounding context for the
+	// client-side depth slider to walk. Cycles are de-duplicated by the UNION;
+	// the outer LIMIT is the safety net against pathologically dense subgraphs.
+	ListArgumentGraphNeighborhood(ctx context.Context, arg ListArgumentGraphNeighborhoodParams) ([]ListArgumentGraphNeighborhoodRow, error)
 	// Recent visible nodes for the graph canvas. The graph viewer is intentionally
 	// bounded so a public instance cannot ship an unbounded graph into the page.
 	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)

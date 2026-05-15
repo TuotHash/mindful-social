@@ -129,6 +129,84 @@ func (q *Queries) ListArgumentGraphEdgesForViewer(ctx context.Context, arg ListA
 	return items, nil
 }
 
+const listArgumentGraphNeighborhood = `-- name: ListArgumentGraphNeighborhood :many
+WITH RECURSIVE reached AS (
+    SELECT n.id, 0 AS hop
+    FROM nodes n
+    WHERE n.id = ANY($2::uuid[])
+      AND node_visible_to(n.*, $3::uuid)
+    UNION
+    SELECT n2.id, r.hop + 1
+    FROM reached r
+    JOIN edges e ON r.id IN (e.from_node, e.to_node)
+    JOIN nodes n2 ON n2.id IN (e.from_node, e.to_node) AND n2.id <> r.id
+    WHERE r.hop < $4::int
+      AND node_visible_to(n2.*, $3::uuid)
+)
+SELECT
+    n.id::text AS id,
+    n.slug,
+    n.type::text AS node_type,
+    n.title,
+    u.username AS author_username
+FROM (SELECT DISTINCT id FROM reached) r
+JOIN nodes n ON n.id = r.id
+JOIN users u ON u.id = n.created_by
+ORDER BY n.created_at DESC
+LIMIT $1
+`
+
+type ListArgumentGraphNeighborhoodParams struct {
+	ResultLimit int32       `json:"result_limit"`
+	SeedIds     []uuid.UUID `json:"seed_ids"`
+	ViewerID    *uuid.UUID  `json:"viewer_id"`
+	MaxHops     int32       `json:"max_hops"`
+}
+
+type ListArgumentGraphNeighborhoodRow struct {
+	ID             string `json:"id"`
+	Slug           string `json:"slug"`
+	NodeType       string `json:"node_type"`
+	Title          string `json:"title"`
+	AuthorUsername string `json:"author_username"`
+}
+
+// Returns every visible node within max_hops edges of any seed_id, including
+// the seeds themselves. Used by the graph search path so a single direct
+// match still arrives at the browser with enough surrounding context for the
+// client-side depth slider to walk. Cycles are de-duplicated by the UNION;
+// the outer LIMIT is the safety net against pathologically dense subgraphs.
+func (q *Queries) ListArgumentGraphNeighborhood(ctx context.Context, arg ListArgumentGraphNeighborhoodParams) ([]ListArgumentGraphNeighborhoodRow, error) {
+	rows, err := q.db.Query(ctx, listArgumentGraphNeighborhood,
+		arg.ResultLimit,
+		arg.SeedIds,
+		arg.ViewerID,
+		arg.MaxHops,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListArgumentGraphNeighborhoodRow
+	for rows.Next() {
+		var i ListArgumentGraphNeighborhoodRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.NodeType,
+			&i.Title,
+			&i.AuthorUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listArgumentGraphNodesForViewer = `-- name: ListArgumentGraphNodesForViewer :many
 SELECT
     n.id::text AS id,

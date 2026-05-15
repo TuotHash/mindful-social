@@ -14,6 +14,12 @@ import (
 const (
 	argumentGraphNodeLimit int32 = 120
 	argumentGraphEdgeLimit int32 = 320
+
+	// argumentGraphSearchMaxHops bounds how far we expand around each
+	// search match before shipping the result to the browser. It must
+	// keep up with the maximum the client-side depth slider can request
+	// — otherwise the slider would run out of data past its midpoint.
+	argumentGraphSearchMaxHops int32 = 5
 )
 
 func (s *Server) handleArgumentGraph(w http.ResponseWriter, r *http.Request) {
@@ -66,9 +72,15 @@ func (s *Server) loadArgumentGraph(r *http.Request, query string) (views.Argumen
 	}, nil
 }
 
+// searchArgumentGraph hits the full-text/fuzzy node search for `query`,
+// then walks the edges table out from each match to argumentGraphSearchMaxHops
+// hops. Without that expansion the client receives a lonely match and no
+// edges, so the depth slider has nothing to walk and the inspector
+// (correctly!) reports zero connections. The outer LIMIT in the SQL
+// guarantees we never ship more nodes than the canvas can usefully render.
 func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.ArgumentGraphData, error) {
 	vid := viewerID(r)
-	nodeRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
+	matchRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
 		Query:       query,
 		ResultLimit: searchResultLimit,
 		ViewerID:    vid,
@@ -76,14 +88,34 @@ func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.Argum
 	if err != nil {
 		return views.ArgumentGraphData{}, err
 	}
-	if len(nodeRows) == 0 {
+	if len(matchRows) == 0 {
 		return views.ArgumentGraphData{Nodes: []views.ArgumentGraphNode{}, Edges: []views.ArgumentGraphEdge{}}, nil
 	}
 
-	nodeIDs := make([]uuid.UUID, 0, len(nodeRows))
-	for _, row := range nodeRows {
-		nodeIDs = append(nodeIDs, row.ID)
+	seedIDs := make([]uuid.UUID, 0, len(matchRows))
+	for _, row := range matchRows {
+		seedIDs = append(seedIDs, row.ID)
 	}
+
+	neighborhoodRows, err := s.queries.ListArgumentGraphNeighborhood(r.Context(), db.ListArgumentGraphNeighborhoodParams{
+		SeedIds:     seedIDs,
+		ViewerID:    vid,
+		MaxHops:     argumentGraphSearchMaxHops,
+		ResultLimit: argumentGraphNodeLimit,
+	})
+	if err != nil {
+		return views.ArgumentGraphData{}, err
+	}
+
+	nodeIDs := make([]uuid.UUID, 0, len(neighborhoodRows))
+	for _, row := range neighborhoodRows {
+		id, parseErr := uuid.Parse(row.ID)
+		if parseErr != nil {
+			continue
+		}
+		nodeIDs = append(nodeIDs, id)
+	}
+
 	edgeRows, err := s.queries.ListArgumentGraphEdgesForNodeIDs(r.Context(), db.ListArgumentGraphEdgesForNodeIDsParams{
 		NodeIds:   nodeIDs,
 		ViewerID:  vid,
@@ -93,7 +125,7 @@ func (s *Server) searchArgumentGraph(r *http.Request, query string) (views.Argum
 		return views.ArgumentGraphData{}, err
 	}
 	return views.ArgumentGraphData{
-		Nodes: argumentGraphNodesFromSearchRows(nodeRows),
+		Nodes: argumentGraphNodesFromNeighborhoodRows(neighborhoodRows),
 		Edges: argumentGraphEdgesFromNodeIDRows(edgeRows),
 	}, nil
 }
@@ -112,13 +144,13 @@ func argumentGraphNodesFromRows(rows []db.ListArgumentGraphNodesForViewerRow) []
 	return out
 }
 
-func argumentGraphNodesFromSearchRows(rows []db.SearchNodesRow) []views.ArgumentGraphNode {
+func argumentGraphNodesFromNeighborhoodRows(rows []db.ListArgumentGraphNeighborhoodRow) []views.ArgumentGraphNode {
 	out := make([]views.ArgumentGraphNode, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, views.ArgumentGraphNode{
-			ID:             row.ID.String(),
+			ID:             row.ID,
 			Slug:           row.Slug,
-			Type:           string(row.Type),
+			Type:           row.NodeType,
 			Title:          row.Title,
 			AuthorUsername: row.AuthorUsername,
 		})

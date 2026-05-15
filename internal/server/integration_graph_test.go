@@ -71,6 +71,67 @@ func TestArgumentGraphData_SearchesServerSide(t *testing.T) {
 	}
 }
 
+// TestArgumentGraphData_SearchIncludesNeighborhood pins the contract the
+// depth slider depends on: when a search matches a single node, the
+// response still carries that node's connected neighbours (and the edges
+// between them). The unrelated node sits beyond the configured hop cap
+// (a deliberately large gap is hard to construct in a unit test, so we
+// verify the simpler "1 hop is included" case here).
+func TestArgumentGraphData_SearchIncludesNeighborhood(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	match := createNode(t, c, "view", "Nuclear neighbourhood seed", "")
+	neighbour := createNode(t, c, "finding", "Reactor backstop study", "")
+	unrelated := createNode(t, c, "view", "Solar panels everywhere", "")
+
+	resp := formPost(t, c, "/nodes/"+match.String()+"/edges", url.Values{
+		"kind":  {"supports"},
+		"to_id": {neighbour.String()},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create edge: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	resp = get(t, c, "/graph/data?"+url.Values{"q": {"nuclear"}}.Encode())
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/graph/data status = %d", resp.StatusCode)
+	}
+
+	var data views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("decode graph data: %v", err)
+	}
+
+	byID := make(map[string]views.ArgumentGraphNode, len(data.Nodes))
+	for _, node := range data.Nodes {
+		byID[node.ID] = node
+	}
+	if _, ok := byID[match.String()]; !ok {
+		t.Fatalf("response missing search match; nodes: %+v", data.Nodes)
+	}
+	if _, ok := byID[neighbour.String()]; !ok {
+		t.Fatalf("response missing 1-hop neighbour; nodes: %+v", data.Nodes)
+	}
+	if _, ok := byID[unrelated.String()]; ok {
+		t.Fatalf("response leaked unrelated node; nodes: %+v", data.Nodes)
+	}
+
+	var foundEdge bool
+	for _, edge := range data.Edges {
+		if (edge.FromID == match.String() && edge.ToID == neighbour.String()) ||
+			(edge.FromID == neighbour.String() && edge.ToID == match.String()) {
+			foundEdge = true
+			break
+		}
+	}
+	if !foundEdge {
+		t.Fatalf("response missing edge between match and neighbour; edges: %+v", data.Edges)
+	}
+}
+
 func TestArgumentGraph_RespectsVisibility(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)
