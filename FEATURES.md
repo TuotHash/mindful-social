@@ -33,6 +33,7 @@ Edge highlighting marks key reasoning inline on the node page.
 - Optional **body** written in Markdown (rendered server-side, sanitised before display).
 - Attached **images** inserted via Markdown syntax; stored separately from profile images.
 - Attached **videos** transcoded to H.264/AAC mp4 at up to 1080p.
+- Uploaded media is served by direct `/uploads/...` file URLs; directory listings are disabled.
 - **Author byline** — linked avatar + username shown below the node title on the detail page.
 
 ### Editing Model
@@ -111,9 +112,10 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 
 - **Password sign-up** — bcrypt hashing; sign-up can be disabled via `SIGNUP_ENABLED`.
 - **OAuth / OIDC** — Google, GitHub, and any OIDC-compatible provider (Authelia, Authentik, Keycloak, Zitadel, …). Multiple providers run simultaneously.
-- Auto-linking of OAuth accounts to existing accounts by verified email.
+- Auto-linking of OAuth accounts to existing accounts by provider email.
 - **Account page** — change password, manage linked sign-in methods, set profile image.
 - **CSRF protection** — double-submit cookie + token on all state-changing requests.
+- **Cookie hardening** — session and CSRF cookies are `HttpOnly`, `SameSite=Lax`, and marked Secure when `PUBLIC_BASE_URL` uses HTTPS.
 
 ---
 
@@ -130,7 +132,7 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 
 - **Self-contained binary** — static assets and SQL migrations embedded with `go:embed`; no on-disk asset tree needed at runtime.
 - **Auto-migrations** — pending migrations apply on startup; safe to restart repeatedly.
-- **Static asset caching** — `Cache-Control: public, max-age=86400` on `/static/*`.
+- **Static and upload caching** — `Cache-Control: public, max-age=86400` on `/static/*` and direct `/uploads/*` files.
 - **Health check** — `GET /healthz` returns `ok <version>` or 503 when the database is unreachable.
 - **Nix flake** — `nix build` produces the binary; `nixosModules.default` for NixOS deployments.
 - **NixOS module** — minimal config (`enable = true` + `publicBaseURL`); local Postgres provisioned by default; secrets via `environmentFile`; systemd unit is sandboxed.
@@ -139,5 +141,5 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 
 ## Testing
 
-- 58 unit subtests covering parsing, normalisation, and rendering helpers.
+- Unit tests covering parsing, normalisation, rendering helpers, session cookie policy, and upload serving.
 - Integration suite (auth, nodes, edges, pins, groups) against real Postgres via `TEST_DATABASE_URL`; auto-skips when unset.

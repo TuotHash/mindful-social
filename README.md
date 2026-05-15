@@ -33,6 +33,8 @@ go run ./cmd/server              # listens on 127.0.0.1:8080
 
 The app speaks plain HTTP on `127.0.0.1:8080`. Put a reverse proxy
 (HAProxy, Caddy, nginx) in front for TLS — the app never sees a certificate.
+Set `PUBLIC_BASE_URL` to the public `https://` origin in production; that
+same value drives OAuth callback URLs and marks session/CSRF cookies Secure.
 
 ## Tests
 
@@ -68,7 +70,7 @@ migrations/         goose .sql migrations (numbered)
 queries/            SQL files consumed by sqlc to generate Go code
 scripts/            dev helpers (db-init, migrate-up, …)
 static/             CSS and vendored JS (htmx v2.0.4)
-uploads/            user-uploaded files (images, videos) — not committed
+uploads/            user-uploaded media served from /uploads; no directory listings
 flake.nix           reproducible dev shell + Nix package (flake users)
 default.nix         channels entrypoint (non-flake `nix-build`)
 nix/package.nix     buildGoModule recipe, shared by both
@@ -125,7 +127,7 @@ The server is configured entirely through environment variables. Inside
 | `DATABASE_URL` | **yes** | — | Postgres connection string, e.g. `postgres:///mindful_social?host=/path/to/socket` |
 | `LISTEN_ADDR` | no | `127.0.0.1:8080` | TCP address the HTTP server binds to |
 | `LOG_LEVEL` | no | `info` | Minimum JSON log level: `debug`, `info`, `warn`, or `error` |
-| `PUBLIC_BASE_URL` | no* | `http://127.0.0.1:8080` | Absolute origin the browser sees. Required when any OAuth provider is configured, because callback URLs are derived from it. Set to your public domain, e.g. `https://mindful.example.org` |
+| `PUBLIC_BASE_URL` | no* | `http://127.0.0.1:8080` | Absolute origin the browser sees. Required when any OAuth provider is configured, because callback URLs are derived from it. Set to your public domain, e.g. `https://mindful.example.org`; HTTPS also enables Secure on session and CSRF cookies |
 | `SIGNUP_ENABLED` | no | `true` | Set to `false` to close password sign-up while keeping OAuth/OIDC account creation open |
 | `ADMIN_USERS` | no | — | Comma-separated list of email addresses bootstrapped as admins on every startup (idempotent) |
 
@@ -176,6 +178,12 @@ for a key named `work` is `<PUBLIC_BASE_URL>/auth/callback/oidc:work`.
 
 Any provider that is missing its required variables is skipped at startup with
 a warning; it does not prevent the other providers or the app from starting.
+
+### Upload serving
+
+Uploaded profile images and node media are served as direct `/uploads/...`
+file URLs. Directory requests under `/uploads` return 404 so the upload tree
+cannot be browsed, but individual media URLs remain public.
 
 ## License
 

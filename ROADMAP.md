@@ -66,6 +66,10 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 - **Comment markdown** — comments ship as plain text in v1 to validate the UX. Revisit markdown support once threading is mature.
 
+### Security & Privacy Hardening
+
+- **Authorization-aware media serving** — direct `/uploads/...` URLs are public today, with directory listings disabled. Serve node media through a visibility-aware route before relying on private/group node media attachments.
+
 ---
 
 ## Future Considerations
@@ -82,12 +86,12 @@ This document outlines upcoming features beyond the MVP. For the current feature
 Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
 
 - **Argument graph** — topics, views, findings; typed directed edges; parent enforcement (views need a topic, findings need a view or another finding); inline finding creation from the Connect form; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
-- **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode.
+- **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode; direct upload serving with directory listings disabled.
 - **Discussion** — view comment threads with one-level replies; author edit and soft-delete; visibility inherits from the parent view.
 - **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
 - **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, stance-only pins (Support/Oppose/Feature), home feed, public profiles; author bylines on node detail, home feed, and search results.
 - **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
-- **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection.
+- **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection, Secure cookies when `PUBLIC_BASE_URL` uses HTTPS.
 - **Administration & moderation** — role-based access, admin UI, `ADMIN_USERS` bootstrap; staff can delete any node and change visibility on any node.
 - **Observability** — structured JSON logs via `slog`; one request line per HTTP request (method, path, status, duration, request id, user id); auth and node-lifecycle audit events; panic recovery routed through slog; config typos surface as warnings on startup.
 - **Deployment** — self-contained binary, embedded migrations, Nix flake, NixOS module, health check endpoint.
