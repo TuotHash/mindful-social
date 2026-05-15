@@ -31,10 +31,27 @@ func groupRoleLabel(r db.GroupMemberRole) string {
 		return "owner"
 	case db.GroupMemberRoleAdmin:
 		return "admin"
+	case db.GroupMemberRoleEditor:
+		return "editor"
 	case db.GroupMemberRoleMember:
 		return "member"
 	}
 	return string(r)
+}
+
+// memberVisibilityHelp returns a one-liner describing who can see the
+// group's member list under the given threshold, rendered under the
+// settings selector so admins understand the effect of each option.
+func memberVisibilityHelp(r db.GroupMemberRole) string {
+	switch r {
+	case db.GroupMemberRoleOwner:
+		return "Only the owner can see the member list."
+	case db.GroupMemberRoleAdmin:
+		return "Owner and admins can see the member list."
+	case db.GroupMemberRoleEditor:
+		return "Owner, admins, and editors can see the member list."
+	}
+	return "All members can see each other."
 }
 
 templ GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow) {
@@ -111,7 +128,7 @@ templ GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow
 	}
 }
 
-templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage bool) {
+templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage, canSeeMembers bool) {
 	@Layout(group.Name+" — group", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -169,7 +186,9 @@ templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.G
 			</section>
 			<section class="card" style="padding: 20px; margin-top: 24px;">
 				<h2 style="margin-top: 0;">Members</h2>
-				if len(members) == 0 {
+				if !canSeeMembers {
+					<p class="muted">The member list is hidden under this group's privacy settings.</p>
+				} else if len(members) == 0 {
 					<p class="muted">No members yet.</p>
 				} else {
 					<ul class="list-rows">
@@ -181,6 +200,7 @@ templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.G
 									<span class="badge">{ groupRoleLabel(m.Role) }</span>
 								</a>
 								if canManage && m.Role != db.GroupMemberRoleOwner {
+									@memberRoleControls(group.Slug, m.ID.String(), m.Role)
 									<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/members/" + m.ID.String() + "/delete") } class="inline">
 										@CSRFField()
 										<button type="submit" class="btn ghost sm">Remove</button>
@@ -205,7 +225,67 @@ templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.G
 						</div>
 					</form>
 				</section>
+				<section class="card" style="padding: 20px; margin-top: 24px;">
+					<h2 style="margin-top: 0;">Settings</h2>
+					<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/settings") } class="form">
+						@CSRFField()
+						<fieldset class="toggle-group">
+							<legend>Member list visibility</legend>
+							<div class="toggle-btns">
+								<label class="toggle-btn">
+									<input type="radio" name="member_visibility" value="member" checked?={ group.MemberVisibility == db.GroupMemberRoleMember }/>
+									<span class="material-symbols-outlined">groups</span>
+									Members
+								</label>
+								<label class="toggle-btn">
+									<input type="radio" name="member_visibility" value="editor" checked?={ group.MemberVisibility == db.GroupMemberRoleEditor }/>
+									<span class="material-symbols-outlined">edit_note</span>
+									Editors+
+								</label>
+								<label class="toggle-btn">
+									<input type="radio" name="member_visibility" value="admin" checked?={ group.MemberVisibility == db.GroupMemberRoleAdmin }/>
+									<span class="material-symbols-outlined">shield_person</span>
+									Admins+
+								</label>
+								<label class="toggle-btn">
+									<input type="radio" name="member_visibility" value="owner" checked?={ group.MemberVisibility == db.GroupMemberRoleOwner }/>
+									<span class="material-symbols-outlined">key</span>
+									Owner only
+								</label>
+							</div>
+							<small class="muted" style="font-size: 12px;">{ memberVisibilityHelp(group.MemberVisibility) }</small>
+						</fieldset>
+						<div class="form-row">
+							<button type="submit" class="btn accent">Save settings</button>
+						</div>
+					</form>
+				</section>
 			}
 		</div>
 	}
+}
+
+// memberRoleControls renders three inline role-change buttons (admin /
+// editor / member). Each is its own one-button form so a click submits
+// the new role without JS. The button matching the member's current role
+// is rendered as disabled to make the active state obvious and to avoid
+// a no-op POST.
+templ memberRoleControls(slug, memberID string, current db.GroupMemberRole) {
+	<div class="row gap-4 wrap">
+		@memberRoleButton(slug, memberID, db.GroupMemberRoleAdmin, "admin", current)
+		@memberRoleButton(slug, memberID, db.GroupMemberRoleEditor, "editor", current)
+		@memberRoleButton(slug, memberID, db.GroupMemberRoleMember, "member", current)
+	</div>
+}
+
+templ memberRoleButton(slug, memberID string, role db.GroupMemberRole, value string, current db.GroupMemberRole) {
+	<form method="post" action={ templ.SafeURL("/groups/" + slug + "/members/" + memberID + "/role") } class="inline">
+		@CSRFField()
+		<input type="hidden" name="role" value={ value }/>
+		if role == current {
+			<button type="submit" class="btn ghost sm" disabled aria-pressed="true">{ value }</button>
+		} else {
+			<button type="submit" class="btn ghost sm">{ value }</button>
+		}
+	</form>
 }

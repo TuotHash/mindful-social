@@ -66,7 +66,7 @@ func (q *Queries) CountGroupMembers(ctx context.Context, groupID uuid.UUID) (int
 const createGroup = `-- name: CreateGroup :one
 INSERT INTO groups (slug, name, description, owner_id, visibility)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, slug, name, description, owner_id, visibility, created_at
+RETURNING id, slug, name, description, owner_id, visibility, created_at, member_visibility
 `
 
 type CreateGroupParams struct {
@@ -94,6 +94,7 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group
 		&i.OwnerID,
 		&i.Visibility,
 		&i.CreatedAt,
+		&i.MemberVisibility,
 	)
 	return i, err
 }
@@ -129,7 +130,7 @@ func (q *Queries) CreateGroupInvite(ctx context.Context, arg CreateGroupInvitePa
 }
 
 const getGroup = `-- name: GetGroup :one
-SELECT id, slug, name, description, owner_id, visibility, created_at FROM groups WHERE id = $1
+SELECT id, slug, name, description, owner_id, visibility, created_at, member_visibility FROM groups WHERE id = $1
 `
 
 func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
@@ -143,12 +144,13 @@ func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
 		&i.OwnerID,
 		&i.Visibility,
 		&i.CreatedAt,
+		&i.MemberVisibility,
 	)
 	return i, err
 }
 
 const getGroupBySlug = `-- name: GetGroupBySlug :one
-SELECT id, slug, name, description, owner_id, visibility, created_at FROM groups WHERE slug = $1
+SELECT id, slug, name, description, owner_id, visibility, created_at, member_visibility FROM groups WHERE slug = $1
 `
 
 func (q *Queries) GetGroupBySlug(ctx context.Context, slug string) (Group, error) {
@@ -162,6 +164,7 @@ func (q *Queries) GetGroupBySlug(ctx context.Context, slug string) (Group, error
 		&i.OwnerID,
 		&i.Visibility,
 		&i.CreatedAt,
+		&i.MemberVisibility,
 	)
 	return i, err
 }
@@ -489,5 +492,43 @@ type RemoveGroupMemberParams struct {
 
 func (q *Queries) RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error {
 	_, err := q.db.Exec(ctx, removeGroupMember, arg.GroupID, arg.UserID)
+	return err
+}
+
+const setGroupMemberRole = `-- name: SetGroupMemberRole :execrows
+UPDATE group_memberships
+SET role = $3
+WHERE group_id = $1 AND user_id = $2 AND role <> 'owner'
+`
+
+type SetGroupMemberRoleParams struct {
+	GroupID uuid.UUID       `json:"group_id"`
+	UserID  uuid.UUID       `json:"user_id"`
+	Role    GroupMemberRole `json:"role"`
+}
+
+// Updates a member's role. Owners are protected — their role cannot be
+// changed here; transferring ownership is a separate flow. Reports the
+// number of affected rows so callers can distinguish "no such member"
+// from "owner protected".
+func (q *Queries) SetGroupMemberRole(ctx context.Context, arg SetGroupMemberRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setGroupMemberRole, arg.GroupID, arg.UserID, arg.Role)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateGroupMemberVisibility = `-- name: UpdateGroupMemberVisibility :exec
+UPDATE groups SET member_visibility = $2 WHERE id = $1
+`
+
+type UpdateGroupMemberVisibilityParams struct {
+	ID               uuid.UUID       `json:"id"`
+	MemberVisibility GroupMemberRole `json:"member_visibility"`
+}
+
+func (q *Queries) UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error {
+	_, err := q.db.Exec(ctx, updateGroupMemberVisibility, arg.ID, arg.MemberVisibility)
 	return err
 }

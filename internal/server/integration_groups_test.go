@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
@@ -124,4 +126,196 @@ func TestNodeVisibility_ChildPublicInheritsGroupParent(t *testing.T) {
 		t.Fatalf("anonymous visitor should not see child inheriting group parent, got %d", resp.StatusCode)
 	}
 	resp.Body.Close()
+}
+
+// seedGroupWith creates a group owned by `alice` and adds `bob` with the
+// given role. Used by the role / moderation tests below. Returns the
+// group's slug and ID.
+func seedGroupWith(t *testing.T, alice *http.Client, aliceUser, bobUser db.User, bobRole db.GroupMemberRole, slug string) (string, uuid.UUID) {
+	t.Helper()
+	group, err := testServer.queries.CreateGroup(t.Context(), db.CreateGroupParams{
+		Slug:       slug,
+		Name:       slug,
+		OwnerID:    aliceUser.ID,
+		Visibility: db.GroupVisibilityKindInvite,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := testServer.queries.AddGroupMember(t.Context(), db.AddGroupMemberParams{
+		GroupID: group.ID, UserID: aliceUser.ID, Role: db.GroupMemberRoleOwner,
+	}); err != nil {
+		t.Fatalf("add owner: %v", err)
+	}
+	if err := testServer.queries.AddGroupMember(t.Context(), db.AddGroupMemberParams{
+		GroupID: group.ID, UserID: bobUser.ID, Role: bobRole,
+	}); err != nil {
+		t.Fatalf("add bob: %v", err)
+	}
+	_ = alice
+	return group.Slug, group.ID
+}
+
+func TestGroups_EditorCanEditAndDeleteHostedNode(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	_, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleEditor, "editor-test-group")
+
+	resp := formPost(t, alice, "/nodes", url.Values{
+		"type":       {"topic"},
+		"title":      {"Alice's group topic"},
+		"visibility": {"group:" + groupID.String()},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create group-hosted topic: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	node, err := testServer.queries.GetNodeBySlug(t.Context(), "alice-s-group-topic")
+	if err != nil {
+		t.Fatalf("lookup hosted node: %v", err)
+	}
+
+	// Editor opens the edit page successfully — canEditNode honors group staff.
+	resp = get(t, bob, "/nodes/"+node.ID.String()+"/edit")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("editor opening edit page: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Editor deletes the node — canDeleteNode honors group staff too.
+	resp = formPost(t, bob, "/nodes/"+node.ID.String()+"/delete", url.Values{})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("editor deleting node: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	if _, err := testServer.queries.GetNodeBySlug(t.Context(), node.Slug); err == nil {
+		t.Fatalf("expected node to be deleted")
+	}
+}
+
+func TestGroups_PlainMemberCannotModerate(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	_, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleMember, "member-test-group")
+
+	resp := formPost(t, alice, "/nodes", url.Values{
+		"type":       {"topic"},
+		"title":      {"Members can't moderate me"},
+		"visibility": {"group:" + groupID.String()},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("seed node: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	node, err := testServer.queries.GetNodeBySlug(t.Context(), "members-can-t-moderate-me")
+	if err != nil {
+		t.Fatalf("lookup node: %v", err)
+	}
+
+	resp = formPost(t, bob, "/nodes/"+node.ID.String()+"/delete", url.Values{})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("plain member deleting non-author node: expected 403, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestGroups_AdminCanChangeMemberRoleButNotOwners(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	slug, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleMember, "role-change-group")
+
+	// Owner promotes bob to editor.
+	resp := formPost(t, alice, "/groups/"+slug+"/members/"+bobUser.ID.String()+"/role", url.Values{
+		"role": {"editor"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("set role: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	row, err := testServer.queries.GetGroupMembership(t.Context(), db.GetGroupMembershipParams{
+		GroupID: groupID, UserID: bobUser.ID,
+	})
+	if err != nil {
+		t.Fatalf("lookup membership: %v", err)
+	}
+	if row.Role != db.GroupMemberRoleEditor {
+		t.Fatalf("expected editor role, got %s", row.Role)
+	}
+
+	// Owner can't be demoted through this endpoint.
+	resp = formPost(t, alice, "/groups/"+slug+"/members/"+aliceUser.ID.String()+"/role", url.Values{
+		"role": {"member"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("set owner role: status %d", resp.StatusCode)
+	}
+	ownerRow, err := testServer.queries.GetGroupMembership(t.Context(), db.GetGroupMembershipParams{
+		GroupID: groupID, UserID: aliceUser.ID,
+	})
+	if err != nil {
+		t.Fatalf("lookup owner membership: %v", err)
+	}
+	if ownerRow.Role != db.GroupMemberRoleOwner {
+		t.Fatalf("owner role should be preserved, got %s", ownerRow.Role)
+	}
+}
+
+func TestGroups_MemberRoleChangeRequiresManageRights(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	slug, _ := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleMember, "no-self-promote-group")
+
+	// Bob is a plain member; trying to promote himself must 403.
+	resp := formPost(t, bob, "/groups/"+slug+"/members/"+bobUser.ID.String()+"/role", url.Values{
+		"role": {"admin"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("member self-promoting: expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestGroups_MemberVisibilityOwnerHidesListFromMembers(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	slug, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleMember, "private-members-group")
+
+	if err := testServer.queries.UpdateGroupMemberVisibility(t.Context(), db.UpdateGroupMemberVisibilityParams{
+		ID: groupID, MemberVisibility: db.GroupMemberRoleOwner,
+	}); err != nil {
+		t.Fatalf("set member_visibility: %v", err)
+	}
+
+	// Bob (member) shouldn't see Alice's profile link via the member list —
+	// his own nav avatar links to /users/bob regardless, so we check for the
+	// other user's username plus the hidden-list explanation.
+	body := readBody(t, get(t, bob, "/groups/"+slug))
+	if strings.Contains(body, `href="/users/alice"`) {
+		t.Fatalf("member should not see member list under owner-only visibility; excerpt: %s", snippet(body))
+	}
+	if !strings.Contains(body, "member list is hidden") {
+		t.Fatalf("expected hidden-list explanation; excerpt: %s", snippet(body))
+	}
+
+	// Alice (owner) still sees the full list and Bob's row in it.
+	body = readBody(t, get(t, alice, "/groups/"+slug))
+	if !strings.Contains(body, `href="/users/bob"`) {
+		t.Fatalf("owner should see member list under owner-only visibility; excerpt: %s", snippet(body))
+	}
 }

@@ -237,6 +237,8 @@ func (s *Server) routes() {
 		r.Post("/groups/{slug}/leave", s.handleGroupLeave)
 		r.Post("/groups/{slug}/members", s.handleGroupAddMember)
 		r.Post("/groups/{slug}/members/{userID}/delete", s.handleGroupRemoveMember)
+		r.Post("/groups/{slug}/members/{userID}/role", s.handleGroupSetMemberRole)
+		r.Post("/groups/{slug}/settings", s.handleGroupSettings)
 		r.Get("/lists", s.handleListsIndex)
 		r.Post("/lists", s.handleListCreate)
 		r.Get("/lists/{id}", s.handleListDetail)

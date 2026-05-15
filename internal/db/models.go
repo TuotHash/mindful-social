@@ -70,6 +70,7 @@ type GroupMemberRole string
 const (
 	GroupMemberRoleOwner  GroupMemberRole = "owner"
 	GroupMemberRoleAdmin  GroupMemberRole = "admin"
+	GroupMemberRoleEditor GroupMemberRole = "editor"
 	GroupMemberRoleMember GroupMemberRole = "member"
 )
 
@@ -112,6 +113,7 @@ func (e GroupMemberRole) Valid() bool {
 	switch e {
 	case GroupMemberRoleOwner,
 		GroupMemberRoleAdmin,
+		GroupMemberRoleEditor,
 		GroupMemberRoleMember:
 		return true
 	}
@@ -492,13 +494,14 @@ type Follow struct {
 }
 
 type Group struct {
-	ID          uuid.UUID           `json:"id"`
-	Slug        string              `json:"slug"`
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	OwnerID     uuid.UUID           `json:"owner_id"`
-	Visibility  GroupVisibilityKind `json:"visibility"`
-	CreatedAt   pgtype.Timestamptz  `json:"created_at"`
+	ID               uuid.UUID           `json:"id"`
+	Slug             string              `json:"slug"`
+	Name             string              `json:"name"`
+	Description      string              `json:"description"`
+	OwnerID          uuid.UUID           `json:"owner_id"`
+	Visibility       GroupVisibilityKind `json:"visibility"`
+	CreatedAt        pgtype.Timestamptz  `json:"created_at"`
+	MemberVisibility GroupMemberRole     `json:"member_visibility"`
 }
 
 type GroupInvite struct {

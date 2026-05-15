@@ -230,6 +230,11 @@ type Querier interface {
 	// People search for /search. Prefix/substring matching makes exact handle
 	// discovery predictable, while trigram word similarity catches small typos.
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
+	// Updates a member's role. Owners are protected — their role cannot be
+	// changed here; transferring ownership is a separate flow. Reports the
+	// number of affected rows so callers can distinguish "no such member"
+	// from "owner protected".
+	SetGroupMemberRole(ctx context.Context, arg SetGroupMemberRoleParams) (int64, error)
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first. Returns
@@ -240,6 +245,7 @@ type Querier interface {
 	// pov_node. No-op if pov_node isn't one of the edge's endpoints.
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
+	UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Keeps the password identity's subject (an email mirror) aligned with the

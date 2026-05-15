@@ -465,6 +465,12 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	canDelete, err := s.canDeleteNode(r.Context(), node, user)
+	if err != nil {
+		s.logger.Error("node detail: delete policy", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	var topicViews []views.TopicView
 	if node.Type == db.NodeTypeTopic {
@@ -506,7 +512,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		tags,
 		canEdit,
 		canLink,
-		canDeleteNode(node, user),
+		canDelete,
 	))
 }
 
@@ -597,7 +603,13 @@ func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	id := node.ID
-	if !canDeleteNode(node, user) {
+	allowed, err := s.canDeleteNode(r.Context(), node, user)
+	if err != nil {
+		s.logger.Error("node delete confirm: delete policy", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -629,7 +641,13 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !canDeleteNode(node, user) {
+	allowed, err := s.canDeleteNode(r.Context(), node, user)
+	if err != nil {
+		s.logger.Error("node delete: delete policy", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -639,12 +657,25 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("node deleted", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID)
-	// Authors land back on their own profile; a moderator deleting
-	// someone else's content lands on /admin where the rest of the
-	// moderation surface lives.
+	// Authors land back on their own profile. Site staff deleting other
+	// people's content go to /admin where the rest of the moderation
+	// surface lives. Group editors (non-author, non-staff) deleting a
+	// hosted node go back to the group; if the node had no group, fall
+	// back to /home.
 	dest := "/users/" + user.Username
 	if node.CreatedBy != user.ID {
-		dest = "/admin"
+		switch {
+		case isStaff(user):
+			dest = "/admin"
+		case node.GroupID != nil:
+			if g, err := s.queries.GetGroup(r.Context(), *node.GroupID); err == nil {
+				dest = "/groups/" + g.Slug
+			} else {
+				dest = "/home"
+			}
+		default:
+			dest = "/home"
+		}
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }

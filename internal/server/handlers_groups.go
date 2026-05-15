@@ -209,6 +209,75 @@ func (s *Server) handleGroupAddMember(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
 }
 
+func (s *Server) handleGroupSetMemberRole(w http.ResponseWriter, r *http.Request) {
+	group, membership, ok := s.resolveGroup(w, r)
+	if !ok {
+		return
+	}
+	if !canManageGroup(membership) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	memberID, err := uuid.Parse(chiURLParam(r, "userID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	newRole, ok := parseAssignableRole(r.PostFormValue("role"))
+	if !ok {
+		s.renderGroupDetail(w, r, group, membership, "Pick a valid role.")
+		return
+	}
+	// SetGroupMemberRole's WHERE clause guards owners — they can't be
+	// demoted through this endpoint. A zero affected-rows result means
+	// either the target isn't a member or they're the owner; we treat
+	// both as a soft no-op with a flash so the UI re-renders cleanly.
+	affected, err := s.queries.SetGroupMemberRole(r.Context(), db.SetGroupMemberRoleParams{
+		GroupID: group.ID,
+		UserID:  memberID,
+		Role:    newRole,
+	})
+	if err != nil {
+		s.logger.Error("group set member role", "err", err)
+		s.renderGroupDetail(w, r, group, membership, "Could not update role. Please try again.")
+		return
+	}
+	if affected == 0 {
+		s.renderGroupDetail(w, r, group, membership, "That member's role can't be changed.")
+		return
+	}
+	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
+}
+
+func (s *Server) handleGroupSettings(w http.ResponseWriter, r *http.Request) {
+	group, membership, ok := s.resolveGroup(w, r)
+	if !ok {
+		return
+	}
+	if !canManageGroup(membership) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	visibility := parseMemberVisibility(r.PostFormValue("member_visibility"))
+	if err := s.queries.UpdateGroupMemberVisibility(r.Context(), db.UpdateGroupMemberVisibilityParams{
+		ID:               group.ID,
+		MemberVisibility: visibility,
+	}); err != nil {
+		s.logger.Error("group settings: member visibility", "err", err)
+		s.renderGroupDetail(w, r, group, membership, "Could not save settings. Please try again.")
+		return
+	}
+	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
+}
+
 func (s *Server) handleGroupRemoveMember(w http.ResponseWriter, r *http.Request) {
 	group, membership, ok := s.resolveGroup(w, r)
 	if !ok {
@@ -245,8 +314,47 @@ func parseGroupVisibility(raw string) db.GroupVisibilityKind {
 	}
 }
 
+// parseAssignableRole decodes the role value coming from the role
+// dropdown. Returns (role, true) on a known value and (zero, false) on
+// anything else. `owner` is excluded — ownership transfer is a separate
+// flow, not a freeform assignment.
+func parseAssignableRole(raw string) (db.GroupMemberRole, bool) {
+	switch strings.TrimSpace(raw) {
+	case "admin":
+		return db.GroupMemberRoleAdmin, true
+	case "editor":
+		return db.GroupMemberRoleEditor, true
+	case "member":
+		return db.GroupMemberRoleMember, true
+	}
+	return "", false
+}
+
+// parseMemberVisibility decodes the value from the settings form's
+// member-visibility selector. Falls back to 'member' (the default).
+func parseMemberVisibility(raw string) db.GroupMemberRole {
+	switch strings.TrimSpace(raw) {
+	case "owner":
+		return db.GroupMemberRoleOwner
+	case "admin":
+		return db.GroupMemberRoleAdmin
+	case "editor":
+		return db.GroupMemberRoleEditor
+	}
+	return db.GroupMemberRoleMember
+}
+
 func canManageGroup(membership *db.GroupMembership) bool {
 	return membership != nil && (membership.Role == db.GroupMemberRoleOwner || membership.Role == db.GroupMemberRoleAdmin)
+}
+
+// canSeeGroupMembers reports whether the viewer's role meets the group's
+// member_visibility threshold. Non-members always fail.
+func canSeeGroupMembers(group db.Group, membership *db.GroupMembership) bool {
+	if membership == nil {
+		return false
+	}
+	return groupRoleAtLeast(membership.Role, group.MemberVisibility)
 }
 
 func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group, *db.GroupMembership, bool) {
@@ -287,11 +395,16 @@ func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group,
 }
 
 func (s *Server) renderGroupDetail(w http.ResponseWriter, r *http.Request, group db.Group, membership *db.GroupMembership, flash string) {
-	members, err := s.queries.ListGroupMembers(r.Context(), group.ID)
-	if err != nil {
-		s.logger.Error("group detail: members", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	canSee := canSeeGroupMembers(group, membership)
+	var members []db.ListGroupMembersRow
+	if canSee {
+		rows, err := s.queries.ListGroupMembers(r.Context(), group.ID)
+		if err != nil {
+			s.logger.Error("group detail: members", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		members = rows
 	}
 	nodes, err := s.queries.ListNodesForGroupForViewer(r.Context(), db.ListNodesForGroupForViewerParams{
 		GroupID:     group.ID,
@@ -303,5 +416,5 @@ func (s *Server) renderGroupDetail(w http.ResponseWriter, r *http.Request, group
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.GroupDetail(viewerFor(currentUser(r)), flash, group, membership, members, nodes, canManageGroup(membership)))
+	render(w, r, views.GroupDetail(viewerFor(currentUser(r)), flash, group, membership, members, nodes, canManageGroup(membership), canSee))
 }

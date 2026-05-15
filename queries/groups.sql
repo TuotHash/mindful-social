@@ -22,6 +22,18 @@ END;
 DELETE FROM group_memberships
 WHERE group_id = $1 AND user_id = $2 AND role <> 'owner';
 
+-- name: SetGroupMemberRole :execrows
+-- Updates a member's role. Owners are protected — their role cannot be
+-- changed here; transferring ownership is a separate flow. Reports the
+-- number of affected rows so callers can distinguish "no such member"
+-- from "owner protected".
+UPDATE group_memberships
+SET role = $3
+WHERE group_id = $1 AND user_id = $2 AND role <> 'owner';
+
+-- name: UpdateGroupMemberVisibility :exec
+UPDATE groups SET member_visibility = $2 WHERE id = $1;
+
 -- name: GetGroupMembership :one
 SELECT * FROM group_memberships
 WHERE group_id = $1 AND user_id = $2;
