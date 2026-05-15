@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: config.LogLevelFromEnv()}))
 	slog.SetDefault(logger)
 	logger.Info("mindful-social starting", "version", mindfulsocial.Version)
 

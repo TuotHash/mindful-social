@@ -124,6 +124,7 @@ The server is configured entirely through environment variables. Inside
 |---|---|---|---|
 | `DATABASE_URL` | **yes** | — | Postgres connection string, e.g. `postgres:///mindful_social?host=/path/to/socket` |
 | `LISTEN_ADDR` | no | `127.0.0.1:8080` | TCP address the HTTP server binds to |
+| `LOG_LEVEL` | no | `info` | Minimum JSON log level: `debug`, `info`, `warn`, or `error` |
 | `PUBLIC_BASE_URL` | no* | `http://127.0.0.1:8080` | Absolute origin the browser sees. Required when any OAuth provider is configured, because callback URLs are derived from it. Set to your public domain, e.g. `https://mindful.example.org` |
 | `SIGNUP_ENABLED` | no | `true` | Set to `false` to close password sign-up while keeping OAuth/OIDC account creation open |
 | `ADMIN_USERS` | no | — | Comma-separated list of email addresses bootstrapped as admins on every startup (idempotent) |

@@ -34,6 +34,14 @@ in {
       '';
     };
 
+    logLevel = lib.mkOption {
+      type = lib.types.enum [ "debug" "info" "warn" "error" ];
+      default = "info";
+      description = ''
+        Minimum JSON log level emitted by the server.
+      '';
+    };
+
     publicBaseURL = lib.mkOption {
       type = lib.types.str;
       example = "https://mindful.example.org";
@@ -161,6 +169,7 @@ in {
 
       environment = {
         LISTEN_ADDR = cfg.listenAddr;
+        LOG_LEVEL = cfg.logLevel;
         PUBLIC_BASE_URL = cfg.publicBaseURL;
         SIGNUP_ENABLED = if cfg.signupEnabled then "true" else "false";
         # Matches StateDirectory below. systemd creates and owns this

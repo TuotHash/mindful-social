@@ -11,6 +11,7 @@ import (
 type Config struct {
 	ListenAddr  string
 	DatabaseURL string
+	LogLevel    slog.Level
 
 	// PublicBaseURL is the absolute origin the browser sees (e.g.
 	// "https://mindful.example.org"). Required only when at least one OAuth
@@ -55,6 +56,7 @@ func Load(logger *slog.Logger) (Config, error) {
 	cfg := Config{
 		ListenAddr:    envOr("LISTEN_ADDR", "127.0.0.1:8080"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		LogLevel:      envLogLevel(logger, "LOG_LEVEL", slog.LevelInfo),
 		PublicBaseURL: envOr("PUBLIC_BASE_URL", "http://127.0.0.1:8080"),
 		SignupEnabled: envBool(logger, "SIGNUP_ENABLED", true),
 		AdminUsers:    envList("ADMIN_USERS"),
@@ -68,6 +70,16 @@ func Load(logger *slog.Logger) (Config, error) {
 		logger.Warn("config: PUBLIC_BASE_URL unset, using default", "default", cfg.PublicBaseURL)
 	}
 	return cfg, nil
+}
+
+// LogLevelFromEnv returns the configured startup log level. Invalid values
+// fall back silently here; Load logs the warning once the logger exists.
+func LogLevelFromEnv() slog.Level {
+	level, ok := parseLogLevel(os.Getenv("LOG_LEVEL"))
+	if !ok {
+		return slog.LevelInfo
+	}
+	return level
 }
 
 func envOr(key, fallback string) string {
@@ -93,6 +105,33 @@ func envList(key string) []string {
 		}
 	}
 	return out
+}
+
+func envLogLevel(logger *slog.Logger, key string, fallback slog.Level) slog.Level {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	level, ok := parseLogLevel(raw)
+	if ok {
+		return level
+	}
+	logger.Warn("config: unrecognised log level, using default", "key", key, "value", raw, "default", fallback.String())
+	return fallback
+}
+
+func parseLogLevel(raw string) (slog.Level, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "debug":
+		return slog.LevelDebug, true
+	case "info":
+		return slog.LevelInfo, true
+	case "warn", "warning":
+		return slog.LevelWarn, true
+	case "error":
+		return slog.LevelError, true
+	}
+	return slog.LevelInfo, false
 }
 
 // envBool parses common true/false spellings; anything unrecognised falls
