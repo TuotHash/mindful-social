@@ -122,7 +122,7 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 		Name:        "Profile pin audience",
 		Description: "",
 		OwnerID:     alice.ID,
-		Visibility:  db.GroupVisibilityKindClosed,
+		Visibility:  db.GroupVisibilityKindPrivate,
 	})
 	if err != nil {
 		t.Fatalf("create group: %v", err)

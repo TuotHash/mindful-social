@@ -11,12 +11,14 @@ import (
 const searchResultLimit = 50
 
 // handleSearch renders /search?q=...: full-text matches across node titles
-// and bodies plus matching usernames, ranked by relevance.
+// and bodies, plus matching usernames and groups. Groups results are gated
+// by the same visibility branches that ListVisibleGroups uses, so search
+// can't leak a private group's existence to a non-member.
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	viewer := viewerFor(currentUser(r))
 	if q == "" {
-		render(w, r, views.SearchResults(viewer, "", nil, nil))
+		render(w, r, views.SearchResults(viewer, "", nil, nil, nil))
 		return
 	}
 	nodeRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
@@ -38,7 +40,17 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.SearchResults(viewer, q, searchHits(nodeRows), userHits(userRows)))
+	groupRows, err := s.queries.SearchGroups(r.Context(), db.SearchGroupsParams{
+		Query:       q,
+		ResultLimit: searchResultLimit,
+		ViewerID:    viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("search groups", "err", err, "q", q)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.SearchResults(viewer, q, searchHits(nodeRows), userHits(userRows), groupHits(groupRows)))
 }
 
 func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
@@ -62,6 +74,21 @@ func userHits(rows []db.SearchUsersRow) []views.UserSearchHit {
 		out = append(out, views.UserSearchHit{
 			ID:       row.ID,
 			Username: row.Username,
+		})
+	}
+	return out
+}
+
+func groupHits(rows []db.SearchGroupsRow) []views.GroupSearchHit {
+	out := make([]views.GroupSearchHit, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, views.GroupSearchHit{
+			ID:          row.ID,
+			Slug:        row.Slug,
+			Name:        row.Name,
+			Description: row.Description,
+			Visibility:  row.Visibility,
+			MemberCount: row.MemberCount,
 		})
 	}
 	return out

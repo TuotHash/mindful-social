@@ -17,12 +17,26 @@ func groupVisibilityLabel(v db.GroupVisibilityKind) string {
 	switch v {
 	case db.GroupVisibilityKindPublic:
 		return "public"
-	case db.GroupVisibilityKindInvite:
-		return "invite-only"
-	case db.GroupVisibilityKindClosed:
-		return "closed"
+	case db.GroupVisibilityKindConnections:
+		return "connections only"
+	case db.GroupVisibilityKindPrivate:
+		return "private"
 	}
 	return string(v)
+}
+
+// groupVisibilityHelp returns the one-liner shown under the visibility
+// radios so the owner understands the audience effect of each option.
+func groupVisibilityHelp(v db.GroupVisibilityKind) string {
+	switch v {
+	case db.GroupVisibilityKindPublic:
+		return "Anyone can see and join the group."
+	case db.GroupVisibilityKindConnections:
+		return "Visible to your followers and connections; new members join by invite."
+	case db.GroupVisibilityKindPrivate:
+		return "Only members can see the group; new members join by invite."
+	}
+	return ""
 }
 
 func groupRoleLabel(r db.GroupMemberRole) string {
@@ -107,14 +121,14 @@ templ GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow
 									Public
 								</label>
 								<label class="toggle-btn">
-									<input type="radio" name="visibility" value="invite" checked/>
-									<span class="material-symbols-outlined">mail</span>
-									Invite-only
+									<input type="radio" name="visibility" value="connections"/>
+									<span class="material-symbols-outlined">group</span>
+									Connections
 								</label>
 								<label class="toggle-btn">
-									<input type="radio" name="visibility" value="closed"/>
+									<input type="radio" name="visibility" value="private" checked/>
 									<span class="material-symbols-outlined">lock</span>
-									Closed
+									Private
 								</label>
 							</div>
 						</fieldset>
@@ -128,7 +142,7 @@ templ GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow
 	}
 }
 
-templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage, canSeeMembers bool) {
+templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage, canOwn, canSeeMembers bool) {
 	@Layout(group.Name+" — group", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -229,6 +243,29 @@ templ GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.G
 					<h2 style="margin-top: 0;">Settings</h2>
 					<form method="post" action={ templ.SafeURL("/groups/" + group.Slug + "/settings") } class="form">
 						@CSRFField()
+						if canOwn {
+							<fieldset class="toggle-group">
+								<legend>Group visibility</legend>
+								<div class="toggle-btns">
+									<label class="toggle-btn">
+										<input type="radio" name="visibility" value="public" checked?={ group.Visibility == db.GroupVisibilityKindPublic }/>
+										<span class="material-symbols-outlined">public</span>
+										Public
+									</label>
+									<label class="toggle-btn">
+										<input type="radio" name="visibility" value="connections" checked?={ group.Visibility == db.GroupVisibilityKindConnections }/>
+										<span class="material-symbols-outlined">group</span>
+										Connections
+									</label>
+									<label class="toggle-btn">
+										<input type="radio" name="visibility" value="private" checked?={ group.Visibility == db.GroupVisibilityKindPrivate }/>
+										<span class="material-symbols-outlined">lock</span>
+										Private
+									</label>
+								</div>
+								<small class="muted" style="font-size: 12px;">{ groupVisibilityHelp(group.Visibility) }</small>
+							</fieldset>
+						}
 						<fieldset class="toggle-group">
 							<legend>Member list visibility</legend>
 							<div class="toggle-btns">

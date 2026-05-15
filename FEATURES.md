@@ -47,7 +47,7 @@ Edge highlighting marks key reasoning inline on the node page.
 
 ## Discovery
 
-- **Full-text search** — Postgres `tsvector` with stemming; returns results with highlighted excerpts and an author byline beside each hit.
+- **Full-text search** — Postgres `tsvector` with stemming; returns results with highlighted excerpts and an author byline beside each hit. People and visible groups appear in dedicated sections alongside graph hits.
 - **Argument graph view** — `/graph` visualises visible topics, views, findings, and typed edges with node search, author filter, and type filters. The inspector exposes a one-click "Filter by this author" toggle.
 - **Fuzzy title search** — trigram similarity on node titles for typo and partial-match tolerance.
 - **Live search** — HTMX-powered picker in edge and topic forms; results update as you type.
@@ -100,8 +100,8 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 ## Groups
 
 - **Groups** are collaborative spaces for friends, study groups, or research teams.
-- Group visibility: `public` (anyone can browse and join), `invite` (listed but requires invite), `closed` (hidden from non-members).
-- Member roles: `owner`, `admin`, `member`.
+- Group visibility (owner-configurable): `public` (anyone can browse and join), `connections` (visible to the owner's mutual followers, invite to join), `private` (hidden from non-members, invite to join).
+- Member roles: `owner`, `admin`, `editor`, `member`.
 - Nodes posted into a group default to group-scope visibility.
 - Group invites with an accept workflow.
 - Nodes can optionally belong to a group; group becomes a first-class visibility predicate.

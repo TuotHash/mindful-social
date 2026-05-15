@@ -34,6 +34,40 @@ WHERE group_id = $1 AND user_id = $2 AND role <> 'owner';
 -- name: UpdateGroupMemberVisibility :exec
 UPDATE groups SET member_visibility = $2 WHERE id = $1;
 
+-- name: UpdateGroupVisibility :exec
+-- Owner-only — the handler enforces that. Stored as the same enum the
+-- create form populates: 'public' | 'connections' | 'private'.
+UPDATE groups SET visibility = $2 WHERE id = $1;
+
+-- name: CanViewGroup :one
+-- Single-group visibility probe used by resolveGroup() to gate the
+-- detail page for non-public groups. Mirrors the visibility branches
+-- in ListVisibleGroups: members always pass, connections groups pass
+-- when viewer mutually follows the owner, private groups require
+-- membership.
+SELECT (
+  g.visibility = 'public'
+  OR EXISTS (
+    SELECT 1 FROM group_memberships m
+    WHERE m.group_id = g.id
+      AND m.user_id = sqlc.narg(viewer_id)::uuid
+  )
+  OR (
+    g.visibility = 'connections'
+    AND sqlc.narg(viewer_id)::uuid IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM follows f1
+      JOIN follows f2
+        ON f2.follower_id = f1.followed_id
+       AND f2.followed_id = f1.follower_id
+      WHERE f1.follower_id = sqlc.narg(viewer_id)::uuid
+        AND f1.followed_id = g.owner_id
+    )
+  )
+)::bool AS can_view
+FROM groups g
+WHERE g.id = sqlc.arg(group_id)::uuid;
+
 -- name: GetGroupMembership :one
 SELECT * FROM group_memberships
 WHERE group_id = $1 AND user_id = $2;
@@ -57,6 +91,13 @@ ORDER BY
   u.username ASC;
 
 -- name: ListVisibleGroups :many
+-- Three visibility branches:
+--   public       — visible to everyone (the public/anon visitor included)
+--   connections  — visible to the owner's mutual followers + members
+--   private      — visible only to members
+-- The viewer_role / is_member columns power the badge/CTA logic in the
+-- groups index; member_count is a per-row aggregate so we don't need a
+-- separate hit per group.
 SELECT
   g.id,
   g.slug,
@@ -72,9 +113,67 @@ FROM groups g
 LEFT JOIN group_memberships gm
   ON gm.group_id = g.id
  AND gm.user_id = sqlc.narg(viewer_id)::uuid
-WHERE g.visibility <> 'closed'
+WHERE g.visibility = 'public'
    OR gm.user_id IS NOT NULL
+   OR (
+     g.visibility = 'connections'
+     AND sqlc.narg(viewer_id)::uuid IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM follows f1
+       JOIN follows f2
+         ON f2.follower_id = f1.followed_id
+        AND f2.followed_id = f1.follower_id
+       WHERE f1.follower_id = sqlc.narg(viewer_id)::uuid
+         AND f1.followed_id = g.owner_id
+     )
+   )
 ORDER BY g.created_at DESC;
+
+-- name: SearchGroups :many
+-- Trigram fuzzy match against the group name. Mirrors SearchUsers but
+-- additionally gates each row by the viewer's right to see the group
+-- (see ListVisibleGroups for the visibility branches). The %> threshold
+-- is the same one the picker uses elsewhere (set in pgxpool.AfterConnect).
+SELECT
+  g.id,
+  g.slug,
+  g.name,
+  g.description,
+  g.visibility,
+  (SELECT count(*)::bigint FROM group_memberships m WHERE m.group_id = g.id) AS member_count
+FROM groups g
+WHERE (
+    g.name ILIKE '%' || sqlc.arg(query)::text || '%'
+    OR g.name %> sqlc.arg(query)::text
+  )
+  AND (
+    g.visibility = 'public'
+    OR (
+      sqlc.narg(viewer_id)::uuid IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM group_memberships m
+        WHERE m.group_id = g.id
+          AND m.user_id = sqlc.narg(viewer_id)::uuid
+      )
+    )
+    OR (
+      g.visibility = 'connections'
+      AND sqlc.narg(viewer_id)::uuid IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM follows f1
+        JOIN follows f2
+          ON f2.follower_id = f1.followed_id
+         AND f2.followed_id = f1.follower_id
+        WHERE f1.follower_id = sqlc.narg(viewer_id)::uuid
+          AND f1.followed_id = g.owner_id
+      )
+    )
+  )
+ORDER BY
+  CASE WHEN g.name ILIKE sqlc.arg(query)::text || '%' THEN 0 ELSE 1 END,
+  word_similarity(sqlc.arg(query)::text, g.name) DESC,
+  g.name ASC
+LIMIT sqlc.arg(result_limit);
 
 -- name: ListGroupsForUser :many
 SELECT

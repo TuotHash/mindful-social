@@ -52,6 +52,48 @@ func (q *Queries) AddGroupMember(ctx context.Context, arg AddGroupMemberParams) 
 	return err
 }
 
+const canViewGroup = `-- name: CanViewGroup :one
+SELECT (
+  g.visibility = 'public'
+  OR EXISTS (
+    SELECT 1 FROM group_memberships m
+    WHERE m.group_id = g.id
+      AND m.user_id = $1::uuid
+  )
+  OR (
+    g.visibility = 'connections'
+    AND $1::uuid IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM follows f1
+      JOIN follows f2
+        ON f2.follower_id = f1.followed_id
+       AND f2.followed_id = f1.follower_id
+      WHERE f1.follower_id = $1::uuid
+        AND f1.followed_id = g.owner_id
+    )
+  )
+)::bool AS can_view
+FROM groups g
+WHERE g.id = $2::uuid
+`
+
+type CanViewGroupParams struct {
+	ViewerID *uuid.UUID `json:"viewer_id"`
+	GroupID  uuid.UUID  `json:"group_id"`
+}
+
+// Single-group visibility probe used by resolveGroup() to gate the
+// detail page for non-public groups. Mirrors the visibility branches
+// in ListVisibleGroups: members always pass, connections groups pass
+// when viewer mutually follows the owner, private groups require
+// membership.
+func (q *Queries) CanViewGroup(ctx context.Context, arg CanViewGroupParams) (bool, error) {
+	row := q.db.QueryRow(ctx, canViewGroup, arg.ViewerID, arg.GroupID)
+	var can_view bool
+	err := row.Scan(&can_view)
+	return can_view, err
+}
+
 const countGroupMembers = `-- name: CountGroupMembers :one
 SELECT count(*)::bigint FROM group_memberships WHERE group_id = $1
 `
@@ -430,8 +472,20 @@ FROM groups g
 LEFT JOIN group_memberships gm
   ON gm.group_id = g.id
  AND gm.user_id = $1::uuid
-WHERE g.visibility <> 'closed'
+WHERE g.visibility = 'public'
    OR gm.user_id IS NOT NULL
+   OR (
+     g.visibility = 'connections'
+     AND $1::uuid IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM follows f1
+       JOIN follows f2
+         ON f2.follower_id = f1.followed_id
+        AND f2.followed_id = f1.follower_id
+       WHERE f1.follower_id = $1::uuid
+         AND f1.followed_id = g.owner_id
+     )
+   )
 ORDER BY g.created_at DESC
 `
 
@@ -448,6 +502,15 @@ type ListVisibleGroupsRow struct {
 	MemberCount int64               `json:"member_count"`
 }
 
+// Three visibility branches:
+//
+//	public       — visible to everyone (the public/anon visitor included)
+//	connections  — visible to the owner's mutual followers + members
+//	private      — visible only to members
+//
+// The viewer_role / is_member columns power the badge/CTA logic in the
+// groups index; member_count is a per-row aggregate so we don't need a
+// separate hit per group.
 func (q *Queries) ListVisibleGroups(ctx context.Context, viewerID *uuid.UUID) ([]ListVisibleGroupsRow, error) {
 	rows, err := q.db.Query(ctx, listVisibleGroups, viewerID)
 	if err != nil {
@@ -494,6 +557,95 @@ func (q *Queries) RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberPa
 	return err
 }
 
+const searchGroups = `-- name: SearchGroups :many
+SELECT
+  g.id,
+  g.slug,
+  g.name,
+  g.description,
+  g.visibility,
+  (SELECT count(*)::bigint FROM group_memberships m WHERE m.group_id = g.id) AS member_count
+FROM groups g
+WHERE (
+    g.name ILIKE '%' || $1::text || '%'
+    OR g.name %> $1::text
+  )
+  AND (
+    g.visibility = 'public'
+    OR (
+      $2::uuid IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM group_memberships m
+        WHERE m.group_id = g.id
+          AND m.user_id = $2::uuid
+      )
+    )
+    OR (
+      g.visibility = 'connections'
+      AND $2::uuid IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM follows f1
+        JOIN follows f2
+          ON f2.follower_id = f1.followed_id
+         AND f2.followed_id = f1.follower_id
+        WHERE f1.follower_id = $2::uuid
+          AND f1.followed_id = g.owner_id
+      )
+    )
+  )
+ORDER BY
+  CASE WHEN g.name ILIKE $1::text || '%' THEN 0 ELSE 1 END,
+  word_similarity($1::text, g.name) DESC,
+  g.name ASC
+LIMIT $3
+`
+
+type SearchGroupsParams struct {
+	Query       string     `json:"query"`
+	ViewerID    *uuid.UUID `json:"viewer_id"`
+	ResultLimit int32      `json:"result_limit"`
+}
+
+type SearchGroupsRow struct {
+	ID          uuid.UUID           `json:"id"`
+	Slug        string              `json:"slug"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Visibility  GroupVisibilityKind `json:"visibility"`
+	MemberCount int64               `json:"member_count"`
+}
+
+// Trigram fuzzy match against the group name. Mirrors SearchUsers but
+// additionally gates each row by the viewer's right to see the group
+// (see ListVisibleGroups for the visibility branches). The %> threshold
+// is the same one the picker uses elsewhere (set in pgxpool.AfterConnect).
+func (q *Queries) SearchGroups(ctx context.Context, arg SearchGroupsParams) ([]SearchGroupsRow, error) {
+	rows, err := q.db.Query(ctx, searchGroups, arg.Query, arg.ViewerID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchGroupsRow
+	for rows.Next() {
+		var i SearchGroupsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Description,
+			&i.Visibility,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setGroupMemberRole = `-- name: SetGroupMemberRole :execrows
 UPDATE group_memberships
 SET role = $3
@@ -529,5 +681,21 @@ type UpdateGroupMemberVisibilityParams struct {
 
 func (q *Queries) UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error {
 	_, err := q.db.Exec(ctx, updateGroupMemberVisibility, arg.ID, arg.MemberVisibility)
+	return err
+}
+
+const updateGroupVisibility = `-- name: UpdateGroupVisibility :exec
+UPDATE groups SET visibility = $2 WHERE id = $1
+`
+
+type UpdateGroupVisibilityParams struct {
+	ID         uuid.UUID           `json:"id"`
+	Visibility GroupVisibilityKind `json:"visibility"`
+}
+
+// Owner-only — the handler enforces that. Stored as the same enum the
+// create form populates: 'public' | 'connections' | 'private'.
+func (q *Queries) UpdateGroupVisibility(ctx context.Context, arg UpdateGroupVisibilityParams) error {
+	_, err := q.db.Exec(ctx, updateGroupVisibility, arg.ID, arg.Visibility)
 	return err
 }

@@ -129,7 +129,7 @@ func (s *Server) handleGroupJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if group.Visibility != db.GroupVisibilityKindPublic {
-		s.renderGroupDetail(w, r, group, membership, "This group is invite-only.")
+		s.renderGroupDetail(w, r, group, membership, "This group is invite-only — ask a member to invite you.")
 		return
 	}
 	if err := s.queries.AddGroupMember(r.Context(), db.AddGroupMemberParams{
@@ -266,15 +266,36 @@ func (s *Server) handleGroupSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	visibility := parseMemberVisibility(r.PostFormValue("member_visibility"))
+
+	memberVis := parseMemberVisibility(r.PostFormValue("member_visibility"))
 	if err := s.queries.UpdateGroupMemberVisibility(r.Context(), db.UpdateGroupMemberVisibilityParams{
 		ID:               group.ID,
-		MemberVisibility: visibility,
+		MemberVisibility: memberVis,
 	}); err != nil {
 		s.logger.Error("group settings: member visibility", "err", err)
 		s.renderGroupDetail(w, r, group, membership, "Could not save settings. Please try again.")
 		return
 	}
+
+	// Group visibility is owner-only — admins manage members but not the
+	// audience of the group itself. Non-owners get the field silently
+	// ignored (no error: their other settings still saved). The form
+	// hides the radios for them, so reaching this branch only happens
+	// when somebody POSTs by hand.
+	if rawVis := r.PostFormValue("visibility"); rawVis != "" && canOwnGroup(membership) {
+		visibility := parseGroupVisibility(rawVis)
+		if visibility != group.Visibility {
+			if err := s.queries.UpdateGroupVisibility(r.Context(), db.UpdateGroupVisibilityParams{
+				ID:         group.ID,
+				Visibility: visibility,
+			}); err != nil {
+				s.logger.Error("group settings: visibility", "err", err)
+				s.renderGroupDetail(w, r, group, membership, "Could not save settings. Please try again.")
+				return
+			}
+		}
+	}
+
 	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
 }
 
@@ -307,10 +328,12 @@ func parseGroupVisibility(raw string) db.GroupVisibilityKind {
 	switch strings.TrimSpace(raw) {
 	case "public":
 		return db.GroupVisibilityKindPublic
-	case "closed":
-		return db.GroupVisibilityKindClosed
+	case "connections":
+		return db.GroupVisibilityKindConnections
 	default:
-		return db.GroupVisibilityKindInvite
+		// Private is the safer default — losing access is recoverable,
+		// accidentally exposing a group is not.
+		return db.GroupVisibilityKindPrivate
 	}
 }
 
@@ -346,6 +369,13 @@ func parseMemberVisibility(raw string) db.GroupMemberRole {
 
 func canManageGroup(membership *db.GroupMembership) bool {
 	return membership != nil && (membership.Role == db.GroupMemberRoleOwner || membership.Role == db.GroupMemberRoleAdmin)
+}
+
+// canOwnGroup gates owner-only actions (currently: changing group
+// visibility). Distinct from canManageGroup so admins keep their
+// member-management powers without inheriting audience control.
+func canOwnGroup(membership *db.GroupMembership) bool {
+	return membership != nil && membership.Role == db.GroupMemberRoleOwner
 }
 
 // canSeeGroupMembers reports whether the viewer's role meets the group's
@@ -387,9 +417,24 @@ func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group,
 			return db.Group{}, nil, false
 		}
 	}
-	if group.Visibility == db.GroupVisibilityKindClosed && membership == nil {
-		http.NotFound(w, r)
-		return db.Group{}, nil, false
+	if membership == nil && group.Visibility != db.GroupVisibilityKindPublic {
+		// Members are vetted by GetGroupMembership above; non-public
+		// groups need an extra check. CanViewGroup folds the connections
+		// branch (mutual follow with owner) and the private branch (no
+		// access at all) into one query so resolveGroup stays O(1) hits.
+		canView, err := s.queries.CanViewGroup(r.Context(), db.CanViewGroupParams{
+			GroupID:  group.ID,
+			ViewerID: viewerID(r),
+		})
+		if err != nil {
+			s.logger.Error("resolve group: can view", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return db.Group{}, nil, false
+		}
+		if !canView {
+			http.NotFound(w, r)
+			return db.Group{}, nil, false
+		}
 	}
 	return group, membership, true
 }
@@ -416,5 +461,5 @@ func (s *Server) renderGroupDetail(w http.ResponseWriter, r *http.Request, group
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.GroupDetail(viewerFor(currentUser(r)), flash, group, membership, members, nodes, canManageGroup(membership), canSee))
+	render(w, r, views.GroupDetail(viewerFor(currentUser(r)), flash, group, membership, members, nodes, canManageGroup(membership), canOwnGroup(membership), canSee))
 }

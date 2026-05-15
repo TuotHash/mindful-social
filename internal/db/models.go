@@ -123,9 +123,9 @@ func (e GroupMemberRole) Valid() bool {
 type GroupVisibilityKind string
 
 const (
-	GroupVisibilityKindPublic GroupVisibilityKind = "public"
-	GroupVisibilityKindInvite GroupVisibilityKind = "invite"
-	GroupVisibilityKindClosed GroupVisibilityKind = "closed"
+	GroupVisibilityKindPublic      GroupVisibilityKind = "public"
+	GroupVisibilityKindConnections GroupVisibilityKind = "connections"
+	GroupVisibilityKindPrivate     GroupVisibilityKind = "private"
 )
 
 func (e *GroupVisibilityKind) Scan(src interface{}) error {
@@ -166,8 +166,8 @@ func (ns NullGroupVisibilityKind) Value() (driver.Value, error) {
 func (e GroupVisibilityKind) Valid() bool {
 	switch e {
 	case GroupVisibilityKindPublic,
-		GroupVisibilityKindInvite,
-		GroupVisibilityKindClosed:
+		GroupVisibilityKindConnections,
+		GroupVisibilityKindPrivate:
 		return true
 	}
 	return false

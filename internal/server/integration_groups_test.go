@@ -58,7 +58,7 @@ func TestNodeVisibility_ChildPublicInheritsGroupParent(t *testing.T) {
 		Name:        "Private Research",
 		Description: "",
 		OwnerID:     aliceUser.ID,
-		Visibility:  db.GroupVisibilityKindInvite,
+		Visibility:  db.GroupVisibilityKindConnections,
 	})
 	if err != nil {
 		t.Fatalf("create group: %v", err)
@@ -137,7 +137,7 @@ func seedGroupWith(t *testing.T, alice *http.Client, aliceUser, bobUser db.User,
 		Slug:       slug,
 		Name:       slug,
 		OwnerID:    aliceUser.ID,
-		Visibility: db.GroupVisibilityKindInvite,
+		Visibility: db.GroupVisibilityKindConnections,
 	})
 	if err != nil {
 		t.Fatalf("create group: %v", err)
@@ -285,6 +285,122 @@ func TestGroups_MemberRoleChangeRequiresManageRights(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("member self-promoting: expected 403, got %d", resp.StatusCode)
+	}
+}
+
+// TestGroups_ConnectionsVisibilityHonorsMutualFollows pins the gating
+// on the new 'connections' visibility: a stranger gets a 404 on the
+// detail page (and the group is hidden from the index), a one-way
+// follower also gets a 404, but a mutual follower of the owner can
+// see and read the group.
+func TestGroups_ConnectionsVisibilityHonorsMutualFollows(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "aliceconns", "aliceconns@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bobconns", "bobconns@example.com", "correct horse battery staple")
+	stranger := newClient(t)
+	signup(t, stranger, "stranger2", "stranger2@example.com", "correct horse battery staple")
+
+	group, err := testServer.queries.CreateGroup(t.Context(), db.CreateGroupParams{
+		Slug:       "salon-of-connections",
+		Name:       "Salon of Connections",
+		OwnerID:    aliceUser.ID,
+		Visibility: db.GroupVisibilityKindConnections,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := testServer.queries.AddGroupMember(t.Context(), db.AddGroupMemberParams{
+		GroupID: group.ID, UserID: aliceUser.ID, Role: db.GroupMemberRoleOwner,
+	}); err != nil {
+		t.Fatalf("seed owner: %v", err)
+	}
+
+	// Stranger has no follow link with alice — page must 404.
+	resp := get(t, stranger, "/groups/"+group.Slug)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("stranger seeing connections-only group: expected 404, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Bob follows alice, but she doesn't follow back — still not a
+	// connection (mutual), so still 404.
+	resp = formPost(t, bob, "/users/"+aliceUser.Username+"/follow", url.Values{})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("bob follow alice: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	resp = get(t, bob, "/groups/"+group.Slug)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("one-way follower seeing connections-only group: expected 404, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Alice follows bob back — now they are a mutual connection, so bob
+	// can read the page.
+	resp = formPost(t, alice, "/users/"+bobUser.Username+"/follow", url.Values{})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("alice follow bob: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	body := readBody(t, get(t, bob, "/groups/"+group.Slug))
+	if !strings.Contains(body, "Salon of Connections") {
+		t.Fatalf("connection should see group page; excerpt: %s", snippet(body))
+	}
+
+	// Index also reflects the gating: stranger's /groups page must not
+	// list the connections-only group.
+	body = readBody(t, get(t, stranger, "/groups"))
+	if strings.Contains(body, "Salon of Connections") {
+		t.Fatalf("/groups index leaked connections-only group to stranger; excerpt: %s", snippet(body))
+	}
+}
+
+// TestGroups_AdminCannotChangeVisibility pins the owner-only gate on the
+// settings handler: an admin can still save the member-list visibility,
+// but their visibility= field is silently ignored. Used to enforce that
+// audience-control stays with the owner alone.
+func TestGroups_AdminCannotChangeVisibility(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "aliceownr", "aliceownr@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bobadmin", "bobadmin@example.com", "correct horse battery staple")
+	slug, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleAdmin, "owner-only-vis")
+
+	// Bob (admin) tries to flip the group to public.
+	resp := formPost(t, bob, "/groups/"+slug+"/settings", url.Values{
+		"visibility":        {"public"},
+		"member_visibility": {"member"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("admin saving settings: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	got, err := testServer.queries.GetGroup(t.Context(), groupID)
+	if err != nil {
+		t.Fatalf("reload group: %v", err)
+	}
+	if got.Visibility != db.GroupVisibilityKindConnections {
+		t.Fatalf("admin should not be able to change visibility, got %s", got.Visibility)
+	}
+
+	// Owner can flip it.
+	resp = formPost(t, alice, "/groups/"+slug+"/settings", url.Values{
+		"visibility":        {"public"},
+		"member_visibility": {"member"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("owner saving settings: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	got, err = testServer.queries.GetGroup(t.Context(), groupID)
+	if err != nil {
+		t.Fatalf("reload group: %v", err)
+	}
+	if got.Visibility != db.GroupVisibilityKindPublic {
+		t.Fatalf("owner-set visibility should be public, got %s", got.Visibility)
 	}
 }
 

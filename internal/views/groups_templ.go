@@ -25,12 +25,26 @@ func groupVisibilityLabel(v db.GroupVisibilityKind) string {
 	switch v {
 	case db.GroupVisibilityKindPublic:
 		return "public"
-	case db.GroupVisibilityKindInvite:
-		return "invite-only"
-	case db.GroupVisibilityKindClosed:
-		return "closed"
+	case db.GroupVisibilityKindConnections:
+		return "connections only"
+	case db.GroupVisibilityKindPrivate:
+		return "private"
 	}
 	return string(v)
+}
+
+// groupVisibilityHelp returns the one-liner shown under the visibility
+// radios so the owner understands the audience effect of each option.
+func groupVisibilityHelp(v db.GroupVisibilityKind) string {
+	switch v {
+	case db.GroupVisibilityKindPublic:
+		return "Anyone can see and join the group."
+	case db.GroupVisibilityKindConnections:
+		return "Visible to your followers and connections; new members join by invite."
+	case db.GroupVisibilityKindPrivate:
+		return "Only members can see the group; new members join by invite."
+	}
+	return ""
 }
 
 func groupRoleLabel(r db.GroupMemberRole) string {
@@ -125,7 +139,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 					var templ_7745c5c3_Var3 templ.SafeURL
 					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + g.Slug))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 74, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 88, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 					if templ_7745c5c3_Err != nil {
@@ -138,7 +152,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 75, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 89, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -151,7 +165,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(groupVisibilityLabel(g.Visibility))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 76, Col: 65}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 90, Col: 65}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -174,7 +188,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(groupMemberCountLabel(g.MemberCount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 80, Col: 67}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 94, Col: 67}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -203,7 +217,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<label>Name <input type=\"text\" name=\"name\" required maxlength=\"80\" placeholder=\"Research circle\"></label> <label>Description <textarea name=\"description\" rows=\"3\" maxlength=\"600\"></textarea></label><fieldset class=\"toggle-group\"><legend>Visibility</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"public\"> <span class=\"material-symbols-outlined\">public</span> Public</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"invite\" checked> <span class=\"material-symbols-outlined\">mail</span> Invite-only</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"closed\"> <span class=\"material-symbols-outlined\">lock</span> Closed</label></div></fieldset><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Create group</button></div></form></section>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<label>Name <input type=\"text\" name=\"name\" required maxlength=\"80\" placeholder=\"Research circle\"></label> <label>Description <textarea name=\"description\" rows=\"3\" maxlength=\"600\"></textarea></label><fieldset class=\"toggle-group\"><legend>Visibility</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"public\"> <span class=\"material-symbols-outlined\">public</span> Public</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"connections\"> <span class=\"material-symbols-outlined\">group</span> Connections</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"private\" checked> <span class=\"material-symbols-outlined\">lock</span> Private</label></div></fieldset><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Create group</button></div></form></section>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -222,7 +236,7 @@ func GroupsIndex(viewer *Viewer, flash string, groups []db.ListVisibleGroupsRow)
 	})
 }
 
-func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage, canSeeMembers bool) templ.Component {
+func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.GroupMembership, members []db.ListGroupMembersRow, nodes []db.Node, canManage, canOwn, canSeeMembers bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -262,7 +276,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(groupVisibilityLabel(group.Visibility))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 137, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 151, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -280,7 +294,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(groupRoleLabel(membership.Role))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 139, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 153, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -298,7 +312,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(group.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 142, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 156, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -316,7 +330,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(group.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 144, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 158, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -339,7 +353,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var13 templ.SafeURL
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + group.Slug + "/join"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 148, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 162, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -366,7 +380,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var14 templ.SafeURL
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + group.Slug + "/leave"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 154, Col: 84}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 168, Col: 84}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -425,7 +439,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var15 templ.SafeURL
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + n.Slug))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 175, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 189, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -460,7 +474,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(string(n.Type))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 178, Col: 26}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 192, Col: 26}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 					if templ_7745c5c3_Err != nil {
@@ -473,7 +487,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var19 string
 					templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 180, Col: 38}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 194, Col: 38}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 					if templ_7745c5c3_Err != nil {
@@ -516,7 +530,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var20 templ.SafeURL
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/users/" + m.Username))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 197, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 211, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -537,7 +551,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var21 string
 					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(m.Username)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 199, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 213, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 					if templ_7745c5c3_Err != nil {
@@ -550,7 +564,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 					var templ_7745c5c3_Var22 string
 					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(groupRoleLabel(m.Role))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 200, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 214, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 					if templ_7745c5c3_Err != nil {
@@ -572,7 +586,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 						var templ_7745c5c3_Var23 templ.SafeURL
 						templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + group.Slug + "/members/" + m.ID.String() + "/delete"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 204, Col: 118}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 218, Col: 118}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 						if templ_7745c5c3_Err != nil {
@@ -613,7 +627,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var24 templ.SafeURL
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + group.Slug + "/members"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 217, Col: 85}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 231, Col: 85}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -634,7 +648,7 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				var templ_7745c5c3_Var25 templ.SafeURL
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + group.Slug + "/settings"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 230, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 244, Col: 86}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -648,65 +662,114 @@ func GroupDetail(viewer *Viewer, flash string, group db.Group, membership *db.Gr
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<fieldset class=\"toggle-group\"><legend>Member list visibility</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"member\"")
+				if canOwn {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<fieldset class=\"toggle-group\"><legend>Group visibility</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"public\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if group.Visibility == db.GroupVisibilityKindPublic {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, " checked")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "> <span class=\"material-symbols-outlined\">public</span> Public</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"connections\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if group.Visibility == db.GroupVisibilityKindConnections {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, " checked")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "> <span class=\"material-symbols-outlined\">group</span> Connections</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"visibility\" value=\"private\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if group.Visibility == db.GroupVisibilityKindPrivate {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " checked")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "> <span class=\"material-symbols-outlined\">lock</span> Private</label></div><small class=\"muted\" style=\"font-size: 12px;\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var26 string
+					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(groupVisibilityHelp(group.Visibility))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 266, Col: 93}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</small></fieldset>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "<fieldset class=\"toggle-group\"><legend>Member list visibility</legend><div class=\"toggle-btns\"><label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"member\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if group.MemberVisibility == db.GroupMemberRoleMember {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, " checked")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, " checked")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "> <span class=\"material-symbols-outlined\">groups</span> Members</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"editor\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "> <span class=\"material-symbols-outlined\">groups</span> Members</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"editor\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if group.MemberVisibility == db.GroupMemberRoleEditor {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, " checked")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, " checked")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "> <span class=\"material-symbols-outlined\">edit_note</span> Editors+</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"admin\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "> <span class=\"material-symbols-outlined\">edit_note</span> Editors+</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"admin\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if group.MemberVisibility == db.GroupMemberRoleAdmin {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " checked")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, " checked")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "> <span class=\"material-symbols-outlined\">shield_person</span> Admins+</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"owner\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "> <span class=\"material-symbols-outlined\">shield_person</span> Admins+</label> <label class=\"toggle-btn\"><input type=\"radio\" name=\"member_visibility\" value=\"owner\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if group.MemberVisibility == db.GroupMemberRoleOwner {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, " checked")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, " checked")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "> <span class=\"material-symbols-outlined\">key</span> Owner only</label></div><small class=\"muted\" style=\"font-size: 12px;\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "> <span class=\"material-symbols-outlined\">key</span> Owner only</label></div><small class=\"muted\" style=\"font-size: 12px;\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var26 string
-				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(memberVisibilityHelp(group.MemberVisibility))
+				var templ_7745c5c3_Var27 string
+				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(memberVisibilityHelp(group.MemberVisibility))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 256, Col: 99}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 293, Col: 99}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</small></fieldset><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Save settings</button></div></form></section>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</small></fieldset><div class=\"form-row\"><button type=\"submit\" class=\"btn accent\">Save settings</button></div></form></section>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -741,12 +804,12 @@ func memberRoleControls(slug, memberID string, current db.GroupMemberRole) templ
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var27 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var27 == nil {
-			templ_7745c5c3_Var27 = templ.NopComponent
+		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var28 == nil {
+			templ_7745c5c3_Var28 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<div class=\"row gap-4 wrap\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<div class=\"row gap-4 wrap\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -762,7 +825,7 @@ func memberRoleControls(slug, memberID string, current db.GroupMemberRole) templ
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -786,25 +849,25 @@ func memberRoleButton(slug, memberID string, role db.GroupMemberRole, value stri
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var28 == nil {
-			templ_7745c5c3_Var28 = templ.NopComponent
+		templ_7745c5c3_Var29 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var29 == nil {
+			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var29 templ.SafeURL
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + slug + "/members/" + memberID + "/role"))
+		var templ_7745c5c3_Var30 templ.SafeURL
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/groups/" + slug + "/members/" + memberID + "/role"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 282, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 319, Col: 97}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "\" class=\"inline\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" class=\"inline\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -812,61 +875,61 @@ func memberRoleButton(slug, memberID string, role db.GroupMemberRole, value stri
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<input type=\"hidden\" name=\"role\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<input type=\"hidden\" name=\"role\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(value)
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 284, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 321, Col: 48}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if role == current {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<button type=\"submit\" class=\"btn ghost sm\" disabled aria-pressed=\"true\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(value)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 286, Col: 82}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</button>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<button type=\"submit\" class=\"btn ghost sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "<button type=\"submit\" class=\"btn ghost sm\" disabled aria-pressed=\"true\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 288, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 323, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</button>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<button type=\"submit\" class=\"btn ghost sm\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var33 string
+			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(value)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/groups.templ`, Line: 325, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "</form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "</form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

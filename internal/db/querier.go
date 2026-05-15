@@ -21,6 +21,12 @@ type Querier interface {
 	// True when `viewer` is permitted to create an edge touching `node` under
 	// its link_policy.
 	CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error)
+	// Single-group visibility probe used by resolveGroup() to gate the
+	// detail page for non-public groups. Mirrors the visibility branches
+	// in ListVisibleGroups: members always pass, connections groups pass
+	// when viewer mutually follows the owner, private groups require
+	// membership.
+	CanViewGroup(ctx context.Context, arg CanViewGroupParams) (bool, error)
 	CanViewNode(ctx context.Context, arg CanViewNodeParams) (bool, error)
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
@@ -180,6 +186,13 @@ type Querier interface {
 	// the canonical hierarchy link; node_visible_to() keeps group/list/private
 	// child views hidden from viewers outside their audience.
 	ListViewsForTopic(ctx context.Context, arg ListViewsForTopicParams) ([]ListViewsForTopicRow, error)
+	// Three visibility branches:
+	//   public       — visible to everyone (the public/anon visitor included)
+	//   connections  — visible to the owner's mutual followers + members
+	//   private      — visible only to members
+	// The viewer_role / is_member columns power the badge/CTA logic in the
+	// groups index; member_count is a per-row aggregate so we don't need a
+	// separate hit per group.
 	ListVisibleGroups(ctx context.Context, viewerID *uuid.UUID) ([]ListVisibleGroupsRow, error)
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
@@ -190,6 +203,11 @@ type Querier interface {
 	// pg_trgm operators take plain text, no query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
+	// Trigram fuzzy match against the group name. Mirrors SearchUsers but
+	// additionally gates each row by the viewer's right to see the group
+	// (see ListVisibleGroups for the visibility branches). The %> threshold
+	// is the same one the picker uses elsewhere (set in pgxpool.AfterConnect).
+	SearchGroups(ctx context.Context, arg SearchGroupsParams) ([]SearchGroupsRow, error)
 	// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
 	// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
 	// title catches typos and partial words ("nucear" → "Nuclear"). A row
@@ -232,6 +250,9 @@ type Querier interface {
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
 	UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error
+	// Owner-only — the handler enforces that. Stored as the same enum the
+	// create form populates: 'public' | 'connections' | 'private'.
+	UpdateGroupVisibility(ctx context.Context, arg UpdateGroupVisibilityParams) error
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdatePasswordIdentitySecret(ctx context.Context, arg UpdatePasswordIdentitySecretParams) error
 	// Keeps the password identity's subject (an email mirror) aligned with the

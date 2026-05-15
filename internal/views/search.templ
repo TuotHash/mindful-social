@@ -25,6 +25,18 @@ type UserSearchHit struct {
 	Username string
 }
 
+// GroupSearchHit is one community result on the /search page. Visibility
+// drives the badge label so members can spot connections-only or private
+// groups they already belong to.
+type GroupSearchHit struct {
+	ID          uuid.UUID
+	Slug        string
+	Name        string
+	Description string
+	Visibility  db.GroupVisibilityKind
+	MemberCount int64
+}
+
 // ExcerptPart is one chunk of a search result's body excerpt. Match=true
 // segments are wrapped in <mark> at render time.
 type ExcerptPart struct {
@@ -32,7 +44,7 @@ type ExcerptPart struct {
 	Match bool
 }
 
-templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSearchHit) {
+templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSearchHit, groups []GroupSearchHit) {
 	@Layout("Search", viewer) {
 		<div class="page medium">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -40,13 +52,13 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSear
 				<h1 class="h-1">Search the graph</h1>
 			</div>
 			<form method="get" action="/search" class="search-form">
-				<input type="search" name="q" value={ q } placeholder="search people, node titles, and bodies..."/>
+				<input type="search" name="q" value={ q } placeholder="search people, groups, node titles, and bodies..."/>
 				<button type="submit" class="btn accent">Search</button>
 			</form>
 			if q == "" {
-				<p class="muted">Type a query above to search people, node titles, and bodies.</p>
+				<p class="muted">Type a query above to search people, groups, node titles, and bodies.</p>
 			}
-			if isQueryWithNoHits(q, hits, users) {
+			if isQueryWithNoHits(q, hits, users, groups) {
 				<div class="card muted" style="text-align: center; padding: 24px;">{ noMatchesPhrase(q) }</div>
 			}
 			if q != "" && len(users) > 0 {
@@ -55,6 +67,16 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSear
 					<ul class="search-results">
 						for _, u := range users {
 							@userSearchHitItem(u)
+						}
+					</ul>
+				</section>
+			}
+			if q != "" && len(groups) > 0 {
+				<section class="search-section">
+					<h2>Groups</h2>
+					<ul class="search-results">
+						for _, g := range groups {
+							@groupSearchHitItem(g)
 						}
 					</ul>
 				</section>
@@ -72,6 +94,19 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSear
 			}
 		</div>
 	}
+}
+
+templ groupSearchHitItem(g GroupSearchHit) {
+	<li>
+		<a href={ templ.SafeURL("/groups/" + g.Slug) } class="search-hit">
+			<span class="title">{ g.Name }</span>
+			<span class="badge">{ groupVisibilityLabel(g.Visibility) }</span>
+			<span class="muted">{ groupMemberCountLabel(g.MemberCount) }</span>
+		</a>
+		if g.Description != "" {
+			<p class="search-excerpt"><span>{ g.Description }</span></p>
+		}
+	</li>
 }
 
 templ userSearchHitItem(u UserSearchHit) {
@@ -117,8 +152,8 @@ templ searchExcerpt(parts []ExcerptPart) {
 	}
 }
 
-func isQueryWithNoHits(q string, hits []SearchHit, users []UserSearchHit) bool {
-	return q != "" && len(hits) == 0 && len(users) == 0
+func isQueryWithNoHits(q string, hits []SearchHit, users []UserSearchHit, groups []GroupSearchHit) bool {
+	return q != "" && len(hits) == 0 && len(users) == 0 && len(groups) == 0
 }
 
 // resultsForPhrase returns "N results for QUERY" — folded into one Go
