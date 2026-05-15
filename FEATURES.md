@@ -41,7 +41,8 @@ Edge highlighting marks key reasoning inline on the node page.
 
 - Wiki-open: any user with the required action-policy level can edit a node.
 - Clean deletes — no soft-delete. A confirmation step shows what cascades before committing.
-- Parent-topic enforcement: every non-topic node attaches to a topic so the graph stays rooted.
+- Parent enforcement: views attach to a topic, findings attach to a view or another finding. Constraints are enforced at the schema level.
+- Findings are created inline from the **Connect** form on any view or finding — the source node becomes the parent and the chosen edge kind makes the link.
 
 ---
 
@@ -86,7 +87,7 @@ Child nodes inherit the parent's restrictions — a child cannot be more open th
 
 - Users pin themselves to a view with a three-way stance: **Support**, **Oppose**, or **Feature**.
 - Topics can only be Featured (support/oppose don't apply to grouping nodes).
-- Multiple finding nodes can be attached to a pin to show the user's reasoning.
+- Pins record stance only — reasoning lives in the typed-edge graph: use **Connect** to add a finding off a view.
 - Pins are displayed on public user profiles.
 
 ### Home Feed

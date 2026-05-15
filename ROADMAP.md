@@ -8,12 +8,6 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 ### Node Hierarchy Polish
 
-- **Re-enable inline finding creation in the Connect menu** — today findings can only be created via the pin form's picker. Putting "create a new finding" back into the Connect flow makes the typed-edge graph the primary way to attach evidence.
-
-- **Simplify the pin form** — drop the finding picker so pinning is a simple three-way stance: Support, Oppose, or Feature. Findings stay first-class graph nodes attached through edges.
-
-- **Parent enforcement for findings** — view → topic is already enforced at creation. Extend the same rule so findings must declare a parent view or finding at creation.
-
 - **Featured topic bundles** *(deferred)* — surface a whole topic together with its key views and findings as a single unit. Individual nodes can still be featured standalone; the bundle is an additive display mode on top.
 
 ---
@@ -85,11 +79,11 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
 
-- **Argument graph** — topics, views, findings; typed directed edges; parent-topic enforcement; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
+- **Argument graph** — topics, views, findings; typed directed edges; parent enforcement (views need a topic, findings need a view or another finding); inline finding creation from the Connect form; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
 - **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode.
 - **Discussion** — view comment threads with one-level replies; author edit and soft-delete; visibility inherits from the parent view.
 - **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
-- **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, pins with finding attachments, home feed, public profiles; author bylines on node detail, home feed, and search results.
+- **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, stance-only pins (Support/Oppose/Feature), home feed, public profiles; author bylines on node detail, home feed, and search results.
 - **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
 - **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection.
 - **Administration & moderation** — role-based access, admin UI, `ADMIN_USERS` bootstrap; staff can delete any node and change visibility on any node.
