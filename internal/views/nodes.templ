@@ -1023,7 +1023,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 		</div>
 		<small class="muted" style="font-size: 12px;">How the source relates to the target — supports backs it, opposes argues against, and related is for everything else (citations, clarifications, loose links).</small>
 	</fieldset>
-	<fieldset class="toggle-group">
+	<fieldset class="toggle-group edge-target-mode">
 		<legend>Target</legend>
 		<div class="toggle-btns">
 			<label class="toggle-btn" data-to-mode="existing">
@@ -1039,22 +1039,24 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 		</div>
 		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new finding attached to this one. The new finding inherits visibility from this node.</small>
 	</fieldset>
-	<label>
-		Find target node
-		<input
-			type="search"
-			name="find"
-			value={ find }
-			placeholder="search by title or body…"
-			hx-get={ "/nodes/" + fromNode.Slug + "/edges/picker" }
-			hx-trigger="input changed delay:200ms, search"
-			hx-target="#picker-target"
-			hx-swap="outerHTML"
-		/>
-		<small>Used when target is "Existing node". Results update as you type.</small>
-	</label>
-	@CandidatePicker(find, candidates)
-	<label>
+	<div class="edge-target-existing">
+		<label>
+			Find target node
+			<input
+				type="search"
+				name="find"
+				value={ find }
+				placeholder="search by title or body…"
+				hx-get={ "/nodes/" + fromNode.Slug + "/edges/picker" }
+				hx-trigger="input changed delay:200ms, search"
+				hx-target="#picker-target"
+				hx-swap="outerHTML"
+			/>
+			<small>Results update as you type.</small>
+		</label>
+		@CandidatePicker(find, candidates)
+	</div>
+	<label class="edge-target-new">
 		New finding title
 		<input
 			type="text"
@@ -1063,7 +1065,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 			maxlength="200"
 			placeholder="e.g. The 2023 IPCC synthesis report"
 		/>
-		<small>Used when target is "New finding". The finding is created with this title and attached by the chosen relationship kind.</small>
+		<small>The finding is created with this title and attached by the chosen relationship kind.</small>
 	</label>
 }
 

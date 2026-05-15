@@ -2563,17 +2563,7 @@ fieldset.toggle-group legend {
   color: white;
   border-color: var(--opposes);
 }
-.toggle-btn[data-edge-kind="refines"]:has(input:checked) {
-  background: var(--refines);
-  color: white;
-  border-color: var(--refines);
-}
-.toggle-btn[data-edge-kind="cites"]:has(input:checked) {
-  background: var(--cites);
-  color: white;
-  border-color: var(--cites);
-}
-.toggle-btn[data-edge-kind="relates_to"]:has(input:checked) {
+.toggle-btn[data-edge-kind="related"]:has(input:checked) {
   background: var(--relates);
   color: var(--text);
   border-color: var(--relates);
@@ -2609,6 +2599,16 @@ fieldset.toggle-group legend {
     input[name="topic_parent_mode"][value="root"]:checked
   )
   .topic-picker-section {
+  display: none;
+}
+
+/* Connect form: show the search picker only when target=existing, and the
+   new-finding title input only when target=new. The user's selected toggle
+   drives which input is visible without any JS. */
+form:has(input[name="to_mode"][value="existing"]:checked) .edge-target-new {
+  display: none;
+}
+form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   display: none;
 }
 
