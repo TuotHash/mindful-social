@@ -2,9 +2,8 @@
 
 A community platform for respectful, mindful conversations. Combines free-form
 discussion with a structured **argument graph**: typed nodes (Topic / View /
-Finding) connected by typed edges (supports / opposes / refines / cites /
-relates_to). Users commit to views and attach findings that explain their
-thinking.
+Finding) connected by typed edges (supports / opposes / related). Users
+commit to views and attach findings that explain their thinking.
 
 > **Status:** v1.0.0-alpha — argument graph, social layer, and groups are live;
 > threads, voting, and graph visualisation are on the roadmap.
@@ -98,11 +97,10 @@ nix/module.nix      NixOS module (systemd service + optional Postgres)
   `finding`. Bodies are written in Markdown. Free-form `tags` add cross-cutting
   grouping without bloating the type system.
 - **Edge** — directed, typed link between two nodes. `kind` is one of
-  `supports`, `opposes`, `refines`, `cites`, `relates_to`. Edges can be
-  highlighted to surface key reasoning inline.
+  `supports`, `opposes`, `related`. Edges can be highlighted to surface key
+  reasoning inline.
 - **Pin** — a user committing to a View with a three-way stance (Support /
-  Oppose / Feature), optionally with Finding nodes that explain their reasoning.
-  Displayed on their public profile.
+  Oppose / Feature). Displayed on their public profile.
 - **Follow / Connection** — users follow each other one-way; mutual follows
   automatically become *connections* (mutuals).
 - **Audience list** — a named set of users the author curates for fine-grained

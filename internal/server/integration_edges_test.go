@@ -136,7 +136,7 @@ func TestEdgeCreate_InlineFindingCreatesFindingAndEdge(t *testing.T) {
 	}
 
 	// The new finding exists, is a finding, and is parented to the source.
-	// The source view also carries an auto-created relates_to edge to its
+	// The source view also carries an auto-created related edge to its
 	// parent topic (set up by createNode for view-type seeds), so we look
 	// for the supports edge specifically.
 	rows, err := testServer.queries.ListEdgesFromNodeForViewer(t.Context(), db.ListEdgesFromNodeForViewerParams{

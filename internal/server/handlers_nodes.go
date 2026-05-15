@@ -313,7 +313,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		if _, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
 			FromNode:  node.ID,
 			ToNode:    parentTopicID,
-			Kind:      db.EdgeKindRelatesTo,
+			Kind:      db.EdgeKindRelated,
 			CreatedBy: user.ID,
 		}); err != nil {
 			s.logger.Error("create node: parent topic edge", "err", err)
@@ -1066,7 +1066,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // edgeOrder fixes the canonical kind sequence for the legend and pins active
-// vs. passive labels for each kind. relates_to is symmetric so its passive
+// vs. passive labels for each kind. 'related' is symmetric so its passive
 // form matches its active one and the two directions render in a single bucket.
 var edgeOrder = []struct {
 	kind         db.EdgeKind
@@ -1075,15 +1075,13 @@ var edgeOrder = []struct {
 }{
 	{db.EdgeKindSupports, "Supports", "Supported by"},
 	{db.EdgeKindOpposes, "Opposes", "Opposed by"},
-	{db.EdgeKindRefines, "Refines", "Refined by"},
-	{db.EdgeKindCites, "Cites", "Cited by"},
-	{db.EdgeKindRelatesTo, "Relates to", "Relates to"},
+	{db.EdgeKindRelated, "Related", "Related"},
 }
 
 // displayGroups combines outgoing and incoming edges into one ordered list
 // of legend sections. For asymmetric kinds the two directions become two
 // separate sections with active and passive labels ("Supports" /
-// "Supported by"). For relates_to (symmetric) both directions merge into a
+// "Supported by"). For 'related' (symmetric) both directions merge into a
 // single "Relates to" section. Featured outgoing edges are excluded — they
 // render inline in the "Key findings" section above the legend.
 func displayGroups(out []db.ListEdgesFromNodeForViewerRow, in []db.ListEdgesToNodeForViewerRow) []views.EdgeGroup {
@@ -1092,7 +1090,7 @@ func displayGroups(out []db.ListEdgesFromNodeForViewerRow, in []db.ListEdgesToNo
 		outRows := outgoingRowsOfKind(out, ek.kind)
 		inRows := incomingRowsOfKind(in, ek.kind)
 
-		if ek.kind == db.EdgeKindRelatesTo {
+		if ek.kind == db.EdgeKindRelated {
 			merged := append(append([]views.EdgeRow{}, outRows...), inRows...)
 			if len(merged) > 0 {
 				groups = append(groups, views.EdgeGroup{

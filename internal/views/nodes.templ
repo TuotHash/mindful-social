@@ -1015,23 +1015,13 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 				<span class="material-symbols-outlined">thumb_down</span>
 				Opposes
 			</label>
-			<label class="toggle-btn" data-edge-kind="refines">
-				<input type="radio" name="kind" value="refines" checked?={ formKind == "refines" }/>
-				<span class="material-symbols-outlined">tune</span>
-				Refines
-			</label>
-			<label class="toggle-btn" data-edge-kind="cites">
-				<input type="radio" name="kind" value="cites" checked?={ formKind == "cites" }/>
-				<span class="material-symbols-outlined">format_quote</span>
-				Cites
-			</label>
-			<label class="toggle-btn" data-edge-kind="relates_to">
-				<input type="radio" name="kind" value="relates_to" checked?={ formKind == "relates_to" }/>
+			<label class="toggle-btn" data-edge-kind="related">
+				<input type="radio" name="kind" value="related" checked?={ formKind == "related" }/>
 				<span class="material-symbols-outlined">link</span>
-				Relates to
+				Related
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">How the source relates to the target — supports backs it, opposes argues against, refines clarifies, cites references, relates_to is a loose link.</small>
+		<small class="muted" style="font-size: 12px;">How the source relates to the target — supports backs it, opposes argues against, and related is for everything else (citations, clarifications, loose links).</small>
 	</fieldset>
 	<fieldset class="toggle-group">
 		<legend>Target</legend>

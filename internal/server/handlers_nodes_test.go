@@ -79,28 +79,28 @@ func TestDisplayGroups_incomingOnly_assignsPassiveLabel(t *testing.T) {
 }
 
 func TestDisplayGroups_outgoingAndIncoming_sameKind_yieldsTwoGroups(t *testing.T) {
-	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "T")}
-	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindRefines, uuid.New(), db.NodeTypeView, "V")}
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeTopic, "T")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindSupports, uuid.New(), db.NodeTypeView, "V")}
 	groups := displayGroups(out, in)
 
 	if len(groups) != 2 {
 		t.Fatalf("want 2 groups (active + passive), got %d", len(groups))
 	}
-	if groups[0].Label != "Refines" || groups[1].Label != "Refined by" {
-		t.Fatalf("labels = [%q, %q], want [%q, %q]", groups[0].Label, groups[1].Label, "Refines", "Refined by")
+	if groups[0].Label != "Supports" || groups[1].Label != "Supported by" {
+		t.Fatalf("labels = [%q, %q], want [%q, %q]", groups[0].Label, groups[1].Label, "Supports", "Supported by")
 	}
 }
 
-func TestDisplayGroups_relatesTo_mergesIntoOneBucket(t *testing.T) {
-	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "A")}
-	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindRelatesTo, uuid.New(), db.NodeTypeView, "B")}
+func TestDisplayGroups_related_mergesIntoOneBucket(t *testing.T) {
+	out := []db.ListEdgesFromNodeForViewerRow{makeOut(db.EdgeKindRelated, nil, uuid.New(), db.NodeTypeView, "A")}
+	in := []db.ListEdgesToNodeForViewerRow{makeIn(db.EdgeKindRelated, uuid.New(), db.NodeTypeView, "B")}
 	groups := displayGroups(out, in)
 
 	if len(groups) != 1 {
 		t.Fatalf("want 1 merged group, got %d", len(groups))
 	}
-	if groups[0].Label != "Relates to" {
-		t.Fatalf("label = %q, want %q", groups[0].Label, "Relates to")
+	if groups[0].Label != "Related" {
+		t.Fatalf("label = %q, want %q", groups[0].Label, "Related")
 	}
 	if len(groups[0].Rows) != 2 {
 		t.Fatalf("merged rows = %d, want 2", len(groups[0].Rows))
@@ -132,16 +132,14 @@ func TestDisplayGroups_featuredOutgoing_excludedFromLegend(t *testing.T) {
 
 func TestDisplayGroups_kindOrderingIsCanonical(t *testing.T) {
 	out := []db.ListEdgesFromNodeForViewerRow{
-		makeOut(db.EdgeKindRelatesTo, nil, uuid.New(), db.NodeTypeView, "rel"),
-		makeOut(db.EdgeKindCites, nil, uuid.New(), db.NodeTypeFinding, "cite"),
+		makeOut(db.EdgeKindRelated, nil, uuid.New(), db.NodeTypeView, "rel"),
 		makeOut(db.EdgeKindSupports, nil, uuid.New(), db.NodeTypeFinding, "sup"),
-		makeOut(db.EdgeKindRefines, nil, uuid.New(), db.NodeTypeTopic, "ref"),
 		makeOut(db.EdgeKindOpposes, nil, uuid.New(), db.NodeTypeView, "opp"),
 	}
 	groups := displayGroups(out, nil)
 
 	wantOrder := []db.EdgeKind{
-		db.EdgeKindSupports, db.EdgeKindOpposes, db.EdgeKindRefines, db.EdgeKindCites, db.EdgeKindRelatesTo,
+		db.EdgeKindSupports, db.EdgeKindOpposes, db.EdgeKindRelated,
 	}
 	if len(groups) != len(wantOrder) {
 		t.Fatalf("want %d groups, got %d", len(wantOrder), len(groups))

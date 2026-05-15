@@ -15,11 +15,9 @@ import (
 type EdgeKind string
 
 const (
-	EdgeKindSupports  EdgeKind = "supports"
-	EdgeKindOpposes   EdgeKind = "opposes"
-	EdgeKindRefines   EdgeKind = "refines"
-	EdgeKindCites     EdgeKind = "cites"
-	EdgeKindRelatesTo EdgeKind = "relates_to"
+	EdgeKindSupports EdgeKind = "supports"
+	EdgeKindOpposes  EdgeKind = "opposes"
+	EdgeKindRelated  EdgeKind = "related"
 )
 
 func (e *EdgeKind) Scan(src interface{}) error {
@@ -61,9 +59,7 @@ func (e EdgeKind) Valid() bool {
 	switch e {
 	case EdgeKindSupports,
 		EdgeKindOpposes,
-		EdgeKindRefines,
-		EdgeKindCites,
-		EdgeKindRelatesTo:
+		EdgeKindRelated:
 		return true
 	}
 	return false

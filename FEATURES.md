@@ -10,7 +10,7 @@ Current feature set as of v1.0.0-alpha (May 2026).
 
 - **Topic** — root node; the subject around which views and findings are organised.
 - **View** — a stance or position inside a topic's discussion.
-- **Finding** — a claim, argument, or cited source that supports, opposes, or refines a view or another finding.
+- **Finding** — a claim, argument, or cited source that supports, opposes, or is related to a view or another finding.
 
 ### Edges
 
@@ -20,9 +20,7 @@ Directed, typed connections between nodes:
 |------|---------|
 | `supports` | source argues in favour of target |
 | `opposes` | source argues against target |
-| `refines` | source sharpens or qualifies target |
-| `cites` | source references an external source (findings only) |
-| `relates_to` | loose topical connection |
+| `related` | loose link, citation, or clarification — everything that isn't a stance |
 
 Edge highlighting marks key reasoning inline on the node page.
 
