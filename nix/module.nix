@@ -99,6 +99,37 @@ in {
       '';
     };
 
+    nodeImage = {
+      maxUploadBytes = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 8 * 1024 * 1024;
+        description = ''
+          Raw request-body ceiling (in bytes) for node image uploads,
+          enforced before decoding. Anything larger is rejected with
+          HTTP 413.
+        '';
+      };
+
+      maxDimension = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 1920;
+        description = ''
+          Longest side, in pixels, of stored node images. Inputs larger
+          than this are downscaled while preserving aspect ratio.
+        '';
+      };
+
+      bytesPerMegapixel = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 500 * 1024;
+        description = ''
+          Target post-compression byte budget per megapixel. The JPEG
+          encoder walks its quality ladder until the resized image fits
+          this budget. GIFs bypass recompression to preserve animation.
+        '';
+      };
+    };
+
     database = {
       createLocally = lib.mkOption {
         type = lib.types.bool;
@@ -172,6 +203,9 @@ in {
         LOG_LEVEL = cfg.logLevel;
         PUBLIC_BASE_URL = cfg.publicBaseURL;
         SIGNUP_ENABLED = if cfg.signupEnabled then "true" else "false";
+        NODE_IMAGE_MAX_UPLOAD_BYTES = toString cfg.nodeImage.maxUploadBytes;
+        NODE_IMAGE_MAX_DIMENSION = toString cfg.nodeImage.maxDimension;
+        NODE_IMAGE_BYTES_PER_MEGAPIXEL = toString cfg.nodeImage.bytesPerMegapixel;
         # Matches StateDirectory below. systemd creates and owns this
         # path, so it's the one place the sandboxed unit can write.
         DATA_DIR = "/var/lib/mindful-social";
