@@ -1089,7 +1089,6 @@ templ NodeDelete(viewer *Viewer, node db.Node, edgeCount, otherPinCount int64) {
 			<ul class="muted" style="margin: 0 0 24px; padding-left: 20px; line-height: 1.7;">
 				<li>{ cascadeEdgeLabel(edgeCount) } will be removed.</li>
 				<li>{ cascadePinLabel(otherPinCount) }</li>
-				<li>Findings attached to other users' pins will detach (the pins survive without a finding).</li>
 				<li>Tags lose their link to this node, but the tags themselves remain.</li>
 			</ul>
 			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="form">
