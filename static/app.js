@@ -596,6 +596,8 @@
 
       var search = graph.querySelector("[data-graph-search]");
       var typeInputs = Array.from(graph.querySelectorAll("[data-graph-type]"));
+      var depthInput = graph.querySelector("[data-graph-depth]");
+      var depthValueEl = graph.querySelector("[data-graph-depth-value]");
       var visibleCount = graph.querySelector("[data-graph-visible-count]");
       var titleEl = graph.querySelector("[data-graph-title]");
       var metaEl = graph.querySelector("[data-graph-meta]");
@@ -657,12 +659,21 @@
         return ((search && search.value) || "").trim().toLowerCase();
       }
 
+      // currentDepth reads the connection-depth slider — the number of
+      // extra hops to include around each direct match. Default 2 keeps
+      // a node's neighbours and their neighbours visible without dragging
+      // in distant subgraphs the user didn't search for.
+      function currentDepth() {
+        if (!depthInput) return 2;
+        var v = parseInt(depthInput.value, 10);
+        if (isNaN(v) || v < 0) return 0;
+        return v;
+      }
+
       function filteredNodes() {
         var active = activeTypes();
         var query = currentQuery();
         var textFilter = !!(query && query !== serverQuery);
-        var direct = {};
-        var keep = {};
 
         if (!textFilter) {
           return data.nodes.filter(function (node) {
@@ -670,20 +681,36 @@
           });
         }
 
+        // Seed the BFS with direct matches that pass the type filter.
+        // Inactive-type nodes can never be direct matches, but the BFS
+        // expansion below ignores type so a path through a hidden node
+        // still reaches the visible side of the graph.
+        var keep = {};
+        var frontier = [];
         data.nodes.forEach(function (node) {
           if (!active[node.type]) return;
           if (matchesQuery(node, query)) {
-            direct[node.id] = true;
             keep[node.id] = true;
+            frontier.push(node.id);
           }
         });
 
-        edges.forEach(function (edge) {
-          if (direct[edge.from] || direct[edge.to]) {
-            keep[edge.from] = true;
-            keep[edge.to] = true;
+        var depth = currentDepth();
+        for (var hop = 0; hop < depth && frontier.length > 0; hop++) {
+          var next = [];
+          for (var i = 0; i < frontier.length; i++) {
+            var neighbors = adjacency[frontier[i]];
+            if (!neighbors) continue;
+            var ids = Object.keys(neighbors);
+            for (var j = 0; j < ids.length; j++) {
+              var nid = ids[j];
+              if (keep[nid]) continue;
+              keep[nid] = true;
+              next.push(nid);
+            }
           }
-        });
+          frontier = next;
+        }
 
         return data.nodes.filter(function (node) {
           if (!active[node.type]) return false;
@@ -995,6 +1022,17 @@
       typeInputs.forEach(function (input) {
         input.addEventListener("change", renderFromFilter);
       });
+
+      function syncDepthDisplay() {
+        if (depthValueEl) depthValueEl.textContent = String(currentDepth());
+      }
+      if (depthInput) {
+        syncDepthDisplay();
+        depthInput.addEventListener("input", function () {
+          syncDepthDisplay();
+          render();
+        });
+      }
 
       graph.querySelectorAll("[data-graph-zoom]").forEach(function (button) {
         button.addEventListener("click", function () {

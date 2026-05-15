@@ -79,6 +79,19 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q string) {
 							Finding
 						</label>
 					</fieldset>
+					<label class="argument-graph-depth" title="How many extra hops of connected nodes to include around each match.">
+						<span class="argument-graph-depth-label">Depth</span>
+						<input
+							type="range"
+							min="0"
+							max="5"
+							step="1"
+							value="2"
+							data-graph-depth
+							aria-label="Levels of connections shown around each match"
+						/>
+						<span class="argument-graph-depth-value" data-graph-depth-value aria-live="polite">2</span>
+					</label>
 					<div class="argument-graph-zoom" aria-label="Graph zoom controls">
 						<button type="button" class="btn ghost sm" data-graph-zoom="out" title="Zoom out" aria-label="Zoom out">
 							<span class="material-symbols-outlined">remove</span>

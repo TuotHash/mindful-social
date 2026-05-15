@@ -1733,6 +1733,62 @@ label.field {
   opacity: 0.55;
 }
 
+.argument-graph-depth {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-1);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.argument-graph-depth-label {
+  color: var(--text-muted);
+}
+
+.argument-graph-depth input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  outline: none;
+  cursor: pointer;
+}
+.argument-graph-depth input[type="range"]:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+.argument-graph-depth input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--accent-strong, var(--accent));
+  cursor: pointer;
+}
+.argument-graph-depth input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--accent-strong, var(--accent));
+  cursor: pointer;
+}
+
+.argument-graph-depth-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-width: 1.4em;
+  text-align: right;
+}
+
 .argument-graph-zoom {
   display: inline-flex;
   align-items: center;
@@ -1941,9 +1997,14 @@ label.field {
     flex-direction: column;
   }
   .argument-graph-types,
-  .argument-graph-zoom {
+  .argument-graph-zoom,
+  .argument-graph-depth {
     width: 100%;
     flex-wrap: wrap;
+  }
+  .argument-graph-depth input[type="range"] {
+    flex: 1;
+    min-width: 0;
   }
   .argument-graph-zoom {
     border-left: 0;
