@@ -117,12 +117,25 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 	publicNode := createNodeForUser(t, alice.ID, db.NodeTypeView, "Pin visible to everyone", db.VisibilityKindPublic, nil)
 	privateNode := createNodeForUser(t, alice.ID, db.NodeTypeView, "Pin visible only to Alice", db.VisibilityKindPrivate, nil)
 	connectionsNode := createNodeForUser(t, alice.ID, db.NodeTypeView, "Pin visible to connections", db.VisibilityKindConnections, nil)
-	trusted, err := testServer.queries.GetTrustedList(t.Context(), alice.ID)
+	group, err := testServer.queries.CreateGroup(t.Context(), db.CreateGroupParams{
+		Slug:        "test-pins-" + uuid.NewString()[:8],
+		Name:        "Profile pin audience",
+		Description: "",
+		OwnerID:     alice.ID,
+		Visibility:  db.GroupVisibilityKindClosed,
+	})
 	if err != nil {
-		t.Fatalf("get trusted list: %v", err)
+		t.Fatalf("create group: %v", err)
 	}
-	listNode := createNodeForUser(t, alice.ID, db.NodeTypeView, "Pin visible to list members", db.VisibilityKindList, &trusted.ID)
-	for _, nodeID := range []uuid.UUID{publicNode, privateNode, connectionsNode, listNode} {
+	if err := testServer.queries.AddGroupMember(t.Context(), db.AddGroupMemberParams{
+		GroupID: group.ID,
+		UserID:  alice.ID,
+		Role:    db.GroupMemberRoleOwner,
+	}); err != nil {
+		t.Fatalf("add owner to group: %v", err)
+	}
+	groupNode := createNodeForUser(t, alice.ID, db.NodeTypeView, "Pin visible to group members", db.VisibilityKindGroup, &group.ID)
+	for _, nodeID := range []uuid.UUID{publicNode, privateNode, connectionsNode, groupNode} {
 		if _, err := testServer.queries.SetPin(t.Context(), db.SetPinParams{
 			UserID: alice.ID,
 			NodeID: nodeID,
@@ -136,8 +149,8 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 	signup(t, unrelatedClient, "bob", "bob@example.com", "correct horse battery staple")
 	connectionClient := newClient(t)
 	connection := signupAndGetUser(t, connectionClient, "carol", "carol@example.com", "correct horse battery staple")
-	listClient := newClient(t)
-	listMember := signupAndGetUser(t, listClient, "dave", "dave@example.com", "correct horse battery staple")
+	groupClient := newClient(t)
+	groupMember := signupAndGetUser(t, groupClient, "dave", "dave@example.com", "correct horse battery staple")
 
 	for _, follow := range []db.CreateFollowParams{
 		{FollowerID: connection.ID, FollowedID: alice.ID},
@@ -147,11 +160,12 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 			t.Fatalf("create follow: %v", err)
 		}
 	}
-	if err := testServer.queries.AddListMember(t.Context(), db.AddListMemberParams{
-		ListID:       trusted.ID,
-		MemberUserID: listMember.ID,
+	if err := testServer.queries.AddGroupMember(t.Context(), db.AddGroupMemberParams{
+		GroupID: group.ID,
+		UserID:  groupMember.ID,
+		Role:    db.GroupMemberRoleMember,
 	}); err != nil {
-		t.Fatalf("add list member: %v", err)
+		t.Fatalf("add group member: %v", err)
 	}
 
 	cases := []struct {
@@ -164,30 +178,30 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 			name: "anonymous",
 			c:    newClient(t),
 			want: []string{"Pin visible to everyone"},
-			hide: []string{"Pin visible only to Alice", "Pin visible to connections", "Pin visible to list members"},
+			hide: []string{"Pin visible only to Alice", "Pin visible to connections", "Pin visible to group members"},
 		},
 		{
 			name: "unrelated",
 			c:    unrelatedClient,
 			want: []string{"Pin visible to everyone"},
-			hide: []string{"Pin visible only to Alice", "Pin visible to connections", "Pin visible to list members"},
+			hide: []string{"Pin visible only to Alice", "Pin visible to connections", "Pin visible to group members"},
 		},
 		{
 			name: "connection",
 			c:    connectionClient,
 			want: []string{"Pin visible to everyone", "Pin visible to connections"},
-			hide: []string{"Pin visible only to Alice", "Pin visible to list members"},
+			hide: []string{"Pin visible only to Alice", "Pin visible to group members"},
 		},
 		{
-			name: "list member",
-			c:    listClient,
-			want: []string{"Pin visible to everyone", "Pin visible to list members"},
+			name: "group member",
+			c:    groupClient,
+			want: []string{"Pin visible to everyone", "Pin visible to group members"},
 			hide: []string{"Pin visible only to Alice", "Pin visible to connections"},
 		},
 		{
 			name: "self",
 			c:    aliceClient,
-			want: []string{"Pin visible to everyone", "Pin visible only to Alice", "Pin visible to connections", "Pin visible to list members"},
+			want: []string{"Pin visible to everyone", "Pin visible only to Alice", "Pin visible to connections", "Pin visible to group members"},
 		},
 	}
 	for _, tc := range cases {
@@ -207,16 +221,16 @@ func TestProfilePinsRespectNodeVisibility(t *testing.T) {
 	}
 }
 
-func createNodeForUser(t *testing.T, userID uuid.UUID, nodeType db.NodeType, title string, visibility db.VisibilityKind, listID *uuid.UUID) uuid.UUID {
+func createNodeForUser(t *testing.T, userID uuid.UUID, nodeType db.NodeType, title string, visibility db.VisibilityKind, groupID *uuid.UUID) uuid.UUID {
 	t.Helper()
 	node, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
-		Type:             nodeType,
-		Title:            title,
-		Body:             "",
-		CreatedBy:        userID,
-		Slug:             "test-" + uuid.NewString()[:8],
-		Visibility:       visibility,
-		VisibilityListID: listID,
+		Type:              nodeType,
+		Title:             title,
+		Body:              "",
+		CreatedBy:         userID,
+		Slug:              "test-" + uuid.NewString()[:8],
+		Visibility:        visibility,
+		VisibilityGroupID: groupID,
 	})
 	if err != nil {
 		t.Fatalf("create node %q: %v", title, err)

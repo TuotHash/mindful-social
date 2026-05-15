@@ -80,12 +80,6 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if err != nil {
-		s.logger.Error("node new: lists", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
 	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("node new: groups", "err", err)
@@ -102,12 +96,15 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		initialParents = nil
 	}
 	parentCandidates := parentCandidateRows(initialParents)
-	defaultVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
+	defaultVisibility := string(user.DefaultNodeVisibility)
+	if defaultVisibility == "" {
+		defaultVisibility = string(db.VisibilityKindPublic)
+	}
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", "related", parentCandidates))
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", "related", parentCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
 }
 
 // handleParentPicker serves the post form's parent-node picker fragment.
@@ -171,12 +168,6 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		rawVisibility = "public"
 	}
 
-	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if listsErr != nil {
-		s.logger.Error("create node: lists", "err", listsErr)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
 	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if groupsErr != nil {
 		s.logger.Error("create node: groups", "err", groupsErr)
@@ -209,10 +200,10 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rerender := func(flash string) {
 		tc := parentCandidatesForRerender()
 		if isHTMX(r) {
-			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
 			return
 		}
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
 	}
 
 	flash := ""
@@ -304,7 +295,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			flash = pinErr
 		}
 	}
-	visKind, visListID, visGroupID, visErr := parseNodeVisibility(rawVisibility, user.ID, lists, groups)
+	visKind, visGroupID, visErr := parseNodeVisibility(rawVisibility, user.ID, groups)
 	if flash == "" && visErr != "" {
 		flash = visErr
 	}
@@ -332,7 +323,6 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:         user.ID,
 		Slug:              slug,
 		Visibility:        visKind,
-		VisibilityListID:  visListID,
 		VisibilityGroupID: visGroupID,
 		GroupID:           groupID,
 		ParentNodeID:      parentNodeID,
@@ -739,12 +729,6 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if err != nil {
-		s.logger.Error("node edit: lists", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
 	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("node edit: groups", "err", err)
@@ -753,18 +737,15 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	isAuthor := node.CreatedBy == user.ID
 	canChangeVisibility := isAuthor || isStaff(user)
-	// Audience lists and groups belong to the author's account, so when
-	// staff are moderating someone else's node we hide those scopes from
-	// the picker — they'd map to the moderator's own collections, which
-	// makes no sense as a visibility target. The picker keeps the
-	// public/connections/private options either way.
-	visLists := lists
+	// Groups belong to the author's account, so when staff are moderating
+	// someone else's node we hide them from the picker — they'd map to
+	// the moderator's own groups, which makes no sense as a visibility
+	// target. The picker keeps public/connections/private either way.
 	visGroups := groups
 	if !isAuthor {
-		visLists = nil
 		visGroups = nil
 	}
-	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID), visLists, visGroups, isAuthor, canChangeVisibility, string(node.EditPolicy), string(node.LinkPolicy)))
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityGroupID), visGroups, isAuthor, canChangeVisibility, string(node.EditPolicy), string(node.LinkPolicy)))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -813,17 +794,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	if rawVisibility == "" || !canChangeVisibility {
 		// Editors without visibility rights keep the existing setting;
 		// an empty submission also falls through unchanged.
-		rawVisibility = formatNodeVisibility(node.Visibility, node.VisibilityListID, node.VisibilityGroupID)
+		rawVisibility = formatNodeVisibility(node.Visibility, node.VisibilityGroupID)
 	}
 	rawEditPolicy := strings.TrimSpace(r.PostFormValue("edit_policy"))
 	rawLinkPolicy := strings.TrimSpace(r.PostFormValue("link_policy"))
 
-	lists, listsErr := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if listsErr != nil {
-		s.logger.Error("update node: lists", "err", listsErr)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
 	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if groupsErr != nil {
 		s.logger.Error("update node: groups", "err", groupsErr)
@@ -839,23 +814,19 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		flash = "Title is too long (max 200 characters)."
 	}
 	visKind := node.Visibility
-	visListID := node.VisibilityListID
 	visGroupID := node.VisibilityGroupID
 	groupID := node.GroupID
 	if canChangeVisibility {
 		// Non-authors (staff moderators) can only pick the
 		// owner-independent scopes — public/connections/private — so we
-		// validate against empty lists/groups, matching what the form
-		// rendered. The author keeps the full picker against their own
-		// lists and groups.
-		pickLists := lists
+		// validate against an empty groups slice, matching what the
+		// form rendered. The author keeps the full picker.
 		pickGroups := groups
 		if !isAuthor {
-			pickLists = nil
 			pickGroups = nil
 		}
 		var visErr string
-		visKind, visListID, visGroupID, visErr = parseNodeVisibility(rawVisibility, node.CreatedBy, pickLists, pickGroups)
+		visKind, visGroupID, visErr = parseNodeVisibility(rawVisibility, node.CreatedBy, pickGroups)
 		if flash == "" && visErr != "" {
 			flash = visErr
 		}
@@ -875,13 +846,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if flash != "" {
-		formLists := lists
 		formGroups := groups
 		if !isAuthor {
-			formLists = nil
 			formGroups = nil
 		}
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, formLists, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
 		return
 	}
 
@@ -896,7 +865,6 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		Body:              body,
 		SourceUrl:         srcPtr,
 		Visibility:        visKind,
-		VisibilityListID:  visListID,
 		VisibilityGroupID: visGroupID,
 		GroupID:           groupID,
 		EditPolicy:        editPolicy,
@@ -904,13 +872,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
-		formLists := lists
 		formGroups := groups
 		if !isAuthor {
-			formLists = nil
 			formGroups = nil
 		}
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, formLists, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
 		return
 	}
 	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
@@ -1077,7 +1043,6 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 			CreatedBy:         user.ID,
 			Slug:              slug,
 			Visibility:        fromNode.Visibility,
-			VisibilityListID:  fromNode.VisibilityListID,
 			VisibilityGroupID: fromNode.VisibilityGroupID,
 			GroupID:           fromNode.GroupID,
 			ParentNodeID:      &fromID,

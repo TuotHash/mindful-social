@@ -47,13 +47,11 @@ UPDATE users SET username = $2 WHERE id = $1;
 UPDATE users SET email = $2 WHERE id = $1;
 
 -- name: UpdateUserPreferences :exec
--- Updates all three composer/display defaults at once. The audience-list FK
--- is nullable; pass NULL whenever default_node_visibility is anything other
--- than 'list'. Timezone is an IANA name (empty string = fall back to UTC).
+-- Updates the composer and display defaults. Timezone is an IANA name
+-- (empty string = fall back to UTC).
 UPDATE users
 SET default_node_visibility = $2,
-    default_audience_list_id = $3,
-    timezone = $4
+    timezone = $3
 WHERE id = $1;
 
 -- name: UpdateUserProfileImage :exec

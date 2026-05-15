@@ -7,12 +7,11 @@ INSERT INTO nodes (
     created_by,
     slug,
     visibility,
-    visibility_list_id,
     visibility_group_id,
     group_id,
     parent_node_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetNode :one
@@ -48,11 +47,10 @@ SET title = $2,
     body = $3,
     source_url = $4,
     visibility = $5,
-    visibility_list_id = $6,
-    visibility_group_id = $7,
-    group_id = $8,
-    edit_policy = $9,
-    link_policy = $10,
+    visibility_group_id = $6,
+    group_id = $7,
+    edit_policy = $8,
+    link_policy = $9,
     updated_at = now()
 WHERE id = $1
 RETURNING *;

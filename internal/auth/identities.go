@@ -72,25 +72,10 @@ func (s *Service) SignupWithPassword(ctx context.Context, username, email, passw
 		if err != nil {
 			return err
 		}
-		if err := seedTrustedList(ctx, q, u.ID); err != nil {
-			return err
-		}
 		user = u
 		return nil
 	})
 	return user, err
-}
-
-// seedTrustedList creates the per-user built-in "Trusted" list. Called
-// inside the signup transaction so a user always exits signup with their
-// trusted list available to the visibility selector.
-func seedTrustedList(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
-	_, err := q.CreateAudienceList(ctx, db.CreateAudienceListParams{
-		OwnerID:   userID,
-		Name:      "Trusted",
-		IsTrusted: true,
-	})
-	return err
 }
 
 // AuthenticatePassword returns the user id on a successful email+password
@@ -171,9 +156,6 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 			Secret:   nil,
 		})
 		if err != nil {
-			return err
-		}
-		if err := seedTrustedList(ctx, q, u.ID); err != nil {
 			return err
 		}
 		user = u

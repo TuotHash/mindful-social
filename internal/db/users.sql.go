@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)
-RETURNING id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path
+RETURNING id, username, email, created_at, role, default_node_visibility, timezone, profile_image_path
 `
 
 type CreateUserParams struct {
@@ -33,7 +33,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.Role,
 		&i.DefaultNodeVisibility,
-		&i.DefaultAudienceListID,
 		&i.Timezone,
 		&i.ProfileImagePath,
 	)
@@ -41,7 +40,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE id = $1
+SELECT id, username, email, created_at, role, default_node_visibility, timezone, profile_image_path FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -54,7 +53,6 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.CreatedAt,
 		&i.Role,
 		&i.DefaultNodeVisibility,
-		&i.DefaultAudienceListID,
 		&i.Timezone,
 		&i.ProfileImagePath,
 	)
@@ -62,7 +60,7 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE email = $1
+SELECT id, username, email, created_at, role, default_node_visibility, timezone, profile_image_path FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -75,7 +73,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.Role,
 		&i.DefaultNodeVisibility,
-		&i.DefaultAudienceListID,
 		&i.Timezone,
 		&i.ProfileImagePath,
 	)
@@ -83,7 +80,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users WHERE username = $1
+SELECT id, username, email, created_at, role, default_node_visibility, timezone, profile_image_path FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -96,7 +93,6 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.CreatedAt,
 		&i.Role,
 		&i.DefaultNodeVisibility,
-		&i.DefaultAudienceListID,
 		&i.Timezone,
 		&i.ProfileImagePath,
 	)
@@ -104,7 +100,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const listUsersForAdmin = `-- name: ListUsersForAdmin :many
-SELECT id, username, email, created_at, role, default_node_visibility, default_audience_list_id, timezone, profile_image_path FROM users
+SELECT id, username, email, created_at, role, default_node_visibility, timezone, profile_image_path FROM users
 ORDER BY
     CASE role
         WHEN 'admin' THEN 0
@@ -132,7 +128,6 @@ func (q *Queries) ListUsersForAdmin(ctx context.Context) ([]User, error) {
 			&i.CreatedAt,
 			&i.Role,
 			&i.DefaultNodeVisibility,
-			&i.DefaultAudienceListID,
 			&i.Timezone,
 			&i.ProfileImagePath,
 		); err != nil {
@@ -208,28 +203,20 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 const updateUserPreferences = `-- name: UpdateUserPreferences :exec
 UPDATE users
 SET default_node_visibility = $2,
-    default_audience_list_id = $3,
-    timezone = $4
+    timezone = $3
 WHERE id = $1
 `
 
 type UpdateUserPreferencesParams struct {
 	ID                    uuid.UUID      `json:"id"`
 	DefaultNodeVisibility VisibilityKind `json:"default_node_visibility"`
-	DefaultAudienceListID *uuid.UUID     `json:"default_audience_list_id"`
 	Timezone              string         `json:"timezone"`
 }
 
-// Updates all three composer/display defaults at once. The audience-list FK
-// is nullable; pass NULL whenever default_node_visibility is anything other
-// than 'list'. Timezone is an IANA name (empty string = fall back to UTC).
+// Updates the composer and display defaults. Timezone is an IANA name
+// (empty string = fall back to UTC).
 func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error {
-	_, err := q.db.Exec(ctx, updateUserPreferences,
-		arg.ID,
-		arg.DefaultNodeVisibility,
-		arg.DefaultAudienceListID,
-		arg.Timezone,
-	)
+	_, err := q.db.Exec(ctx, updateUserPreferences, arg.ID, arg.DefaultNodeVisibility, arg.Timezone)
 	return err
 }
 

@@ -239,12 +239,6 @@ func (s *Server) routes() {
 		r.Post("/groups/{slug}/members/{userID}/delete", s.handleGroupRemoveMember)
 		r.Post("/groups/{slug}/members/{userID}/role", s.handleGroupSetMemberRole)
 		r.Post("/groups/{slug}/settings", s.handleGroupSettings)
-		r.Get("/lists", s.handleListsIndex)
-		r.Post("/lists", s.handleListCreate)
-		r.Get("/lists/{id}", s.handleListDetail)
-		r.Post("/lists/{id}/members", s.handleListAddMember)
-		r.Post("/lists/{id}/members/{userID}/delete", s.handleListRemoveMember)
-		r.Post("/lists/{id}/delete", s.handleListDelete)
 	})
 
 	// Admin-only routes. requireAdmin returns 404 for non-admins so the

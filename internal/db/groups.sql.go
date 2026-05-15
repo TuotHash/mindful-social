@@ -309,7 +309,7 @@ func (q *Queries) ListGroupsForUser(ctx context.Context, userID uuid.UUID) ([]Li
 }
 
 const listNodesForGroupForViewer = `-- name: ListNodesForGroupForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, visibility_list_id, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
 WHERE n.group_id = $1::uuid
   AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
@@ -343,7 +343,6 @@ func (q *Queries) ListNodesForGroupForViewer(ctx context.Context, arg ListNodesF
 			&i.SearchTsv,
 			&i.Slug,
 			&i.Visibility,
-			&i.VisibilityListID,
 			&i.EditPolicy,
 			&i.LinkPolicy,
 			&i.ParentNodeID,

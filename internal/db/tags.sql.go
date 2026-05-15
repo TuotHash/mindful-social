@@ -90,7 +90,7 @@ func (q *Queries) ListAllTagsForViewer(ctx context.Context, viewerID *uuid.UUID)
 }
 
 const listNodesWithTagForViewer = `-- name: ListNodesWithTagForViewer :many
-SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv, n.slug, n.visibility, n.visibility_list_id, n.edit_policy, n.link_policy, n.parent_node_id, n.group_id, n.visibility_group_id FROM nodes n
+SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by, n.created_at, n.updated_at, n.search_tsv, n.slug, n.visibility, n.edit_policy, n.link_policy, n.parent_node_id, n.group_id, n.visibility_group_id FROM nodes n
 JOIN node_tags nt ON nt.node_id = n.id
 WHERE nt.tag_id = $1
   AND node_visible_to(n.*, $2::uuid)
@@ -126,7 +126,6 @@ func (q *Queries) ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWi
 			&i.SearchTsv,
 			&i.Slug,
 			&i.Visibility,
-			&i.VisibilityListID,
 			&i.EditPolicy,
 			&i.LinkPolicy,
 			&i.ParentNodeID,

@@ -64,25 +64,22 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if err != nil {
-		s.logger.Error("account: list audience lists", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	prefVisibility := string(user.DefaultNodeVisibility)
+	if prefVisibility == "" {
+		prefVisibility = string(db.VisibilityKindPublic)
 	}
-
-	prefVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 
 	flash := s.sessions.PopString(r.Context(), accountFlashKey)
 	success := s.sessions.PopString(r.Context(), accountSuccessKey)
-	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, lists, prefVisibility, user.Timezone, flash, success))
+	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, prefVisibility, user.Timezone, flash, success))
 }
 
-// handleAccountPreferences persists the user's default node visibility,
-// optional audience list, and timezone. Visibility uses the same encoding
-// as the composer ("public|connections|list:<uuid>|private"). Timezone is
-// validated against the IANA database; the empty string is allowed and
-// means "fall back to UTC".
+// handleAccountPreferences persists the user's default node visibility
+// and timezone. Visibility is a plain enum value — only the audience-
+// independent kinds (public, connections, private) are valid defaults
+// since group selection is per-node. Timezone is validated against the
+// IANA database; the empty string is allowed and means "fall back to
+// UTC".
 func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	if err := r.ParseForm(); err != nil {
@@ -90,16 +87,16 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	lists, err := s.queries.ListAudienceLists(r.Context(), user.ID)
-	if err != nil {
-		s.logger.Error("account prefs: list audience lists", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	visKind, visListID, visErr := parseVisibility(r.PostFormValue("visibility"), user.ID, lists)
-	if visErr != "" {
-		s.flashAccount(r, visErr)
+	var visKind db.VisibilityKind
+	switch strings.TrimSpace(r.PostFormValue("visibility")) {
+	case "", "public":
+		visKind = db.VisibilityKindPublic
+	case "connections":
+		visKind = db.VisibilityKindConnections
+	case "private":
+		visKind = db.VisibilityKindPrivate
+	default:
+		s.flashAccount(r, "Invalid visibility option.")
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
@@ -116,7 +113,6 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 	if err := s.queries.UpdateUserPreferences(r.Context(), db.UpdateUserPreferencesParams{
 		ID:                    user.ID,
 		DefaultNodeVisibility: visKind,
-		DefaultAudienceListID: visListID,
 		Timezone:              tz,
 	}); err != nil {
 		s.logger.Error("account prefs: update", "err", err)

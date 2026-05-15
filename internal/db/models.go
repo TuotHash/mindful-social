@@ -390,7 +390,6 @@ type VisibilityKind string
 const (
 	VisibilityKindPublic      VisibilityKind = "public"
 	VisibilityKindConnections VisibilityKind = "connections"
-	VisibilityKindList        VisibilityKind = "list"
 	VisibilityKindGroup       VisibilityKind = "group"
 	VisibilityKindPrivate     VisibilityKind = "private"
 )
@@ -434,26 +433,11 @@ func (e VisibilityKind) Valid() bool {
 	switch e {
 	case VisibilityKindPublic,
 		VisibilityKindConnections,
-		VisibilityKindList,
 		VisibilityKindGroup,
 		VisibilityKindPrivate:
 		return true
 	}
 	return false
-}
-
-type AudienceList struct {
-	ID        uuid.UUID          `json:"id"`
-	OwnerID   uuid.UUID          `json:"owner_id"`
-	Name      string             `json:"name"`
-	IsTrusted bool               `json:"is_trusted"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type AudienceListMember struct {
-	ListID       uuid.UUID          `json:"list_id"`
-	MemberUserID uuid.UUID          `json:"member_user_id"`
-	AddedAt      pgtype.Timestamptz `json:"added_at"`
 }
 
 type AuthIdentity struct {
@@ -532,7 +516,6 @@ type Node struct {
 	SearchTsv         interface{}        `json:"search_tsv"`
 	Slug              string             `json:"slug"`
 	Visibility        VisibilityKind     `json:"visibility"`
-	VisibilityListID  *uuid.UUID         `json:"visibility_list_id"`
 	EditPolicy        NodeActionPolicy   `json:"edit_policy"`
 	LinkPolicy        NodeActionPolicy   `json:"link_policy"`
 	ParentNodeID      *uuid.UUID         `json:"parent_node_id"`
@@ -592,7 +575,6 @@ type User struct {
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 	Role                  UserRole           `json:"role"`
 	DefaultNodeVisibility VisibilityKind     `json:"default_node_visibility"`
-	DefaultAudienceListID *uuid.UUID         `json:"default_audience_list_id"`
 	Timezone              string             `json:"timezone"`
 	ProfileImagePath      string             `json:"profile_image_path"`
 }

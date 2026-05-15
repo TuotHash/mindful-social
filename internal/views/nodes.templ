@@ -14,7 +14,7 @@ import (
 // URL hits and no-JS clients; the nav button opens NodeNewModal via htmx.
 // All three node types — Topic, View, Finding — are creatable here; the
 // type toggle drives which extra fields appear via CSS.
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -24,7 +24,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/home" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -38,7 +38,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -60,7 +60,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -75,7 +75,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 // don't apply to the selected type: the Position toggle is topic-only,
 // Support / Oppose pin are view-only, and the edge-kind toggle is finding-
 // only. The parent picker is hidden only when creating a root topic.
-templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
@@ -152,7 +152,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		>{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words. Drop or paste an image, or use the video button to attach a clip.</small>
 	</label>
-	@nodeVisibilitySelect(formVisibility, lists, groups)
+	@nodeVisibilitySelect(formVisibility, groups)
 	<fieldset class="toggle-group">
 		<legend>Pin to my profile</legend>
 		<div class="toggle-btns">
@@ -688,7 +688,7 @@ templ CommentEdit(viewer *Viewer, node db.Node, comment Comment, flash, formBody
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, isAuthor, canChangeVisibility bool, formEditPolicy, formLinkPolicy string) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, groups []db.ListGroupsForUserRow, isAuthor, canChangeVisibility bool, formEditPolicy, formLinkPolicy string) {
 	@Layout("Edit "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -726,7 +726,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 					<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 				</label>
 				if canChangeVisibility {
-					@nodeVisibilitySelect(formVisibility, lists, groups)
+					@nodeVisibilitySelect(formVisibility, groups)
 				}
 				if isAuthor {
 					@actionPolicySelect("edit_policy", "Who can edit this node", formEditPolicy)
@@ -771,15 +771,38 @@ templ actionPolicySelect(fieldName, legend, selected string) {
 	</fieldset>
 }
 
-// visibilitySelect renders the per-node audience picker as a toggle-button
-// group. Values: "public", "connections", "list:<uuid>", "private". The
-// "list:<uuid>" format keeps the form a single field while still
-// identifying which list governs visibility.
-templ visibilitySelect(selected string, lists []db.AudienceList) {
-	@nodeVisibilitySelect(selected, lists, nil)
+// visibilitySelect renders the audience picker used in the account
+// preferences form, where only the owner-independent kinds (public /
+// connections / private) are valid defaults — group selection is per-
+// node, not a default.
+templ visibilitySelect(selected string) {
+	<fieldset class="toggle-group">
+		<legend>Default visibility</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-visibility="public">
+				<input type="radio" name="visibility" value="public" checked?={ selected == "public" || selected == "" }/>
+				<span class="material-symbols-outlined">public</span>
+				Public
+			</label>
+			<label class="toggle-btn" data-visibility="connections">
+				<input type="radio" name="visibility" value="connections" checked?={ selected == "connections" }/>
+				<span class="material-symbols-outlined">handshake</span>
+				Connections
+			</label>
+			<label class="toggle-btn" data-visibility="private">
+				<input type="radio" name="visibility" value="private" checked?={ selected == "private" }/>
+				<span class="material-symbols-outlined">lock</span>
+				Private
+			</label>
+		</div>
+	</fieldset>
 }
 
-templ nodeVisibilitySelect(selected string, lists []db.AudienceList, groups []db.ListGroupsForUserRow) {
+// nodeVisibilitySelect renders the per-node audience picker as a
+// toggle-button group. Values: "public", "connections", "group:<uuid>",
+// "private". The "group:<uuid>" form keeps the field single while still
+// identifying which group governs visibility.
+templ nodeVisibilitySelect(selected string, groups []db.ListGroupsForUserRow) {
 	<fieldset class="toggle-group">
 		<legend>Visibility</legend>
 		<div class="toggle-btns">
@@ -796,18 +819,6 @@ templ nodeVisibilitySelect(selected string, lists []db.AudienceList, groups []db
 				<span class="material-symbols-outlined">handshake</span>
 				Connections
 			</label>
-			for _, l := range lists {
-				<label class="toggle-btn" data-visibility="list">
-					<input type="radio" name="visibility" value={ "list:" + l.ID.String() } checked?={ selected == "list:"+l.ID.String() }/>
-					if l.IsTrusted {
-						<span class="material-symbols-outlined">verified_user</span>
-						Trusted
-					} else {
-						<span class="material-symbols-outlined">groups</span>
-						{ l.Name }
-					}
-				</label>
-			}
 			for _, g := range groups {
 				<label class="toggle-btn" data-visibility="group">
 					<input type="radio" name="visibility" value={ "group:" + g.ID.String() } checked?={ selected == "group:"+g.ID.String() }/>
@@ -822,9 +833,9 @@ templ nodeVisibilitySelect(selected string, lists []db.AudienceList, groups []db
 			</label>
 		</div>
 		if len(groups) > 0 {
-			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>; manage communities in <a href="/groups">Groups</a>.</small>
+			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage communities in <a href="/groups">Groups</a>.</small>
 		} else {
-			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow. Manage lists in <a href="/lists">Lists</a>.</small>
+			<small class="muted" style="font-size: 12px;">Connections requires a mutual follow.</small>
 		}
 	</fieldset>
 }

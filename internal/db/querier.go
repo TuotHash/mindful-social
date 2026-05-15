@@ -13,9 +13,6 @@ import (
 type Querier interface {
 	AcceptGroupInvite(ctx context.Context, arg AcceptGroupInviteParams) (int64, error)
 	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
-	// Idempotent. The handler treats "already a member" the same as "now a
-	// member" so the form doesn't need to know which it was.
-	AddListMember(ctx context.Context, arg AddListMemberParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
 	// True when `viewer` is permitted to edit `node` under its edit_policy.
 	// Implemented in SQL so handlers can call it without re-implementing the
@@ -32,17 +29,11 @@ type Querier interface {
 	CountFollowing(ctx context.Context, followerID uuid.UUID) (int64, error)
 	CountGroupMembers(ctx context.Context, groupID uuid.UUID) (int64, error)
 	CountIdentitiesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
-	CountListMembers(ctx context.Context, listID uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
 	// Pins on this node by users other than the node's author. The author's own
 	// pin is excluded — they obviously consent to losing it. Other users' pins
 	// are surfaced on the confirmation page so the author knows what cascades.
 	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
-	// Creates a new list for an owner. The unique index on (owner_id) WHERE
-	// is_trusted means at most one trusted list per user; passing is_trusted=true
-	// twice for the same owner raises a unique-violation that the caller maps to
-	// a friendly error.
-	CreateAudienceList(ctx context.Context, arg CreateAudienceListParams) (AudienceList, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
@@ -55,9 +46,6 @@ type Querier interface {
 	CreateNodeImage(ctx context.Context, arg CreateNodeImageParams) (NodeImage, error)
 	CreateNodeVideo(ctx context.Context, arg CreateNodeVideoParams) (NodeVideo, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	// Trusted lists can't be deleted; the WHERE clause enforces this without
-	// the caller having to remember.
-	DeleteAudienceList(ctx context.Context, arg DeleteAudienceListParams) error
 	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
 	// Page-node editors can delete only edges touching the page node they are
 	// editing. The handler enforces edit permission on that node; this WHERE
@@ -74,7 +62,6 @@ type Querier interface {
 	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —
 	// a malformed cycle would otherwise loop forever.
 	FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
-	GetAudienceList(ctx context.Context, id uuid.UUID) (AudienceList, error)
 	GetCommentForNode(ctx context.Context, arg GetCommentForNodeParams) (GetCommentForNodeRow, error)
 	// One round-trip lookup the profile page uses to render the button: does
 	// the viewer follow this profile, and does the profile follow the viewer
@@ -96,9 +83,6 @@ type Querier interface {
 	// through edges, not bolted onto the pin record.
 	GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error)
 	GetTagByName(ctx context.Context, name string) (Tag, error)
-	// Lookup the user's built-in Trusted list. Should always succeed for
-	// existing users (created on signup or backfilled by the migration).
-	GetTrustedList(ctx context.Context, ownerID uuid.UUID) (AudienceList, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
@@ -111,7 +95,6 @@ type Querier interface {
 	// fails the WHERE clause filters the row out and nothing changes.
 	HighlightEdge(ctx context.Context, arg HighlightEdgeParams) (int64, error)
 	IsGroupMember(ctx context.Context, arg IsGroupMemberParams) (bool, error)
-	IsListMember(ctx context.Context, arg IsListMemberParams) (bool, error)
 	// Tag list with how many nodes carry each tag — for the /tags index page.
 	// Counts only nodes the viewer is allowed to see (public, plus connections-
 	// /list-/private-scoped nodes the viewer has access to). Tags whose visible
@@ -134,9 +117,6 @@ type Querier interface {
 	// Recent visible nodes for the graph canvas. The graph viewer is intentionally
 	// bounded so a public instance cannot ship an unbounded graph into the page.
 	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)
-	// Trusted list first, then custom lists alphabetically — order the visibility
-	// selector and the lists-management page both rely on.
-	ListAudienceLists(ctx context.Context, ownerID uuid.UUID) ([]AudienceList, error)
 	ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]ListCommentsForNodeRow, error)
 	// People the user has a mutual follow with — drives the "friends bubble"
 	// graph view. Alphabetical for stable rendering.
@@ -165,7 +145,6 @@ type Querier interface {
 	// "Key findings" section semantically matches its name.
 	ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
-	ListListMembers(ctx context.Context, listID uuid.UUID) ([]ListListMembersRow, error)
 	ListNodeImagesForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeImagesForRootRow, error)
 	ListNodeVideosForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeVideosForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
@@ -203,7 +182,6 @@ type Querier interface {
 	// pg_trgm operators take plain text, no query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
-	RemoveListMember(ctx context.Context, arg RemoveListMemberParams) error
 	// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
 	// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
 	// title catches typos and partial words ("nucear" → "Nuclear"). A row
@@ -254,9 +232,8 @@ type Querier interface {
 	// sync to avoid future surprises.
 	UpdatePasswordIdentitySubject(ctx context.Context, arg UpdatePasswordIdentitySubjectParams) error
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error
-	// Updates all three composer/display defaults at once. The audience-list FK
-	// is nullable; pass NULL whenever default_node_visibility is anything other
-	// than 'list'. Timezone is an IANA name (empty string = fall back to UTC).
+	// Updates the composer and display defaults. Timezone is an IANA name
+	// (empty string = fall back to UTC).
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) error
 	UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error

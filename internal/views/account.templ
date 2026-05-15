@@ -54,7 +54,7 @@ var AccountTimezones = []string{
 	"Pacific/Auckland",
 }
 
-templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, lists []db.AudienceList, prefVisibility, prefTimezone, flash, success string) {
+templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, prefVisibility, prefTimezone, flash, success string) {
 	@Layout("Account", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -72,7 +72,7 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 				<p class="muted" style="margin-top: 0;">Defaults applied when you create a new node and when timestamps are displayed.</p>
 				<form method="post" action="/account/preferences" class="form">
 					@CSRFField()
-					@visibilitySelect(prefVisibility, lists)
+					@visibilitySelect(prefVisibility)
 					<label>
 						Timezone
 						<select name="timezone">
