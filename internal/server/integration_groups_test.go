@@ -84,10 +84,10 @@ func TestNodeVisibility_ChildPublicInheritsGroupParent(t *testing.T) {
 	}
 
 	resp = formPost(t, alice, "/nodes", url.Values{
-		"type":            {"view"},
-		"title":           {"Public child should inherit"},
-		"visibility":      {"public"},
-		"parent_topic_id": {parent.ID.String()},
+		"type":           {"view"},
+		"title":          {"Public child should inherit"},
+		"visibility":     {"public"},
+		"parent_node_id": {parent.ID.String()},
 	})
 	body = readBody(t, resp)
 	if resp.StatusCode != http.StatusOK {

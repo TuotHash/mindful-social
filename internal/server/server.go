@@ -209,7 +209,7 @@ func (s *Server) routes() {
 		r.Post("/account/password", s.handleAccountPasswordSet)
 		r.Post("/account/identities/{id}/disconnect", s.handleAccountIdentityDisconnect)
 		r.Get("/nodes/new", s.handleNodeNew)
-		r.Get("/nodes/topic-picker", s.handleTopicPicker)
+		r.Get("/nodes/parent-picker", s.handleParentPicker)
 		r.Post("/nodes", s.handleNodeCreate)
 		r.Get("/nodes/{id}/edit", s.handleNodeEdit)
 		r.Post("/nodes/{id}", s.handleNodeUpdate)

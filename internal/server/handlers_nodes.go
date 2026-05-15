@@ -92,40 +92,50 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	initialTopics, err := s.queries.SearchTopics(r.Context(), db.SearchTopicsParams{
-		Query:    "",
-		ViewerID: viewerID(r),
+	initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
+		TypeFilter: string(db.NodeTypeTopic), // default form type is view, which parents to a topic
+		Query:      "",
+		ViewerID:   viewerID(r),
 	})
 	if err != nil {
-		s.logger.Error("node new: search topics", "err", err)
-		initialTopics = nil
+		s.logger.Error("node new: search parents", "err", err)
+		initialParents = nil
 	}
-	topicCandidates := topicCandidateRows(initialTopics)
+	parentCandidates := parentCandidateRows(initialParents)
 	defaultVisibility := formatVisibility(user.DefaultNodeVisibility, user.DefaultAudienceListID)
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", topicCandidates))
+		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", "related", parentCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", topicCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, lists, groups, "", "", "root", "related", parentCandidates))
 }
 
-func (s *Server) handleTopicPicker(w http.ResponseWriter, r *http.Request) {
-	find := strings.TrimSpace(r.URL.Query().Get("find_topic"))
-	rows, err := s.queries.SearchTopics(r.Context(), db.SearchTopicsParams{
-		Query:    find,
-		ViewerID: viewerID(r),
+// handleParentPicker serves the post form's parent-node picker fragment.
+// The selected type drives which candidates are returned: view/topic look
+// for a topic to anchor under; finding searches across all node types.
+func (s *Server) handleParentPicker(w http.ResponseWriter, r *http.Request) {
+	find := strings.TrimSpace(r.URL.Query().Get("find_parent"))
+	typ := strings.TrimSpace(r.URL.Query().Get("type"))
+	filter := string(db.NodeTypeTopic)
+	if typ == string(db.NodeTypeFinding) {
+		filter = "" // findings can attach to any node type
+	}
+	rows, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
+		TypeFilter: filter,
+		Query:      find,
+		ViewerID:   viewerID(r),
 	})
 	if err != nil {
-		s.logger.Error("topic picker", "err", err)
+		s.logger.Error("parent picker", "err", err)
 		rows = nil
 	}
-	render(w, r, views.TopicCandidatePicker(find, "", topicCandidateRows(rows)))
+	render(w, r, views.TopicCandidatePicker(find, "", parentCandidateRows(rows)))
 }
 
-func topicCandidateRows(rows []db.SearchTopicsRow) []views.TopicCandidate {
+func parentCandidateRows(rows []db.SearchPostParentsRow) []views.TopicCandidate {
 	out := make([]views.TopicCandidate, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, views.TopicCandidate{ID: r.ID, Title: r.Title})
+		out = append(out, views.TopicCandidate{ID: r.ID, Type: r.Type, Title: r.Title})
 	}
 	return out
 }
@@ -147,11 +157,15 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	rawPin := strings.TrimSpace(r.PostFormValue("pin")) // "" | "supports" | "opposes" | "featured"
 	rawTags := r.PostFormValue("tags")
 	rawVisibility := strings.TrimSpace(r.PostFormValue("visibility"))
-	rawParentTopicID := strings.TrimSpace(r.PostFormValue("parent_topic_id"))
-	rawFindTopic := strings.TrimSpace(r.PostFormValue("find_topic"))
+	rawParentNodeID := strings.TrimSpace(r.PostFormValue("parent_node_id"))
+	rawFindParent := strings.TrimSpace(r.PostFormValue("find_parent"))
 	rawTopicParentMode := strings.TrimSpace(r.PostFormValue("topic_parent_mode")) // "root" | "sub"
+	rawFindingEdgeKind := strings.TrimSpace(r.PostFormValue("finding_edge_kind")) // "supports" | "opposes" | "related"
 	if rawTopicParentMode != "sub" {
 		rawTopicParentMode = "root"
+	}
+	if rawFindingEdgeKind == "" {
+		rawFindingEdgeKind = "related"
 	}
 	if rawVisibility == "" {
 		rawVisibility = "public"
@@ -170,89 +184,102 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// topicCandidatesForRerender returns a single pre-selected candidate so
+	// parentCandidatesForRerender returns a single pre-selected candidate so
 	// the picker re-renders with the user's selection intact after a validation
-	// error on another field.
-	topicCandidatesForRerender := func() []views.TopicCandidate {
-		if rawParentTopicID == "" {
+	// error on another field. For view / sub-topic the parent must be a topic;
+	// for finding any visible node is acceptable.
+	parentCandidatesForRerender := func() []views.TopicCandidate {
+		if rawParentNodeID == "" {
 			return nil
 		}
-		tid, err := uuid.Parse(rawParentTopicID)
+		pid, err := uuid.Parse(rawParentNodeID)
 		if err != nil {
 			return nil
 		}
-		n, err := s.queries.GetNode(r.Context(), tid)
-		if err != nil || n.Type != db.NodeTypeTopic {
+		n, err := s.queries.GetNode(r.Context(), pid)
+		if err != nil {
 			return nil
 		}
-		return []views.TopicCandidate{{ID: n.ID, Title: n.Title}}
+		if db.NodeType(rawType) != db.NodeTypeFinding && n.Type != db.NodeTypeTopic {
+			return nil
+		}
+		return []views.TopicCandidate{{ID: n.ID, Type: n.Type, Title: n.Title}}
 	}
 
 	rerender := func(flash string) {
-		tc := topicCandidatesForRerender()
+		tc := parentCandidatesForRerender()
 		if isHTMX(r) {
-			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
 			return
 		}
-		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindTopic, rawParentTopicID, rawTopicParentMode, tc))
+		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, lists, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
 	}
 
 	flash := ""
 	nt := db.NodeType(rawType)
 	var pinKind db.PinKind
-	var parentTopicID uuid.UUID
+	var parentID uuid.UUID
 	var parentNodeID *uuid.UUID
 	var parentGroupID *uuid.UUID
+	var findingEdgeKind db.EdgeKind
 	switch {
-	// The Post path only creates topics or views. Findings are created
-	// later as connections off an existing topic or view.
-	case nt != db.NodeTypeTopic && nt != db.NodeTypeView:
-		flash = "Pick a type: View or Topic."
+	case nt != db.NodeTypeTopic && nt != db.NodeTypeView && nt != db.NodeTypeFinding:
+		flash = "Pick a type: View, Topic, or Finding."
 	case title == "":
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
 	}
-	// Views always need a parent topic; topics need one only when the user
-	// chose "sub-topic". Root topics ignore any parent selection.
-	needsParent := nt == db.NodeTypeView || (nt == db.NodeTypeTopic && rawTopicParentMode == "sub")
+	// Views and findings always need a parent; topics need one only when the
+	// user chose "sub-topic". Root topics ignore any parent selection. The
+	// parent for view / sub-topic must be a topic; for finding any visible
+	// node is fine.
+	needsParent := nt == db.NodeTypeView || nt == db.NodeTypeFinding || (nt == db.NodeTypeTopic && rawTopicParentMode == "sub")
 	if flash == "" && needsParent {
 		missingMsg := "A view must be connected to a parent topic. Search and select one above."
 		rejectMsg := "That topic doesn't accept new linked views from you."
-		if nt == db.NodeTypeTopic {
+		mustBeTopic := true
+		switch nt {
+		case db.NodeTypeTopic:
 			missingMsg = "A sub-topic must be connected to a parent topic. Search and select one above."
 			rejectMsg = "That topic doesn't accept new sub-topics from you."
+		case db.NodeTypeFinding:
+			missingMsg = "A finding must attach to an existing node. Search and select one above."
+			rejectMsg = "That node doesn't accept new findings from you."
+			mustBeTopic = false
 		}
-		if rawParentTopicID == "" {
+		if rawParentNodeID == "" {
 			flash = missingMsg
 		} else {
-			tid, err := uuid.Parse(rawParentTopicID)
+			pid, err := uuid.Parse(rawParentNodeID)
 			if err != nil {
-				flash = "Invalid parent topic selection."
+				flash = "Invalid parent selection."
 			} else {
-				parentNode, err := s.queries.GetNode(r.Context(), tid)
+				parentNode, err := s.queries.GetNode(r.Context(), pid)
 				switch {
-				case err != nil || parentNode.Type != db.NodeTypeTopic:
+				case err != nil:
+					flash = "The selected parent was not found."
+				case mustBeTopic && parentNode.Type != db.NodeTypeTopic:
 					flash = "The selected parent must be a topic."
 				default:
 					visible, verr := s.canViewNode(r.Context(), parentNode, viewerID(r))
 					if verr != nil {
 						s.logger.Error("create node: parent visibility", "err", verr)
-						flash = "Could not check parent topic permissions. Please try again."
+						flash = "Could not check parent permissions. Please try again."
 						break
 					}
 					if !visible {
-						flash = "The selected parent topic was not found."
+						flash = "The selected parent was not found."
 						break
 					}
 					if ok, perr := s.canLinkToNode(r.Context(), parentNode, user); perr != nil {
 						s.logger.Error("create node: parent link policy", "err", perr)
-						flash = "Could not check parent topic permissions. Please try again."
+						flash = "Could not check parent permissions. Please try again."
 					} else if !ok {
 						flash = rejectMsg
 					} else {
-						parentTopicID = tid
-						parentNodeID = &parentTopicID
+						parentID = pid
+						parentNodeID = &parentID
 						parentGroupID = parentNode.GroupID
 						if parentGroupID == nil {
 							parentGroupID = parentNode.VisibilityGroupID
@@ -260,6 +287,14 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+		}
+	}
+	if flash == "" && nt == db.NodeTypeFinding {
+		ek := db.EdgeKind(rawFindingEdgeKind)
+		if !ek.Valid() {
+			flash = "Pick how this finding relates to its parent."
+		} else {
+			findingEdgeKind = ek
 		}
 	}
 	if flash == "" && rawPin != "" {
@@ -308,15 +343,26 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("node created", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "visibility", node.Visibility)
-	// Connect the new node (view or sub-topic) to its parent topic automatically.
-	if parentTopicID != uuid.Nil {
+	// Connect the new node to its parent automatically. View and sub-topic
+	// edges go from the new node to its parent topic as `related`. Findings
+	// mirror the inline edge-creation flow: the edge goes parent → finding
+	// with the kind the user picked (supports / opposes / related).
+	if parentID != uuid.Nil {
+		edgeFrom := node.ID
+		edgeTo := parentID
+		edgeKind := db.EdgeKindRelated
+		if nt == db.NodeTypeFinding {
+			edgeFrom = parentID
+			edgeTo = node.ID
+			edgeKind = findingEdgeKind
+		}
 		if _, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
-			FromNode:  node.ID,
-			ToNode:    parentTopicID,
-			Kind:      db.EdgeKindRelated,
+			FromNode:  edgeFrom,
+			ToNode:    edgeTo,
+			Kind:      edgeKind,
 			CreatedBy: user.ID,
 		}); err != nil {
-			s.logger.Error("create node: parent topic edge", "err", err)
+			s.logger.Error("create node: parent edge", "err", err)
 		}
 	}
 	if rawPin != "" {

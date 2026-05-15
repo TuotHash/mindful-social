@@ -76,10 +76,10 @@ func TestNodeDelete_AuthorOnly(t *testing.T) {
 	resp.Body.Close()
 }
 
-func TestNodeCreate_RejectsFinding(t *testing.T) {
-	// The Post path is intentionally limited to topics and views — findings
-	// are created later as connections off an existing node. Direct POSTs of
-	// 'finding' should re-render with a flash, not create a row.
+func TestNodeCreate_FindingRequiresParent(t *testing.T) {
+	// Findings carry a finding_requires_parent DB constraint and the Post
+	// form mirrors it: a finding submission without a selected parent is
+	// re-rendered with a flash, not created.
 	integrationDB(t)
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
@@ -89,11 +89,63 @@ func TestNodeCreate_RejectsFinding(t *testing.T) {
 		"title": {"Should not create"},
 	})
 	body := readBody(t, resp)
-	if !strings.Contains(body, "View or Topic") {
-		t.Fatalf("expected flash about View or Topic, got: %s", snippet(body))
+	if !strings.Contains(body, "finding must attach") {
+		t.Fatalf("expected flash about parent requirement, got: %s", snippet(body))
 	}
 	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
 		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
+	}
+}
+
+func TestNodeCreate_FindingAttachesToParentWithEdge(t *testing.T) {
+	// Submitting type=finding with a parent and edge kind creates the node
+	// AND a parent→finding edge of that kind, matching the inline-edge flow.
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	parentID := createNode(t, c, "view", "Anchor view", "")
+
+	resp := formPost(t, c, "/nodes", url.Values{
+		"type":              {"finding"},
+		"title":             {"Citation finding"},
+		"body":              {""},
+		"parent_node_id":    {parentID.String()},
+		"finding_edge_kind": {"supports"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create finding: status %d", resp.StatusCode)
+	}
+	parts := strings.Split(strings.TrimPrefix(resp.Request.URL.Path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "nodes" {
+		t.Fatalf("expected redirect to /nodes/{slug}, got %s", resp.Request.URL.Path)
+	}
+	finding, err := testServer.queries.GetNodeBySlug(t.Context(), parts[1])
+	if err != nil {
+		t.Fatalf("lookup finding: %v", err)
+	}
+	if finding.Type != db.NodeTypeFinding {
+		t.Fatalf("expected finding type, got %s", finding.Type)
+	}
+	if finding.ParentNodeID == nil || *finding.ParentNodeID != parentID {
+		t.Fatalf("expected parent_node_id=%s, got %v", parentID, finding.ParentNodeID)
+	}
+	edges, err := testServer.queries.ListEdgesFromNodeForViewer(t.Context(), db.ListEdgesFromNodeForViewerParams{
+		FromNode: parentID,
+		ViewerID: &finding.CreatedBy,
+	})
+	if err != nil {
+		t.Fatalf("list edges: %v", err)
+	}
+	found := false
+	for _, e := range edges {
+		if e.ToID == finding.ID && e.Kind == db.EdgeKindSupports {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected parent→finding edge of kind supports; edges=%+v", edges)
 	}
 }
 

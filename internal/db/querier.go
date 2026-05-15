@@ -219,10 +219,14 @@ type Querier interface {
 	//
 	// node_visible_to() filters out anything the viewer isn't entitled to.
 	SearchNodes(ctx context.Context, arg SearchNodesParams) ([]SearchNodesRow, error)
-	// Topic picker for the post form: fuzzy-searches topic titles when a query is
-	// given; falls back to recency order when empty so the picker is pre-populated.
-	// Respects node_visible_to() so viewers only see topics they can post under.
-	SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error)
+	// Parent picker for the post form. type_filter restricts to a single node
+	// type ('topic' when creating a view or sub-topic); leave it empty to match
+	// any type ('topic', 'view', or 'finding') — used when creating a finding,
+	// which can attach to any existing node. Fuzzy-searches titles when a query
+	// is given; falls back to recency order when empty so the picker is
+	// pre-populated. Respects node_visible_to() so viewers only see candidates
+	// they can post under.
+	SearchPostParents(ctx context.Context, arg SearchPostParentsParams) ([]SearchPostParentsRow, error)
 	// People search for /search. Prefix/substring matching makes exact handle
 	// discovery predictable, while trigram word similarity catches small typos.
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)

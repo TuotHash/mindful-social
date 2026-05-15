@@ -97,13 +97,17 @@ WHERE n.created_by = sqlc.arg(author_id)
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 
--- name: SearchTopics :many
--- Topic picker for the post form: fuzzy-searches topic titles when a query is
--- given; falls back to recency order when empty so the picker is pre-populated.
--- Respects node_visible_to() so viewers only see topics they can post under.
-SELECT id, title
+-- name: SearchPostParents :many
+-- Parent picker for the post form. type_filter restricts to a single node
+-- type ('topic' when creating a view or sub-topic); leave it empty to match
+-- any type ('topic', 'view', or 'finding') — used when creating a finding,
+-- which can attach to any existing node. Fuzzy-searches titles when a query
+-- is given; falls back to recency order when empty so the picker is
+-- pre-populated. Respects node_visible_to() so viewers only see candidates
+-- they can post under.
+SELECT id, type, title
 FROM nodes
-WHERE type = 'topic'
+WHERE (sqlc.arg(type_filter)::text = '' OR type::text = sqlc.arg(type_filter)::text)
   AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
   AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
 ORDER BY

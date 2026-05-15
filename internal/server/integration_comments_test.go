@@ -188,10 +188,10 @@ func onlyReplyComment(t *testing.T, nodeID uuid.UUID) uuid.UUID {
 func createViewUnderTopic(t *testing.T, c *http.Client, topicID uuid.UUID, title, body string) uuid.UUID {
 	t.Helper()
 	resp := formPost(t, c, "/nodes", url.Values{
-		"type":            {"view"},
-		"title":           {title},
-		"body":            {body},
-		"parent_topic_id": {topicID.String()},
+		"type":           {"view"},
+		"title":          {title},
+		"body":           {body},
+		"parent_node_id": {topicID.String()},
 	})
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

@@ -3018,21 +3018,28 @@ fieldset.toggle-group legend {
   border-color: color-mix(in oklab, var(--finding-ink) 35%, transparent);
 }
 
-/* Conditional fields in the post form: when type=topic, hide view-only opts. */
-.post-form:has(input[name="type"][value="topic"]:checked) .if-view {
+/* Conditional fields in the post form. Each .if-X class is shown by default
+   and hidden when a non-matching type is selected, so the form rearranges
+   itself as the user toggles between View / Topic / Finding. */
+.post-form:has(input[name="type"][value="topic"]:checked) .if-view,
+.post-form:has(input[name="type"][value="finding"]:checked) .if-view {
   display: none;
 }
-/* Mirror: when type=view, hide topic-only opts (the Position toggle). */
-.post-form:has(input[name="type"][value="view"]:checked) .if-topic {
+.post-form:has(input[name="type"][value="view"]:checked) .if-topic,
+.post-form:has(input[name="type"][value="finding"]:checked) .if-topic {
   display: none;
 }
-/* Hide the parent-topic picker only when creating a root topic (type=topic
-   AND position=root). It stays visible for views (always required) and for
-   sub-topics. */
+.post-form:has(input[name="type"][value="view"]:checked) .if-finding,
+.post-form:has(input[name="type"][value="topic"]:checked) .if-finding {
+  display: none;
+}
+/* Hide the parent picker only when creating a root topic (type=topic AND
+   position=root). It stays visible for views, sub-topics, and findings —
+   all of which require a parent. */
 .post-form:has(input[name="type"][value="topic"]:checked):has(
     input[name="topic_parent_mode"][value="root"]:checked
   )
-  .topic-picker-section {
+  .parent-picker-section {
   display: none;
 }
 

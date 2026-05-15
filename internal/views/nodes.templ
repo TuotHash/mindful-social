@@ -12,20 +12,19 @@ import (
 
 // NodeNew renders the standalone Post form. Used as a fallback for direct
 // URL hits and no-JS clients; the nav button opens NodeNewModal via htmx.
-// Source URL is intentionally absent — only Topic and View are creatable
-// from the Post path; findings are created by attachment to an existing
-// topic or view.
-templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+// All three node types — Topic, View, Finding — are creatable here; the
+// type toggle drives which extra fields appear via CSS.
+templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	@Layout("Post", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
 				<span class="eyebrow">Post</span>
 				<h1 class="h-1">New post</h1>
-				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. Findings are added later as connections off an existing topic or view.</p>
+				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. A finding attaches an observation to an existing node and says how it relates.</p>
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<a href="/home" class="btn ghost"><span class="material-symbols-outlined">close</span>Cancel</a>
@@ -39,7 +38,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -50,7 +49,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			</div>
 			<h2 id="post-modal-title" style="margin: 0 0 6px; font-size: 22px;">New post</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
-				Share a view or start a topic. Findings are added later as connections.
+				Share a view, start a topic, or attach a finding to an existing node.
 			</p>
 			@Flash(flash)
 			<form
@@ -61,7 +60,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-target="#modal"
 				hx-swap="innerHTML"
 			>
-				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findTopic, formParentTopicID, formTopicParentMode, topicCandidates)
+				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, lists, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -72,11 +71,11 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 }
 
 // postFormFields are the shared body of NodeNew and NodeNewModal. The outer
-// .post-form class enables CSS :has() rules in app.css to hide
-// view-specific options (Support / Oppose pin) when Topic is selected, the
-// Position toggle when View is selected, and the topic picker when a root
-// topic is being created.
-templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findTopic, formParentTopicID, formTopicParentMode string, topicCandidates []TopicCandidate) {
+// .post-form class enables CSS :has() rules in app.css to hide options that
+// don't apply to the selected type: the Position toggle is topic-only,
+// Support / Oppose pin are view-only, and the edge-kind toggle is finding-
+// only. The parent picker is hidden only when creating a root topic.
+templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility string, lists []db.AudienceList, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
 	@CSRFField()
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
@@ -91,8 +90,13 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 				<span class="material-symbols-outlined">workspaces</span>
 				Topic
 			</label>
+			<label class="toggle-btn" data-type="finding">
+				<input type="radio" name="type" value="finding" checked?={ formType == "finding" }/>
+				<span class="material-symbols-outlined">fact_check</span>
+				Finding
+			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views.</small>
+		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views. A finding attaches an observation to any existing node.</small>
 	</fieldset>
 	<fieldset class="toggle-group if-topic">
 		<legend>Position</legend>
@@ -110,6 +114,27 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		</div>
 		<small class="muted" style="font-size: 12px;">A root topic stands alone. A sub-topic anchors under another topic.</small>
 	</fieldset>
+	<fieldset class="toggle-group if-finding">
+		<legend>Relationship to parent</legend>
+		<div class="toggle-btns">
+			<label class="toggle-btn" data-edge-kind="supports">
+				<input type="radio" name="finding_edge_kind" value="supports" checked?={ formFindingEdgeKind == "supports" }/>
+				<span class="material-symbols-outlined">thumb_up</span>
+				Supports
+			</label>
+			<label class="toggle-btn" data-edge-kind="opposes">
+				<input type="radio" name="finding_edge_kind" value="opposes" checked?={ formFindingEdgeKind == "opposes" }/>
+				<span class="material-symbols-outlined">thumb_down</span>
+				Opposes
+			</label>
+			<label class="toggle-btn" data-edge-kind="related">
+				<input type="radio" name="finding_edge_kind" value="related" checked?={ formFindingEdgeKind == "related" || formFindingEdgeKind == "" }/>
+				<span class="material-symbols-outlined">link</span>
+				Related
+			</label>
+		</div>
+		<small class="muted" style="font-size: 12px;">How this finding relates to its parent — supports backs it, opposes argues against, related is for citations or loose links.</small>
+	</fieldset>
 	<label>
 		Title
 		<input type="text" name="title" required maxlength="200" value={ formTitle } autofocus/>
@@ -121,9 +146,9 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			rows="5"
 			class="markdown-editor"
 			data-image-endpoint-template="/nodes/{id}/images"
-			data-image-endpoint-source="parent_topic_id"
+			data-image-endpoint-source="parent_node_id"
 			data-video-endpoint-template="/nodes/{id}/videos"
-			data-video-endpoint-source="parent_topic_id"
+			data-video-endpoint-source="parent_node_id"
 		>{ formBody }</textarea>
 		<small>Optional. Describe the node in your own words. Drop or paste an image, or use the video button to attach a clip.</small>
 	</label>
@@ -157,24 +182,28 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 		Tags <small>(comma-separated, optional)</small>
 		<input type="text" name="tags" value={ formTags } placeholder="climate, energy, ethics"/>
 	</label>
-	<div class="topic-picker-section">
+	<div class="parent-picker-section">
 		<label>
-			Parent topic <span style="color: var(--opposes);">*</span>
+			<span class="parent-picker-label if-view">Parent topic <span style="color: var(--opposes);">*</span></span>
+			<span class="parent-picker-label if-topic">Parent topic <span style="color: var(--opposes);">*</span></span>
+			<span class="parent-picker-label if-finding">Parent node <span style="color: var(--opposes);">*</span></span>
 			<input
 				type="search"
-				name="find_topic"
-				value={ findTopic }
-				placeholder="search topics…"
+				name="find_parent"
+				value={ findParent }
+				placeholder="search…"
 				autocomplete="off"
-				hx-get="/nodes/topic-picker"
-				hx-trigger="input changed delay:200ms, search"
-				hx-target="#topic-picker-target"
+				hx-get="/nodes/parent-picker"
+				hx-trigger="input changed delay:200ms, search, change from:input[name='type']"
+				hx-target="#parent-picker-target"
 				hx-swap="outerHTML"
-				hx-include="[name='find_topic']"
+				hx-include="[name='find_parent'],[name='type']"
 			/>
-			<small>Pick the topic this anchors under.</small>
+			<small class="if-view">Pick the topic this anchors under.</small>
+			<small class="if-topic">Pick the topic this anchors under.</small>
+			<small class="if-finding">Pick the node this finding attaches to — any topic, view, or finding.</small>
 		</label>
-		@TopicCandidatePicker(findTopic, formParentTopicID, topicCandidates)
+		@TopicCandidatePicker(findParent, formParentNodeID, parentCandidates)
 	</div>
 }
 
@@ -898,30 +927,35 @@ templ pinFormFields(node db.Node, formKind string) {
 	</fieldset>
 }
 
-// TopicCandidate is a slim topic row for the parent-topic picker on the post form.
+// TopicCandidate is a slim node row for the parent-node picker on the post
+// form. Type drives the chip colour shown next to each candidate — for
+// view / sub-topic flows it's always 'topic'; for the finding flow it can
+// be any node type.
 type TopicCandidate struct {
 	ID    uuid.UUID
+	Type  db.NodeType
 	Title string
 }
 
-// TopicCandidatePicker renders the topic search results in the post form.
-// Stable id="topic-picker-target" lets HTMX swap it on each live-search update.
-// selectedID pre-checks the radio that matches — used when re-rendering on error.
+// TopicCandidatePicker renders the parent-node search results in the post
+// form. Stable id="parent-picker-target" lets HTMX swap it on each live-
+// search update. selectedID pre-checks the radio that matches — used when
+// re-rendering on error.
 templ TopicCandidatePicker(find, selectedID string, candidates []TopicCandidate) {
-	<div id="topic-picker-target">
+	<div id="parent-picker-target">
 		if find == "" && len(candidates) == 0 {
-			<p class="muted" style="font-size: 13px;">Search above to find a topic.</p>
+			<p class="muted" style="font-size: 13px;">Search above to find a parent.</p>
 		}
 		if find != "" && len(candidates) == 0 {
-			<p class="muted" style="font-size: 13px;">No topics match that query.</p>
+			<p class="muted" style="font-size: 13px;">No nodes match that query.</p>
 		}
 		if len(candidates) > 0 {
 			<fieldset class="form-fieldset candidate-list">
-				<legend>Pick a topic</legend>
+				<legend>Pick a parent</legend>
 				for _, c := range candidates {
 					<label class="radio">
-						<input type="radio" name="parent_topic_id" value={ c.ID.String() } checked?={ c.ID.String() == selectedID }/>
-						@nodeTypeChip(db.NodeTypeTopic)
+						<input type="radio" name="parent_node_id" value={ c.ID.String() } checked?={ c.ID.String() == selectedID }/>
+						@nodeTypeChip(c.Type)
 						<span>{ c.Title }</span>
 					</label>
 				}

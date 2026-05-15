@@ -163,8 +163,8 @@
     if (form.classList.contains("post-form")) {
       var type = selectedValue(form, "type");
       var topicMode = selectedValue(form, "topic_parent_mode") || "root";
-      var needsParent = type === "view" || (type === "topic" && topicMode === "sub");
-      setRadioRequired(form, "parent_topic_id", needsParent);
+      var needsParent = type === "view" || type === "finding" || (type === "topic" && topicMode === "sub");
+      setRadioRequired(form, "parent_node_id", needsParent);
     }
 
     var toMode = selectedValue(form, "to_mode");
@@ -188,13 +188,17 @@
     if (form.classList.contains("post-form")) {
       var type = selectedValue(form, "type");
       var topicMode = selectedValue(form, "topic_parent_mode") || "root";
-      var needsParent = type === "view" || (type === "topic" && topicMode === "sub");
-      if (needsParent && !selectedValue(form, "parent_topic_id")) {
+      var needsParent = type === "view" || type === "finding" || (type === "topic" && topicMode === "sub");
+      if (needsParent && !selectedValue(form, "parent_node_id")) {
+        var message = "A view must be connected to a parent topic. Search and select one above.";
+        if (type === "topic") {
+          message = "A sub-topic must be connected to a parent topic. Search and select one above.";
+        } else if (type === "finding") {
+          message = "A finding must attach to an existing node. Search and select one above.";
+        }
         return {
-          field: form.querySelector('input[name="find_topic"]') || form.querySelector('input[name="parent_topic_id"]'),
-          message: type === "topic"
-            ? "A sub-topic must be connected to a parent topic. Search and select one above."
-            : "A view must be connected to a parent topic. Search and select one above.",
+          field: form.querySelector('input[name="find_parent"]') || form.querySelector('input[name="parent_node_id"]'),
+          message: message,
         };
       }
     }

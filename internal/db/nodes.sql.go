@@ -612,42 +612,48 @@ func (q *Queries) SearchNodes(ctx context.Context, arg SearchNodesParams) ([]Sea
 	return items, nil
 }
 
-const searchTopics = `-- name: SearchTopics :many
-SELECT id, title
+const searchPostParents = `-- name: SearchPostParents :many
+SELECT id, type, title
 FROM nodes
-WHERE type = 'topic'
-  AND node_visible_to(nodes.*, $1::uuid)
-  AND ($2::text = '' OR title %> $2::text)
+WHERE ($1::text = '' OR type::text = $1::text)
+  AND node_visible_to(nodes.*, $2::uuid)
+  AND ($3::text = '' OR title %> $3::text)
 ORDER BY
-    CASE WHEN $2::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
-    word_similarity($2::text, title) DESC,
+    CASE WHEN $3::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
+    word_similarity($3::text, title) DESC,
     title ASC
 LIMIT 20
 `
 
-type SearchTopicsParams struct {
-	ViewerID *uuid.UUID `json:"viewer_id"`
-	Query    string     `json:"query"`
+type SearchPostParentsParams struct {
+	TypeFilter string     `json:"type_filter"`
+	ViewerID   *uuid.UUID `json:"viewer_id"`
+	Query      string     `json:"query"`
 }
 
-type SearchTopicsRow struct {
+type SearchPostParentsRow struct {
 	ID    uuid.UUID `json:"id"`
+	Type  NodeType  `json:"type"`
 	Title string    `json:"title"`
 }
 
-// Topic picker for the post form: fuzzy-searches topic titles when a query is
-// given; falls back to recency order when empty so the picker is pre-populated.
-// Respects node_visible_to() so viewers only see topics they can post under.
-func (q *Queries) SearchTopics(ctx context.Context, arg SearchTopicsParams) ([]SearchTopicsRow, error) {
-	rows, err := q.db.Query(ctx, searchTopics, arg.ViewerID, arg.Query)
+// Parent picker for the post form. type_filter restricts to a single node
+// type ('topic' when creating a view or sub-topic); leave it empty to match
+// any type ('topic', 'view', or 'finding') — used when creating a finding,
+// which can attach to any existing node. Fuzzy-searches titles when a query
+// is given; falls back to recency order when empty so the picker is
+// pre-populated. Respects node_visible_to() so viewers only see candidates
+// they can post under.
+func (q *Queries) SearchPostParents(ctx context.Context, arg SearchPostParentsParams) ([]SearchPostParentsRow, error) {
+	rows, err := q.db.Query(ctx, searchPostParents, arg.TypeFilter, arg.ViewerID, arg.Query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchTopicsRow
+	var items []SearchPostParentsRow
 	for rows.Next() {
-		var i SearchTopicsRow
-		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+		var i SearchPostParentsRow
+		if err := rows.Scan(&i.ID, &i.Type, &i.Title); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

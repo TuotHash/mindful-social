@@ -140,7 +140,7 @@ func createNode(t *testing.T, c *http.Client, nodeType, title, body string) uuid
 	// create a throwaway topic so the validation passes.
 	if nodeType == "view" {
 		topicID := createNode(t, c, "topic", "Auto topic for: "+title, "")
-		vals.Set("parent_topic_id", topicID.String())
+		vals.Set("parent_node_id", topicID.String())
 	}
 	resp := formPost(t, c, "/nodes", vals)
 	defer resp.Body.Close()
