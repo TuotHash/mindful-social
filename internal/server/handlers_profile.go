@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -85,12 +84,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		relation.FollowsViewer = state.FollowsViewer
 	}
 
-	pinRowsOut, err := s.pinRows(r, pins)
-	if err != nil {
-		s.logger.Error("profile: pin findings", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	pinRowsOut := pinRows(pins)
 
 	render(w, r, views.Profile(
 		viewerFor(viewer),
@@ -102,11 +96,10 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	))
 }
 
-// pinRows turns DB pin rows into view rows, batch-loading findings for
-// all pins in one query to avoid N+1.
-func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.PinRow, error) {
+// pinRows turns DB pin rows into view rows. Pins are now stance-only;
+// any evidence the pinner wants to show lives in the typed-edge graph.
+func pinRows(rows []db.ListPinsByUserRow) []views.PinRow {
 	out := make([]views.PinRow, 0, len(rows))
-	pinIDs := make([]uuid.UUID, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, views.PinRow{
 			NodeID:    row.NodeID,
@@ -115,28 +108,8 @@ func (s *Server) pinRows(r *http.Request, rows []db.ListPinsByUserRow) ([]views.
 			NodeTitle: row.NodeTitle,
 			Kind:      row.Kind,
 		})
-		pinIDs = append(pinIDs, row.ID)
 	}
-	if len(pinIDs) == 0 {
-		return out, nil
-	}
-	rs, err := s.queries.ListFindingsForPins(r.Context(), db.ListFindingsForPinsParams{
-		PinIds:   pinIDs,
-		ViewerID: viewerID(r),
-	})
-	if err != nil {
-		return nil, err
-	}
-	byPin := map[uuid.UUID][]views.PinFinding{}
-	for _, row := range rs {
-		byPin[row.PinID] = append(byPin[row.PinID], views.PinFinding{
-			ID: row.ID, Slug: row.Slug, Title: row.Title,
-		})
-	}
-	for i, row := range rows {
-		out[i].Findings = byPin[row.ID]
-	}
-	return out, nil
+	return out
 }
 
 // identityLabel turns a provider key into the short, user-friendly name

@@ -16,9 +16,6 @@ type Querier interface {
 	// Idempotent. The handler treats "already a member" the same as "now a
 	// member" so the form doesn't need to know which it was.
 	AddListMember(ctx context.Context, arg AddListMemberParams) error
-	// Attach one finding to a pin. ON CONFLICT DO NOTHING so the same
-	// (pin, finding) pair is a harmless retry rather than an error.
-	AddPinFinding(ctx context.Context, arg AddPinFindingParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
 	// True when `viewer` is permitted to edit `node` under its edit_policy.
 	// Implemented in SQL so handlers can call it without re-implementing the
@@ -66,9 +63,6 @@ type Querier interface {
 	// editing. The handler enforces edit permission on that node; this WHERE
 	// clause keeps the edge membership check in the database mutation too.
 	DeleteEdge(ctx context.Context, arg DeleteEdgeParams) (int64, error)
-	// Clear all attached findings for a pin. Combined with AddPinFinding
-	// this implements "replace the set" semantics for the pin form.
-	DeleteFindingsForPin(ctx context.Context, pinID uuid.UUID) error
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
 	DeletePin(ctx context.Context, arg DeletePinParams) error
@@ -97,9 +91,9 @@ type Querier interface {
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
 	GetPasswordIdentityForUser(ctx context.Context, userID uuid.UUID) (AuthIdentity, error)
-	// Whether and how the viewer has pinned a given node. Attached findings
-	// are loaded separately via ListFindingsForPin so the same shape covers
-	// 0, 1, or many findings without nested aggregation here.
+	// Whether and how the viewer has pinned a given node. Pins now carry
+	// only the stance — findings live as first-class graph nodes attached
+	// through edges, not bolted onto the pin record.
 	GetPinForUserAndNode(ctx context.Context, arg GetPinForUserAndNodeParams) (GetPinForUserAndNodeRow, error)
 	GetTagByName(ctx context.Context, name string) (Tag, error)
 	// Lookup the user's built-in Trusted list. Should always succeed for
@@ -141,13 +135,6 @@ type Querier interface {
 	// to_position is the rank when this node (the TO endpoint) has highlighted
 	// the edge from its side; NULL keeps it in the legend only.
 	ListEdgesToNodeForViewer(ctx context.Context, arg ListEdgesToNodeForViewerParams) ([]ListEdgesToNodeForViewerRow, error)
-	// Findings attached to a single pin, oldest-attached first so the order
-	// the user added them is preserved. Hidden findings are filtered out.
-	ListFindingsForPin(ctx context.Context, arg ListFindingsForPinParams) ([]ListFindingsForPinRow, error)
-	// Batch-load findings for multiple pins at once — used to avoid N+1 when
-	// rendering a profile's pin list. Result includes the pin_id so callers
-	// can group by pin. Hidden findings are filtered out.
-	ListFindingsForPins(ctx context.Context, arg ListFindingsForPinsParams) ([]ListFindingsForPinsRow, error)
 	// Users that follow $1.
 	ListFollowers(ctx context.Context, followedID uuid.UUID) ([]ListFollowersRow, error)
 	// Users that $1 follows.
@@ -176,9 +163,8 @@ type Querier interface {
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
 	ListPendingGroupInvitesForUser(ctx context.Context, invitedUserID uuid.UUID) ([]ListPendingGroupInvitesForUserRow, error)
 	// A user's pins with the joined node — for the "On my profile" section on
-	// a profile page. Findings are loaded separately via ListFindingsForPins
-	// to avoid row-multiplying joins. node_visible_to() hides pins whose
-	// underlying node the viewer isn't entitled to see.
+	// a profile page. node_visible_to() hides pins whose underlying node the
+	// viewer isn't entitled to see.
 	ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
@@ -202,11 +188,6 @@ type Querier interface {
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
 	RemoveListMember(ctx context.Context, arg RemoveListMemberParams) error
-	// Finding picker for the pin form: same fuzzy + recency-fallback shape as
-	// SearchTopics, but filtered to type='finding'. Returns finding nodes the
-	// viewer is permitted to see — authorship is irrelevant, anyone can attach
-	// any visible finding to their pin.
-	SearchFindings(ctx context.Context, arg SearchFindingsParams) ([]SearchFindingsRow, error)
 	// Hybrid full-text + fuzzy search. tsvector handles stems, stop-words, and
 	// phrase quotes via websearch_to_tsquery; pg_trgm word_similarity on the
 	// title catches typos and partial words ("nucear" → "Nuclear"). A row

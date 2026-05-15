@@ -524,54 +524,6 @@ func (q *Queries) PickerSearchNodes(ctx context.Context, arg PickerSearchNodesPa
 	return items, nil
 }
 
-const searchFindings = `-- name: SearchFindings :many
-SELECT id, slug, title
-FROM nodes
-WHERE type = 'finding'
-  AND node_visible_to(nodes.*, $1::uuid)
-  AND ($2::text = '' OR title %> $2::text)
-ORDER BY
-    CASE WHEN $2::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
-    word_similarity($2::text, title) DESC,
-    title ASC
-LIMIT 50
-`
-
-type SearchFindingsParams struct {
-	ViewerID *uuid.UUID `json:"viewer_id"`
-	Query    string     `json:"query"`
-}
-
-type SearchFindingsRow struct {
-	ID    uuid.UUID `json:"id"`
-	Slug  string    `json:"slug"`
-	Title string    `json:"title"`
-}
-
-// Finding picker for the pin form: same fuzzy + recency-fallback shape as
-// SearchTopics, but filtered to type='finding'. Returns finding nodes the
-// viewer is permitted to see — authorship is irrelevant, anyone can attach
-// any visible finding to their pin.
-func (q *Queries) SearchFindings(ctx context.Context, arg SearchFindingsParams) ([]SearchFindingsRow, error) {
-	rows, err := q.db.Query(ctx, searchFindings, arg.ViewerID, arg.Query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SearchFindingsRow
-	for rows.Next() {
-		var i SearchFindingsRow
-		if err := rows.Scan(&i.ID, &i.Slug, &i.Title); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const searchNodes = `-- name: SearchNodes :many
 SELECT
     n.id, n.slug, n.type, n.title, n.body, n.source_url, n.created_by,

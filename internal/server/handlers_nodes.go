@@ -396,17 +396,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 			return // error already written
 		}
 		if row != nil {
-			info := views.PinInfo{Kind: row.Kind}
-			rs, err := s.queries.ListFindingsForPin(r.Context(), db.ListFindingsForPinParams{
-				PinID:    row.ID,
-				ViewerID: viewerID(r),
-			})
-			if err != nil {
-				s.logger.Error("node detail: pin findings", "err", err)
-			} else {
-				info.Findings = pinFindingsFromRows(rs)
-			}
-			pin = &info
+			pin = &views.PinInfo{Kind: row.Kind}
 		}
 	}
 

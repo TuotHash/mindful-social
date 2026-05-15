@@ -222,7 +222,6 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}/images", s.handleNodeImageUpload)
 		r.Post("/nodes/{id}/videos", s.handleNodeVideoUpload)
 		r.Get("/nodes/{id}/pin", s.handlePinForm)
-		r.Get("/nodes/{id}/finding-picker", s.handleFindingPicker)
 		r.Post("/nodes/{id}/pin", s.handlePinSet)
 		r.Post("/nodes/{id}/unpin", s.handlePinDelete)
 		r.Post("/nodes/{id}/comments", s.handleCommentCreate)
