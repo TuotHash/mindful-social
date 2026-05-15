@@ -488,7 +488,43 @@
 
       function applyTransform() {
         if (!viewport) return;
-        viewport.setAttribute("transform", "translate(" + pan.x + " " + pan.y + ") scale(" + zoom + ")");
+        viewport.setAttribute("transform", "matrix(" + zoom + " 0 0 " + zoom + " " + pan.x + " " + pan.y + ")");
+      }
+
+      function clampZoom(value) {
+        return Math.max(0.55, Math.min(2.4, value));
+      }
+
+      function svgPointFromClient(clientX, clientY) {
+        var matrix = svg.getScreenCTM && svg.getScreenCTM();
+        if (matrix && svg.createSVGPoint) {
+          var point = svg.createSVGPoint();
+          point.x = clientX;
+          point.y = clientY;
+          return point.matrixTransform(matrix.inverse());
+        }
+
+        var rect = svg.getBoundingClientRect();
+        return {
+          x: ((clientX - rect.left) * 1200) / Math.max(1, rect.width),
+          y: ((clientY - rect.top) * viewHeight) / Math.max(1, rect.height),
+        };
+      }
+
+      function svgCenterPoint() {
+        var rect = svg.getBoundingClientRect();
+        return svgPointFromClient(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      }
+
+      function zoomAt(nextZoom, anchor) {
+        nextZoom = clampZoom(nextZoom);
+        if (nextZoom === zoom) return;
+
+        var ratio = nextZoom / zoom;
+        pan.x = anchor.x - (anchor.x - pan.x) * ratio;
+        pan.y = anchor.y - (anchor.y - pan.y) * ratio;
+        zoom = nextZoom;
+        applyTransform();
       }
 
       function render() {
@@ -660,8 +696,7 @@
           if (action === "reset") {
             resetView();
           } else {
-            zoom = Math.max(0.55, Math.min(2.4, zoom * (action === "in" ? 1.2 : 0.84)));
-            applyTransform();
+            zoomAt(zoom * (action === "in" ? 1.2 : 0.84), svgCenterPoint());
           }
         });
       });
@@ -683,8 +718,8 @@
         var rect = svg.getBoundingClientRect();
         var dx = event.clientX - lastPointer.x;
         var dy = event.clientY - lastPointer.y;
-        pan.x += (dx * 1200) / Math.max(1, rect.width) / zoom;
-        pan.y += (dy * viewHeight) / Math.max(1, rect.height) / zoom;
+        pan.x += (dx * 1200) / Math.max(1, rect.width);
+        pan.y += (dy * viewHeight) / Math.max(1, rect.height);
         lastPointer = { x: event.clientX, y: event.clientY };
         applyTransform();
       });
@@ -699,8 +734,7 @@
       });
       svg.addEventListener("wheel", function (event) {
         event.preventDefault();
-        zoom = Math.max(0.55, Math.min(2.4, zoom * (event.deltaY < 0 ? 1.08 : 0.92)));
-        applyTransform();
+        zoomAt(zoom * (event.deltaY < 0 ? 1.08 : 0.92), svgPointFromClient(event.clientX, event.clientY));
       }, { passive: false });
 
       render();

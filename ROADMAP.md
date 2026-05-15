@@ -30,6 +30,8 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 - **Trending graph view** — most-engaged nodes and edges over a recent window.
 
+- **3D argument graph** — add an optional `/graph/3d` explorer powered by `3d-force-graph` for spatial graph exploration while keeping the readable 2D graph as the default view.
+
 - **Graph filters** — narrow by topic, node type, or specific person.
 
 - **Graph search** — full-text search inside the graph view; matches highlight in place so the user sees them in context.
