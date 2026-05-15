@@ -145,7 +145,9 @@ type Querier interface {
 	// "Key findings" section semantically matches its name.
 	ListHighlightedEdgesForNode(ctx context.Context, arg ListHighlightedEdgesForNodeParams) ([]ListHighlightedEdgesForNodeRow, error)
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
+	ListNodeImagesByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeImagesByUploaderRow, error)
 	ListNodeImagesForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeImagesForRootRow, error)
+	ListNodeVideosByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeVideosByUploaderRow, error)
 	ListNodeVideosForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeVideosForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
 	// on a profile page. Filtered through node_visible_to() so a visitor only

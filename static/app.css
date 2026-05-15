@@ -2754,6 +2754,88 @@ header.node-header > .chip {
   color: var(--text-muted);
 }
 
+.account-media-list {
+  list-style: none;
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-3);
+}
+.account-media-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+.account-media-row:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.account-media-preview {
+  width: 92px;
+  aspect-ratio: 4 / 3;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+}
+.account-media-preview img,
+.account-media-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.account-media-main {
+  min-width: 0;
+}
+.account-media-name {
+  color: var(--text);
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-media-meta,
+.account-media-topic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: 6px;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}
+.account-media-topic a {
+  color: var(--text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip.media-image {
+  color: var(--supports);
+  background: color-mix(in oklab, var(--supports) 12%, var(--bg-elev-2));
+  border-color: color-mix(in oklab, var(--supports) 28%, transparent);
+}
+.chip.media-video {
+  color: var(--opposes);
+  background: color-mix(in oklab, var(--opposes) 12%, var(--bg-elev-2));
+  border-color: color-mix(in oklab, var(--opposes) 28%, transparent);
+}
+
+@media (max-width: 520px) {
+  .account-media-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .account-media-preview {
+    width: 72px;
+  }
+}
+
 /* =========================================================================
    Search
    ========================================================================= */

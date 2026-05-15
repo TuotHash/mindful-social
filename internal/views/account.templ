@@ -1,6 +1,10 @@
 package views
 
 import (
+	"fmt"
+	"path"
+	"time"
+
 	"github.com/google/uuid"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -16,6 +20,22 @@ type AccountIdentity struct {
 	Label         string
 	Subject       string
 	CanDisconnect bool
+}
+
+// AccountMediaItem is one file the account owner uploaded through a node
+// editor. Profile images are stored directly on the user row and are not
+// part of this media history.
+type AccountMediaItem struct {
+	Kind           string
+	Path           string
+	ContentType    string
+	ByteSize       int64
+	Width          int32
+	Height         int32
+	DurationMs     int32
+	CreatedAt      time.Time
+	RootTopicSlug  string
+	RootTopicTitle string
 }
 
 // AccountTimezones is the curated list of IANA zones shown in the timezone
@@ -54,7 +74,7 @@ var AccountTimezones = []string{
 	"Pacific/Auckland",
 }
 
-templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPassword bool, prefVisibility, prefTimezone, flash, success string) {
+templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, media []AccountMediaItem, hasPassword bool, prefVisibility, prefTimezone, flash, success string) {
 	@Layout("Account", viewer) {
 		<div class="page narrow">
 			<div class="col gap-12" style="margin-bottom: 24px;">
@@ -113,6 +133,57 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 					<div class="account-field-value">{ user.Email }</div>
 					<div class="account-field-note muted">Changing email isn't available yet</div>
 				</div>
+			</section>
+
+			<section class="card" style="padding: 20px; margin-top: 24px;">
+				<h2 style="margin-top: 0;">Media uploads</h2>
+				if len(media) == 0 {
+					<p class="muted">No node media uploads yet.</p>
+				} else {
+					<ul class="account-media-list">
+						for _, item := range media {
+							<li class="account-media-row">
+								<a class="account-media-preview" href={ templ.SafeURL(item.Path) } aria-label={ "Open " + accountMediaFileName(item.Path) }>
+									if item.Kind == "image" {
+										<img src={ templ.SafeURL(item.Path) } alt="" loading="lazy"/>
+									} else {
+										<video src={ templ.SafeURL(item.Path) } muted playsinline preload="metadata"></video>
+									}
+								</a>
+								<div class="account-media-main">
+									<div class="row gap-8 wrap">
+										<span class={ "chip", "media-" + item.Kind }>
+											<span class="dot"></span>
+											{ item.Kind }
+										</span>
+										<a class="account-media-name" href={ templ.SafeURL(item.Path) }>{ accountMediaFileName(item.Path) }</a>
+									</div>
+									<div class="account-media-meta">
+										<span>{ accountMediaBytes(item.ByteSize) }</span>
+										if item.ContentType != "" {
+											<span>{ item.ContentType }</span>
+										}
+										if !item.CreatedAt.IsZero() {
+											<span>{ item.CreatedAt.In(viewer.Location()).Format("Jan 2, 2006") }</span>
+										}
+										if item.Kind == "video" && item.Width > 0 && item.Height > 0 {
+											<span>{ fmt.Sprintf("%dx%d", item.Width, item.Height) }</span>
+										}
+										if d := accountMediaDuration(item.DurationMs); d != "" {
+											<span>{ d }</span>
+										}
+									</div>
+									if item.RootTopicSlug != "" {
+										<div class="account-media-topic">
+											<span class="muted">Topic</span>
+											<a href={ templ.SafeURL("/nodes/" + item.RootTopicSlug) }>{ item.RootTopicTitle }</a>
+										</div>
+									}
+								</div>
+							</li>
+						}
+					</ul>
+				}
 			</section>
 
 			<section class="card" style="padding: 20px; margin-top: 24px;">
@@ -184,4 +255,36 @@ templ Account(viewer *Viewer, user db.User, identities []AccountIdentity, hasPas
 			</section>
 		</div>
 	}
+}
+
+func accountMediaFileName(p string) string {
+	name := path.Base(p)
+	if name == "." || name == "/" {
+		return p
+	}
+	return name
+}
+
+func accountMediaBytes(n int64) string {
+	switch {
+	case n < 1024:
+		return fmt.Sprintf("%d B", n)
+	case n < 1024*1024:
+		return fmt.Sprintf("%.1f KB", float64(n)/1024)
+	default:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
+	}
+}
+
+func accountMediaDuration(ms int32) string {
+	if ms <= 0 {
+		return ""
+	}
+	seconds := int(ms+500) / 1000
+	minutes := seconds / 60
+	seconds = seconds % 60
+	if minutes == 0 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+	return fmt.Sprintf("%d:%02d", minutes, seconds)
 }

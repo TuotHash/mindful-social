@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func TestAccountProfileImageUpload(t *testing.T) {
@@ -149,5 +151,60 @@ func TestAccountProfileImageUpload_CompressesAndResizes(t *testing.T) {
 	b := outImg.Bounds()
 	if b.Dx() > maxProfileImageDimension || b.Dy() > maxProfileImageDimension {
 		t.Fatalf("compressed image dimensions = %dx%d, want max %d", b.Dx(), b.Dy(), maxProfileImageDimension)
+	}
+}
+
+func TestAccountListsOwnNodeMediaUploads(t *testing.T) {
+	integrationDB(t)
+	aliceClient := newClient(t)
+	alice := signupAndGetUser(t, aliceClient, "alice", "alice@example.com", "correct horse battery staple")
+	topicID := createNode(t, aliceClient, "topic", "Media Topic", "")
+	topic, err := testServer.queries.GetNode(t.Context(), topicID)
+	if err != nil {
+		t.Fatalf("get topic: %v", err)
+	}
+
+	if _, err := testServer.queries.CreateNodeImage(t.Context(), db.CreateNodeImageParams{
+		RootTopicID: topic.ID,
+		UploadedBy:  alice.ID,
+		StoredPath:  "/uploads/topics/" + topic.ID.String() + "/alice-image.jpg",
+		ContentType: "image/jpeg",
+		ByteSize:    2048,
+	}); err != nil {
+		t.Fatalf("create image media: %v", err)
+	}
+	if _, err := testServer.queries.CreateNodeVideo(t.Context(), db.CreateNodeVideoParams{
+		RootTopicID: topic.ID,
+		UploadedBy:  alice.ID,
+		StoredPath:  "/uploads/topics/" + topic.ID.String() + "/alice-video.mp4",
+		ContentType: "video/mp4",
+		ByteSize:    4096,
+		Width:       640,
+		Height:      360,
+		DurationMs:  61000,
+	}); err != nil {
+		t.Fatalf("create video media: %v", err)
+	}
+
+	bobClient := newClient(t)
+	bob := signupAndGetUser(t, bobClient, "bob", "bob@example.com", "correct horse battery staple")
+	if _, err := testServer.queries.CreateNodeImage(t.Context(), db.CreateNodeImageParams{
+		RootTopicID: topic.ID,
+		UploadedBy:  bob.ID,
+		StoredPath:  "/uploads/topics/" + topic.ID.String() + "/bob-image.jpg",
+		ContentType: "image/jpeg",
+		ByteSize:    1024,
+	}); err != nil {
+		t.Fatalf("create bob image media: %v", err)
+	}
+
+	body := readBody(t, get(t, aliceClient, "/account"))
+	for _, want := range []string{"Media uploads", "alice-image.jpg", "alice-video.mp4", "Media Topic", "640x360", "1:01"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("account media list missing %q; body: %s", want, snippet(body))
+		}
+	}
+	if strings.Contains(body, "bob-image.jpg") {
+		t.Fatalf("account media list included another user's upload; body: %s", snippet(body))
 	}
 }

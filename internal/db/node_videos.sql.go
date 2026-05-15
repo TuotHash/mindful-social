@@ -64,6 +64,68 @@ func (q *Queries) CreateNodeVideo(ctx context.Context, arg CreateNodeVideoParams
 	return i, err
 }
 
+const listNodeVideosByUploader = `-- name: ListNodeVideosByUploader :many
+SELECT
+    v.id,
+    v.stored_path,
+    v.content_type,
+    v.byte_size,
+    v.width,
+    v.height,
+    v.duration_ms,
+    v.created_at,
+    n.slug AS root_topic_slug,
+    n.title AS root_topic_title
+FROM node_videos v
+JOIN nodes n ON n.id = v.root_topic_id
+WHERE v.uploaded_by = $1
+ORDER BY v.created_at DESC
+`
+
+type ListNodeVideosByUploaderRow struct {
+	ID             uuid.UUID          `json:"id"`
+	StoredPath     string             `json:"stored_path"`
+	ContentType    string             `json:"content_type"`
+	ByteSize       int64              `json:"byte_size"`
+	Width          int32              `json:"width"`
+	Height         int32              `json:"height"`
+	DurationMs     int32              `json:"duration_ms"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	RootTopicSlug  string             `json:"root_topic_slug"`
+	RootTopicTitle string             `json:"root_topic_title"`
+}
+
+func (q *Queries) ListNodeVideosByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeVideosByUploaderRow, error) {
+	rows, err := q.db.Query(ctx, listNodeVideosByUploader, uploadedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNodeVideosByUploaderRow
+	for rows.Next() {
+		var i ListNodeVideosByUploaderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoredPath,
+			&i.ContentType,
+			&i.ByteSize,
+			&i.Width,
+			&i.Height,
+			&i.DurationMs,
+			&i.CreatedAt,
+			&i.RootTopicSlug,
+			&i.RootTopicTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNodeVideosForRoot = `-- name: ListNodeVideosForRoot :many
 SELECT id, stored_path, content_type, byte_size, width, height, duration_ms, created_at
 FROM node_videos

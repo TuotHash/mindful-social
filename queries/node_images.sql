@@ -35,3 +35,17 @@ SELECT id, stored_path, content_type, byte_size, created_at
 FROM node_images
 WHERE root_topic_id = $1
 ORDER BY created_at DESC;
+
+-- name: ListNodeImagesByUploader :many
+SELECT
+    i.id,
+    i.stored_path,
+    i.content_type,
+    i.byte_size,
+    i.created_at,
+    n.slug AS root_topic_slug,
+    n.title AS root_topic_title
+FROM node_images i
+JOIN nodes n ON n.id = i.root_topic_id
+WHERE i.uploaded_by = $1
+ORDER BY i.created_at DESC;

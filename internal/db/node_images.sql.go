@@ -82,6 +82,59 @@ func (q *Queries) FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.
 	return id_2, err
 }
 
+const listNodeImagesByUploader = `-- name: ListNodeImagesByUploader :many
+SELECT
+    i.id,
+    i.stored_path,
+    i.content_type,
+    i.byte_size,
+    i.created_at,
+    n.slug AS root_topic_slug,
+    n.title AS root_topic_title
+FROM node_images i
+JOIN nodes n ON n.id = i.root_topic_id
+WHERE i.uploaded_by = $1
+ORDER BY i.created_at DESC
+`
+
+type ListNodeImagesByUploaderRow struct {
+	ID             uuid.UUID          `json:"id"`
+	StoredPath     string             `json:"stored_path"`
+	ContentType    string             `json:"content_type"`
+	ByteSize       int64              `json:"byte_size"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	RootTopicSlug  string             `json:"root_topic_slug"`
+	RootTopicTitle string             `json:"root_topic_title"`
+}
+
+func (q *Queries) ListNodeImagesByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeImagesByUploaderRow, error) {
+	rows, err := q.db.Query(ctx, listNodeImagesByUploader, uploadedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNodeImagesByUploaderRow
+	for rows.Next() {
+		var i ListNodeImagesByUploaderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoredPath,
+			&i.ContentType,
+			&i.ByteSize,
+			&i.CreatedAt,
+			&i.RootTopicSlug,
+			&i.RootTopicTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNodeImagesForRoot = `-- name: ListNodeImagesForRoot :many
 SELECT id, stored_path, content_type, byte_size, created_at
 FROM node_images

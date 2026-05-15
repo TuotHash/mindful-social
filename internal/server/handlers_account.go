@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,9 +70,57 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 		prefVisibility = string(db.VisibilityKindPublic)
 	}
 
+	media, err := s.accountMedia(r, user.ID)
+	if err != nil {
+		s.logger.Error("account: list media", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	flash := s.sessions.PopString(r.Context(), accountFlashKey)
 	success := s.sessions.PopString(r.Context(), accountSuccessKey)
-	render(w, r, views.Account(viewerFor(user), *user, rows, hasPassword, prefVisibility, user.Timezone, flash, success))
+	render(w, r, views.Account(viewerFor(user), *user, rows, media, hasPassword, prefVisibility, user.Timezone, flash, success))
+}
+
+func (s *Server) accountMedia(r *http.Request, userID uuid.UUID) ([]views.AccountMediaItem, error) {
+	images, err := s.queries.ListNodeImagesByUploader(r.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	videos, err := s.queries.ListNodeVideosByUploader(r.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]views.AccountMediaItem, 0, len(images)+len(videos))
+	for _, img := range images {
+		items = append(items, views.AccountMediaItem{
+			Kind:           "image",
+			Path:           img.StoredPath,
+			ContentType:    img.ContentType,
+			ByteSize:       img.ByteSize,
+			CreatedAt:      img.CreatedAt.Time,
+			RootTopicSlug:  img.RootTopicSlug,
+			RootTopicTitle: img.RootTopicTitle,
+		})
+	}
+	for _, vid := range videos {
+		items = append(items, views.AccountMediaItem{
+			Kind:           "video",
+			Path:           vid.StoredPath,
+			ContentType:    vid.ContentType,
+			ByteSize:       vid.ByteSize,
+			Width:          vid.Width,
+			Height:         vid.Height,
+			DurationMs:     vid.DurationMs,
+			CreatedAt:      vid.CreatedAt.Time,
+			RootTopicSlug:  vid.RootTopicSlug,
+			RootTopicTitle: vid.RootTopicTitle,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
+	return items, nil
 }
 
 // handleAccountPreferences persists the user's default node visibility
