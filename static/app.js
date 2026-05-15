@@ -25,6 +25,262 @@
     return meta ? meta.getAttribute("content") : "";
   }
 
+  function closestForm(target) {
+    if (!target) return null;
+    if (target.tagName === "FORM") return target;
+    return target.closest ? target.closest("form") : null;
+  }
+
+  function formErrorScope(form) {
+    return form.closest(".modal-dialog, .page.narrow, .auth, .account-field, section.card") || form.parentElement;
+  }
+
+  function firstInvalidControl(form) {
+    return Array.from(form.elements || []).find(function (field) {
+      return field.willValidate && !field.validity.valid;
+    }) || null;
+  }
+
+  function fieldLabel(field) {
+    var explicit = field.getAttribute("aria-label") || field.dataset.errorLabel;
+    if (explicit) return explicit;
+
+    var fieldset = field.type === "radio" ? field.closest("fieldset") : null;
+    var legend = fieldset && fieldset.querySelector("legend");
+    if (legend) return legend.textContent.trim();
+
+    var label = field.closest("label");
+    if (label) {
+      var clone = label.cloneNode(true);
+      clone.querySelectorAll("input, textarea, select, small, .EasyMDEContainer").forEach(function (node) {
+        node.remove();
+      });
+      var text = clone.textContent.replace(/\s+/g, " ").trim();
+      if (text) return text;
+    }
+
+    return field.name ? field.name.replace(/[_-]+/g, " ") : "This field";
+  }
+
+  function validationMessage(field) {
+    var label = fieldLabel(field);
+    var validity = field.validity || {};
+    if (validity.valueMissing) return label + " is required.";
+    if (validity.typeMismatch && field.type === "email") return "Enter a valid email address.";
+    if (validity.typeMismatch && field.type === "url") return "Enter a valid URL.";
+    if (validity.tooShort) return label + " must be at least " + field.minLength + " characters.";
+    if (validity.tooLong) return label + " must be " + field.maxLength + " characters or fewer.";
+    if (validity.patternMismatch && field.name === "username") {
+      return "Username must be 3-32 characters: letters, digits, dot, dash, underscore.";
+    }
+    return field.validationMessage || "Check the highlighted field.";
+  }
+
+  function setFieldInvalid(field, invalid) {
+    if (!field) return;
+    if (invalid) {
+      field.setAttribute("aria-invalid", "true");
+    } else {
+      field.removeAttribute("aria-invalid");
+    }
+
+    var group = field.type === "radio" ? field.closest("fieldset") : null;
+    if (group) {
+      if (invalid) group.setAttribute("aria-invalid", "true");
+      else group.removeAttribute("aria-invalid");
+    }
+
+    var editor = field.nextElementSibling && field.nextElementSibling.classList.contains("EasyMDEContainer")
+      ? field.nextElementSibling
+      : null;
+    if (editor) {
+      if (invalid) editor.setAttribute("aria-invalid", "true");
+      else editor.removeAttribute("aria-invalid");
+    }
+  }
+
+  function clearInvalidState(form) {
+    form.querySelectorAll('[aria-invalid="true"]').forEach(function (field) {
+      field.removeAttribute("aria-invalid");
+    });
+  }
+
+  function clientErrorBanner(form) {
+    if (!form) return null;
+    var scope = formErrorScope(form);
+    if (!scope) return null;
+
+    var existing = scope.querySelector('.flash[data-client-error="true"], .flash[role="alert"]');
+    if (existing) return existing;
+
+    var banner = document.createElement("div");
+    banner.className = "flash danger";
+    banner.setAttribute("role", "alert");
+    banner.setAttribute("data-client-error", "true");
+
+    var anchor = form;
+    while (anchor.parentElement && anchor.parentElement !== scope) {
+      anchor = anchor.parentElement;
+    }
+    scope.insertBefore(banner, anchor);
+    return banner;
+  }
+
+  function showClientError(target, message) {
+    var form = closestForm(target);
+    var banner = clientErrorBanner(form);
+    if (!banner) return;
+    banner.textContent = message;
+    banner.hidden = false;
+    banner.classList.add("danger");
+    banner.setAttribute("role", "alert");
+    banner.setAttribute("data-client-error", "true");
+    banner.scrollIntoView && banner.scrollIntoView({ block: "nearest" });
+  }
+
+  function clearClientError(form) {
+    if (!form) return;
+    var scope = formErrorScope(form);
+    if (!scope) return;
+    scope.querySelectorAll('.flash[data-client-error="true"]').forEach(function (banner) {
+      banner.hidden = true;
+      banner.textContent = "";
+    });
+  }
+
+  function selectedValue(form, name) {
+    var checked = form.querySelector('input[name="' + name + '"]:checked');
+    return checked ? checked.value : "";
+  }
+
+  function setRadioRequired(form, name, required) {
+    form.querySelectorAll('input[type="radio"][name="' + name + '"]').forEach(function (input) {
+      input.required = required;
+    });
+  }
+
+  function syncConditionalRequirements(form) {
+    if (form.classList.contains("post-form")) {
+      var type = selectedValue(form, "type");
+      var topicMode = selectedValue(form, "topic_parent_mode") || "root";
+      var needsParent = type === "view" || (type === "topic" && topicMode === "sub");
+      setRadioRequired(form, "parent_topic_id", needsParent);
+    }
+
+    var toMode = selectedValue(form, "to_mode");
+    if (toMode) {
+      var existingMode = toMode !== "new";
+      var targets = form.querySelectorAll('input[type="radio"][name="to_id"]');
+      targets.forEach(function (input) {
+        input.required = existingMode;
+        input.disabled = !existingMode;
+      });
+
+      var newFindingTitle = form.querySelector('input[name="new_finding_title"]');
+      if (newFindingTitle) {
+        newFindingTitle.required = !existingMode;
+        newFindingTitle.disabled = existingMode;
+      }
+    }
+  }
+
+  function customFormError(form) {
+    if (form.classList.contains("post-form")) {
+      var type = selectedValue(form, "type");
+      var topicMode = selectedValue(form, "topic_parent_mode") || "root";
+      var needsParent = type === "view" || (type === "topic" && topicMode === "sub");
+      if (needsParent && !selectedValue(form, "parent_topic_id")) {
+        return {
+          field: form.querySelector('input[name="find_topic"]') || form.querySelector('input[name="parent_topic_id"]'),
+          message: type === "topic"
+            ? "A sub-topic must be connected to a parent topic. Search and select one above."
+            : "A view must be connected to a parent topic. Search and select one above.",
+        };
+      }
+    }
+
+    var toMode = selectedValue(form, "to_mode");
+    if (toMode === "new") {
+      var title = form.querySelector('input[name="new_finding_title"]');
+      if (title && title.value.trim() === "") {
+        return { field: title, message: "Type a title for the new finding." };
+      }
+    } else if (toMode === "existing" && !selectedValue(form, "to_id")) {
+      return {
+        field: form.querySelector('input[name="find"]') || form.querySelector('input[name="to_id"]'),
+        message: "Select a target node.",
+      };
+    }
+
+    return null;
+  }
+
+  function focusInvalidField(field) {
+    if (!field) return;
+    if (field.focus) field.focus({ preventScroll: true });
+    field.scrollIntoView && field.scrollIntoView({ block: "center" });
+  }
+
+  function showFieldError(form, field, message) {
+    clearInvalidState(form);
+    setFieldInvalid(field, true);
+    showClientError(form, message);
+    focusInvalidField(field);
+  }
+
+  function validateClientForm(form) {
+    syncConditionalRequirements(form);
+
+    var custom = customFormError(form);
+    if (custom) {
+      showFieldError(form, custom.field, custom.message);
+      return false;
+    }
+
+    if (form.checkValidity && !form.checkValidity()) {
+      var invalid = firstInvalidControl(form);
+      showFieldError(form, invalid, invalid ? validationMessage(invalid) : "Check the highlighted field.");
+      return false;
+    }
+
+    return true;
+  }
+
+  function initClientErrors(root) {
+    root.querySelectorAll("form").forEach(function (form) {
+      if (form.dataset.clientErrorsReady === "true") return;
+      form.dataset.clientErrorsReady = "true";
+      syncConditionalRequirements(form);
+
+      form.addEventListener("invalid", function (event) {
+        event.preventDefault();
+        var first = firstInvalidControl(form) || event.target;
+        if (event.target !== first) return;
+        showFieldError(form, first, validationMessage(first));
+      }, true);
+
+      form.addEventListener("submit", function (event) {
+        if (validateClientForm(form)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      });
+
+      form.addEventListener("input", function (event) {
+        if (!event.target || !event.target.matches("input, textarea, select")) return;
+        syncConditionalRequirements(form);
+        setFieldInvalid(event.target, false);
+        clearClientError(form);
+      });
+
+      form.addEventListener("change", function (event) {
+        if (!event.target || !event.target.matches("input, textarea, select")) return;
+        syncConditionalRequirements(form);
+        setFieldInvalid(event.target, false);
+        clearClientError(form);
+      });
+    });
+  }
+
   // resolveEndpoint inspects the textarea's data-<kind>-* attributes and
   // returns the URL the editor should POST uploads to. The "template" form
   // ("/nodes/{id}/images") is paired with a form-input name that supplies
@@ -47,6 +303,55 @@
 
   function hasVideoEndpoint(textarea) {
     return !!(textarea.dataset.videoEndpoint || textarea.dataset.videoEndpointTemplate);
+  }
+
+  var IMAGE_ERROR_MESSAGES = {
+    noFileGiven: "Choose an image to upload.",
+    typeNotAllowed: "Only PNG, JPEG and GIF images are accepted.",
+    fileTooLarge: "Images must be 8 MB or smaller.",
+    importError: "Could not upload the image. Please try again.",
+    noPermission: "You don't have permission to upload images here.",
+  };
+
+  function uploadImageFile(textarea, file, onSuccess, onError, options) {
+    var messages = options.errorMessages || IMAGE_ERROR_MESSAGES;
+    if (!file) {
+      onError(messages.noFileGiven);
+      return;
+    }
+    if (file.size > options.imageMaxSize) {
+      onError(messages.fileTooLarge);
+      return;
+    }
+    if (["image/png", "image/jpeg", "image/gif"].indexOf(file.type) < 0) {
+      onError(messages.typeNotAllowed);
+      return;
+    }
+
+    var endpoint = resolveImageEndpoint(textarea);
+    if (!endpoint) {
+      onError(messages.noPermission);
+      return;
+    }
+
+    var form = new FormData();
+    form.append("image", file);
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", endpoint);
+    xhr.setRequestHeader("X-CSRF-Token", csrfToken());
+    xhr.onload = function () {
+      var body = null;
+      try { body = JSON.parse(xhr.responseText); } catch (e) {}
+      if (xhr.status >= 200 && xhr.status < 300 && body && body.data && body.data.filePath) {
+        clearClientError(textarea.form);
+        onSuccess(body.data.filePath);
+        return;
+      }
+      var code = (body && body.error) || "importError";
+      onError(messages[code] || messages.importError);
+    };
+    xhr.onerror = function () { onError(messages.importError); };
+    xhr.send(form);
   }
 
   var VIDEO_ERROR_MESSAGES = {
@@ -139,12 +444,13 @@
     };
 
     uploadVideoFile(textarea, file).then(function (filePath) {
+      clearClientError(textarea.form);
       finish(prefix + videoTag(filePath) + "\n\n");
     }).catch(function (err) {
       finish("");
       if (typeof editor.element !== "undefined" && editor.element) {
         var msg = (err && err.message) || VIDEO_ERROR_MESSAGES.importError;
-        alert(msg);
+        showClientError(textarea.form || textarea, msg);
       }
     });
   }
@@ -200,12 +506,12 @@
         options.imageCSRFHeader = true;
         options.imageCSRFName = "X-CSRF-Token";
         options.imageCSRFToken = csrfToken();
-        options.errorMessages = {
-          noFileGiven: "Choose an image to upload.",
-          typeNotAllowed: "Only PNG, JPEG and GIF images are accepted.",
-          fileTooLarge: "Images must be 8 MB or smaller.",
-          importError: "Could not upload the image. Please try again.",
-          noPermission: "You don't have permission to upload images here.",
+        options.errorMessages = IMAGE_ERROR_MESSAGES;
+        options.errorCallback = function (message) {
+          showClientError(textarea.form || textarea, message || IMAGE_ERROR_MESSAGES.importError);
+        };
+        options.imageUploadFunction = function (file, onSuccess, onError) {
+          uploadImageFile(textarea, file, onSuccess, onError, options);
         };
       }
 
@@ -742,11 +1048,13 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    initClientErrors(document);
     initMarkdownEditors(document);
     initArgumentGraphs(document);
   });
 
   document.addEventListener("htmx:afterSwap", function (event) {
+    initClientErrors(event.target || document);
     initMarkdownEditors(event.target || document);
     initArgumentGraphs(event.target || document);
   });

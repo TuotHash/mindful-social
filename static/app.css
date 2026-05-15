@@ -915,6 +915,17 @@ select:focus {
   background: var(--bg-elev-1);
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
+.form input[aria-invalid="true"],
+.form select[aria-invalid="true"],
+.form textarea[aria-invalid="true"],
+.input[aria-invalid="true"],
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.EasyMDEContainer[aria-invalid="true"] .CodeMirror {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
 
 label.field {
   display: flex;
@@ -1105,6 +1116,10 @@ label.field {
   flex-direction: column;
   gap: var(--s-2);
   background: var(--bg-elev-1);
+}
+.form-fieldset[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-bg);
 }
 .form-fieldset legend {
   padding: 0 6px;
@@ -2811,6 +2826,10 @@ fieldset.toggle-group legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-2);
+}
+.toggle-group[aria-invalid="true"] .toggle-btns {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px var(--danger-bg);
 }
 .toggle-btns.toggle-btns-stack {
   flex-direction: column;
