@@ -75,7 +75,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	sm := auth.NewSessionManager(sqlDB)
+	sm := auth.NewSessionManager(sqlDB, secureCookieForPublicBaseURL(cfg.PublicBaseURL))
 
 	oauthCtx, oauthCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer oauthCancel()
@@ -176,7 +176,7 @@ func (s *Server) routes() {
 	}
 	staticFS := http.FileServer(http.FS(staticSub))
 	r.Handle("/static/*", http.StripPrefix("/static/", cacheStatic(staticFS)))
-	uploadFS := http.FileServer(http.Dir(s.cfg.UploadDir))
+	uploadFS := http.FileServer(noDirectoryListing(http.Dir(s.cfg.UploadDir)))
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", cacheStatic(uploadFS)))
 
 	r.Get("/", s.handleLanding)

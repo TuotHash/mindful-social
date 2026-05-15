@@ -20,14 +20,13 @@ import (
 // copy it onto our own ctx key.
 //
 // Cookie security follows the public base URL: HTTPS turns on Secure;
-// anything else leaves it off so local HTTP dev still works (matches the
-// session cookie's behaviour in internal/auth/sessions.go).
+// anything else leaves it off so local HTTP dev still works.
 func csrfMiddleware(logger *slog.Logger, publicBaseURL string) (func(http.Handler) http.Handler, error) {
 	key, err := loadCSRFKey()
 	if err != nil {
 		return nil, err
 	}
-	secure := strings.HasPrefix(publicBaseURL, "https://")
+	secure := secureCookieForPublicBaseURL(publicBaseURL)
 	protect := csrf.Protect(key,
 		csrf.Secure(secure),
 		csrf.SameSite(csrf.SameSiteLaxMode),
@@ -58,6 +57,10 @@ func csrfMiddleware(logger *slog.Logger, publicBaseURL string) (func(http.Handle
 			protected.ServeHTTP(w, csrf.PlaintextHTTPRequest(r))
 		})
 	}, nil
+}
+
+func secureCookieForPublicBaseURL(publicBaseURL string) bool {
+	return strings.HasPrefix(publicBaseURL, "https://")
 }
 
 // loadCSRFKey honours CSRF_KEY (32 bytes, hex) if set so tokens survive

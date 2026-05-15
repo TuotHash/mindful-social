@@ -17,7 +17,7 @@ const sessionUserKey = "user_id"
 // in a *sql.DB rather than the pgx pool because scs/postgresstore is built
 // against database/sql; the caller bridges with stdlib.OpenDBFromPool.
 // Sessions live in the `sessions` table created by migration 00001.
-func NewSessionManager(db *sql.DB) *scs.SessionManager {
+func NewSessionManager(db *sql.DB, secureCookie bool) *scs.SessionManager {
 	sm := scs.New()
 	sm.Store = postgresstore.NewWithCleanupInterval(db, 30*time.Minute)
 	sm.Lifetime = 30 * 24 * time.Hour
@@ -26,10 +26,7 @@ func NewSessionManager(db *sql.DB) *scs.SessionManager {
 	sm.Cookie.Persist = true
 	sm.Cookie.SameSite = http.SameSiteLaxMode
 	sm.Cookie.HttpOnly = true
-	// Cookie.Secure stays false for local HTTP dev; the reverse proxy
-	// terminates TLS in production and the browser treats the connection
-	// as secure regardless. If you want belt-and-braces, set Secure=true
-	// once you only ever serve through HTTPS.
+	sm.Cookie.Secure = secureCookie
 	return sm
 }
 
