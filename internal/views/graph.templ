@@ -55,6 +55,22 @@ func argumentGraphDataJSON(data ArgumentGraphData) string {
 	return string(b)
 }
 
+// argumentGraphDataScriptHTML returns the full <script> tag carrying the
+// initial graph payload. We emit the tag in Go (and render via templ.Raw)
+// because templ treats <script> bodies as opaque text and will not
+// interpolate { ... } inside one. json.Marshal already escapes <, >, & to
+// \u00xx, so the JSON is safe to drop in raw — no XSS surface even if a
+// node title contains </script>.
+func argumentGraphDataScriptHTML(data ArgumentGraphData) string {
+	return `<script type="application/json" data-argument-graph-data>` +
+		argumentGraphDataJSON(data) + `</script>`
+}
+
+func graphFiltersScriptHTML(f ArgumentGraphFilters) string {
+	return `<script type="application/json" data-argument-graph-filters>` +
+		graphFiltersJSON(f) + `</script>`
+}
+
 func graphFiltersJSON(f ArgumentGraphFilters) string {
 	b, err := json.Marshal(struct {
 		Query      string   `json:"query"`
@@ -99,8 +115,8 @@ func graphToggleClass(current, value string) string {
 templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraphFilters) {
 	@Layout("Argument graph", viewer) {
 		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data" data-graph-author-current={ filters.Author }>
-			<template data-argument-graph-data>{ argumentGraphDataJSON(data) }</template>
-			<template data-argument-graph-filters>{ graphFiltersJSON(filters) }</template>
+			@templ.Raw(argumentGraphDataScriptHTML(data))
+			@templ.Raw(graphFiltersScriptHTML(filters))
 			<header class="argument-graph-head">
 				<div class="col gap-12">
 					<span class="eyebrow">Graph</span>
