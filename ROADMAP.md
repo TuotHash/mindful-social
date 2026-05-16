@@ -32,8 +32,6 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 - **3D argument graph** — add an optional `/graph/3d` explorer powered by `3d-force-graph` for spatial graph exploration while keeping the readable 2D graph as the default view.
 
-- **Graph filters** — narrow by topic, node type, or specific person.
-
 - **Graph search** — full-text search inside the graph view; matches highlight in place so the user sees them in context.
 
 ### Voting & Engagement
@@ -86,7 +84,7 @@ Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
 - **Argument graph** — topics, views, findings; typed directed edges; parent enforcement (views need a topic, findings need a view or another finding); inline finding creation from the Connect form; per-node action policies; edge highlighting; slug URLs; wiki-open editing.
 - **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode; direct upload serving with directory listings disabled.
 - **Discussion** — view comment threads with one-level replies; author edit and soft-delete; visibility inherits from the parent view.
-- **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
+- **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system; graph filters (author, group, tags, date window, sourced, visibility, edge kind).
 - **Version history + rollback** — every edit snapshots title, body, and tags into `node_revisions`. Any user with edit rights can view past revisions and revert in one click. Reverts are themselves recorded as new revisions, so they're also reversible.
 - **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, stance-only pins (Support/Oppose/Feature), home feed, public profiles; author bylines on node detail, home feed, and search results.
 - **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
