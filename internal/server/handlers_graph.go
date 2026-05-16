@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
@@ -15,11 +17,11 @@ const (
 	argumentGraphNodeLimit int32 = 120
 	argumentGraphEdgeLimit int32 = 320
 
-	// argumentGraphAuthorSeedLimit caps how many of an author's nodes are
-	// used as seeds for the neighborhood walk. Keeping it at the canvas
-	// budget avoids feeding the recursive CTE a giant input that would
-	// then be trimmed by the outer LIMIT anyway.
-	argumentGraphAuthorSeedLimit int32 = argumentGraphNodeLimit
+	// argumentGraphSeedLimit caps how many filtered seeds are fed to the
+	// neighborhood walk. Keeping it at the canvas budget avoids feeding the
+	// recursive CTE a giant input that would then be trimmed by the outer
+	// LIMIT anyway.
+	argumentGraphSeedLimit int32 = argumentGraphNodeLimit
 
 	// argumentGraphSearchMaxHops bounds how far we expand around each
 	// search match before shipping the result to the browser. It must
@@ -28,22 +30,97 @@ const (
 	argumentGraphSearchMaxHops int32 = 5
 )
 
+// argumentGraphFilters holds the parsed graph-viewer filter inputs. The
+// zero value means "no filters active"; the search path is short-circuited
+// when isActive() is false.
+type argumentGraphFilters struct {
+	Query      string
+	Author     string
+	Group      string
+	Tags       []string
+	Since      time.Time
+	Sourced    *bool
+	Visibility db.VisibilityKind
+}
+
+func (f argumentGraphFilters) isActive() bool {
+	return f.Query != "" ||
+		f.Author != "" ||
+		f.Group != "" ||
+		len(f.Tags) > 0 ||
+		!f.Since.IsZero() ||
+		f.Sourced != nil ||
+		f.Visibility != ""
+}
+
+// hasSeedPredicate reports whether the filters carry any predicate that the
+// seed query needs to apply itself (i.e. anything other than the free-text
+// q, which goes through SearchNodes).
+func (f argumentGraphFilters) hasSeedPredicate() bool {
+	return f.Author != "" ||
+		f.Group != "" ||
+		len(f.Tags) > 0 ||
+		!f.Since.IsZero() ||
+		f.Sourced != nil ||
+		f.Visibility != ""
+}
+
+// parseGraphFilters reads the filter set from the request's query string.
+// Unknown / invalid values are silently dropped — there is no error path
+// the user can act on, and the worst case is "filter has no effect".
+func parseGraphFilters(r *http.Request) argumentGraphFilters {
+	q := r.URL.Query()
+	f := argumentGraphFilters{
+		Query:  strings.TrimSpace(q.Get("q")),
+		Author: strings.TrimSpace(q.Get("author")),
+		Group:  strings.TrimSpace(q.Get("group")),
+	}
+	for _, t := range q["tag"] {
+		t = strings.TrimSpace(strings.ToLower(t))
+		if t != "" {
+			f.Tags = append(f.Tags, t)
+		}
+	}
+	switch q.Get("since") {
+	case "7d":
+		f.Since = time.Now().Add(-7 * 24 * time.Hour)
+	case "30d":
+		f.Since = time.Now().Add(-30 * 24 * time.Hour)
+	case "90d":
+		f.Since = time.Now().Add(-90 * 24 * time.Hour)
+	}
+	switch q.Get("sourced") {
+	case "yes":
+		v := true
+		f.Sourced = &v
+	case "no":
+		v := false
+		f.Sourced = &v
+	}
+	switch q.Get("visibility") {
+	case string(db.VisibilityKindPublic),
+		string(db.VisibilityKindConnections),
+		string(db.VisibilityKindGroup),
+		string(db.VisibilityKindPrivate):
+		f.Visibility = db.VisibilityKind(q.Get("visibility"))
+	}
+	return f
+}
+
 func (s *Server) handleArgumentGraph(w http.ResponseWriter, r *http.Request) {
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	author := strings.TrimSpace(r.URL.Query().Get("author"))
-	data, err := s.loadArgumentGraph(r, q, author)
+	filters := parseGraphFilters(r)
+	data, err := s.loadArgumentGraph(r, filters)
 	if err != nil {
 		s.logger.Error("argument graph: load", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, q, author))
+	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, graphFiltersForView(filters)))
 }
 
 func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request) {
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	author := strings.TrimSpace(r.URL.Query().Get("author"))
-	data, err := s.loadArgumentGraph(r, q, author)
+	filters := parseGraphFilters(r)
+	data, err := s.loadArgumentGraph(r, filters)
 	if err != nil {
 		s.logger.Error("argument graph data: load", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -53,9 +130,40 @@ func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request)
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *Server) loadArgumentGraph(r *http.Request, query, author string) (views.ArgumentGraphData, error) {
-	if query != "" || author != "" {
-		return s.searchArgumentGraph(r, query, author)
+// graphFiltersForView projects the parsed filter set onto the wire format
+// the templ layer expects. Strings round-trip as-is; the date and sourced
+// filters collapse back to their canonical query-string token.
+func graphFiltersForView(f argumentGraphFilters) views.ArgumentGraphFilters {
+	out := views.ArgumentGraphFilters{
+		Query:      f.Query,
+		Author:     f.Author,
+		Group:      f.Group,
+		Tags:       f.Tags,
+		Visibility: string(f.Visibility),
+	}
+	switch {
+	case f.Since.IsZero():
+		out.Since = ""
+	case time.Since(f.Since) <= 7*24*time.Hour+time.Hour:
+		out.Since = "7d"
+	case time.Since(f.Since) <= 30*24*time.Hour+time.Hour:
+		out.Since = "30d"
+	case time.Since(f.Since) <= 90*24*time.Hour+time.Hour:
+		out.Since = "90d"
+	}
+	if f.Sourced != nil {
+		if *f.Sourced {
+			out.Sourced = "yes"
+		} else {
+			out.Sourced = "no"
+		}
+	}
+	return out
+}
+
+func (s *Server) loadArgumentGraph(r *http.Request, filters argumentGraphFilters) (views.ArgumentGraphData, error) {
+	if filters.isActive() {
+		return s.searchArgumentGraph(r, filters)
 	}
 
 	vid := viewerID(r)
@@ -80,18 +188,17 @@ func (s *Server) loadArgumentGraph(r *http.Request, query, author string) (views
 	}, nil
 }
 
-// searchArgumentGraph collects seed node ids from the active filters
-// (full-text query, author username, or both) and walks the edges table out
-// from each seed up to argumentGraphSearchMaxHops hops. Without that
-// expansion the client receives lonely matches and no edges, so the depth
-// slider has nothing to walk and the inspector (correctly!) reports zero
-// connections. The outer LIMIT in the SQL guarantees we never ship more
-// nodes than the canvas can usefully render.
+// searchArgumentGraph collects seed node ids by intersecting every active
+// filter and walks the edges table out from each seed up to
+// argumentGraphSearchMaxHops hops. Without that expansion the client
+// receives lonely matches and no edges, so the depth slider has nothing to
+// walk and the inspector (correctly!) reports zero connections.
 //
-// When both filters are set the seeds are intersected: the result is the
-// nodes by `author` that also match `query`. That keeps the combined filter
-// behaving like an AND from the user's perspective.
-func (s *Server) searchArgumentGraph(r *http.Request, query, author string) (views.ArgumentGraphData, error) {
+// The free-text query goes through SearchNodes (tsvector + trigram). All
+// other predicates go through ListArgumentGraphSeeds. When both paths run
+// the matched set is the intersection — combined filters behave like AND
+// from the user's perspective.
+func (s *Server) searchArgumentGraph(r *http.Request, f argumentGraphFilters) (views.ArgumentGraphData, error) {
 	vid := viewerID(r)
 
 	var (
@@ -99,9 +206,9 @@ func (s *Server) searchArgumentGraph(r *http.Request, query, author string) (vie
 		matchedIDs = map[string]struct{}{}
 	)
 
-	if query != "" {
+	if f.Query != "" {
 		matchRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
-			Query:       query,
+			Query:       f.Query,
 			ResultLimit: searchResultLimit,
 			ViewerID:    vid,
 		})
@@ -115,34 +222,31 @@ func (s *Server) searchArgumentGraph(r *http.Request, query, author string) (vie
 		}
 	}
 
-	if author != "" {
-		authorIDs, err := s.queries.ListArgumentGraphSeedsByAuthor(r.Context(), db.ListArgumentGraphSeedsByAuthorParams{
-			AuthorUsername: author,
-			ViewerID:       vid,
-			ResultLimit:    argumentGraphAuthorSeedLimit,
-		})
+	if f.hasSeedPredicate() {
+		filterIDs, err := s.queries.ListArgumentGraphSeeds(r.Context(), seedQueryParams(f, vid))
 		if err != nil {
 			return views.ArgumentGraphData{}, err
 		}
-		if query == "" {
-			seedIDs = authorIDs
-			for _, id := range authorIDs {
+		if f.Query == "" {
+			seedIDs = filterIDs
+			matchedIDs = map[string]struct{}{}
+			for _, id := range filterIDs {
 				matchedIDs[id.String()] = struct{}{}
 			}
 		} else {
-			authorSet := make(map[uuid.UUID]struct{}, len(authorIDs))
-			for _, id := range authorIDs {
-				authorSet[id] = struct{}{}
+			filterSet := make(map[uuid.UUID]struct{}, len(filterIDs))
+			for _, id := range filterIDs {
+				filterSet[id] = struct{}{}
 			}
-			filtered := seedIDs[:0]
+			intersect := seedIDs[:0]
 			matchedIDs = map[string]struct{}{}
 			for _, id := range seedIDs {
-				if _, ok := authorSet[id]; ok {
-					filtered = append(filtered, id)
+				if _, ok := filterSet[id]; ok {
+					intersect = append(intersect, id)
 					matchedIDs[id.String()] = struct{}{}
 				}
 			}
-			seedIDs = filtered
+			seedIDs = intersect
 		}
 	}
 
@@ -181,6 +285,40 @@ func (s *Server) searchArgumentGraph(r *http.Request, query, author string) (vie
 		Nodes: argumentGraphNodesFromNeighborhoodRows(neighborhoodRows, matchedIDs),
 		Edges: argumentGraphEdgesFromNodeIDRows(edgeRows),
 	}, nil
+}
+
+// seedQueryParams builds the ListArgumentGraphSeeds parameter struct from the
+// active filter set. Unset filters are passed as NULL (or as the empty array
+// for tag_names) so the SQL predicate short-circuits to TRUE.
+func seedQueryParams(f argumentGraphFilters, viewerID *uuid.UUID) db.ListArgumentGraphSeedsParams {
+	params := db.ListArgumentGraphSeedsParams{
+		ViewerID:    viewerID,
+		TagNames:    f.Tags,
+		ResultLimit: argumentGraphSeedLimit,
+	}
+	if f.Author != "" {
+		a := f.Author
+		params.AuthorUsername = &a
+	}
+	if f.Group != "" {
+		g := f.Group
+		params.GroupSlug = &g
+	}
+	if !f.Since.IsZero() {
+		params.Since = pgtype.Timestamptz{Time: f.Since, Valid: true}
+	}
+	if f.Sourced != nil {
+		v := *f.Sourced
+		params.Sourced = &v
+	}
+	if f.Visibility != "" {
+		v := f.Visibility
+		params.Visibility = &v
+	}
+	if params.TagNames == nil {
+		params.TagNames = []string{}
+	}
+	return params
 }
 
 func argumentGraphNodesFromRows(rows []db.ListArgumentGraphNodesForViewerRow) []views.ArgumentGraphNode {

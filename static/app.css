@@ -1840,6 +1840,129 @@ label.field {
   padding: 0;
 }
 
+/* Second toolbar row: filter chips and toggle groups. flex-wrap lets the
+   row spill onto multiple lines on narrow viewports without crushing the
+   inputs. */
+.argument-graph-toolbar-filters {
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev-1);
+}
+
+.argument-graph-group {
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  border: 1px solid var(--border-input);
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  padding: 0 10px;
+}
+
+.argument-graph-group .material-symbols-outlined {
+  color: var(--text-subtle);
+}
+
+.argument-graph-group input[type="search"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.argument-graph-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  border: 1px solid var(--border-input);
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  min-width: 220px;
+  max-width: 380px;
+}
+
+.argument-graph-tags .material-symbols-outlined {
+  color: var(--text-subtle);
+}
+
+.argument-graph-tags input[type="search"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 0;
+  flex: 1;
+  min-width: 80px;
+}
+
+.argument-graph-tag-chips {
+  display: contents;
+}
+
+.argument-graph-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+}
+
+.argument-graph-tag-chip-remove {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-left: 2px;
+  font-size: var(--fs-md);
+  line-height: 1;
+  color: var(--text-subtle);
+  cursor: pointer;
+}
+
+.argument-graph-tag-chip-remove:hover {
+  color: var(--text);
+}
+
+/* Per-kind palette for the edge-kind chip toggles. Mirrors the type-chip
+   colour pattern: the dot picks up the same colour the edge stroke uses
+   on the canvas, so the toolbar legend is unambiguous. */
+.chip.kind-supports .dot { background: var(--supports); }
+.chip.kind-opposes .dot { background: var(--opposes); }
+.chip.kind-related .dot { background: var(--relates); }
+
+/* Toggle-button group for single-choice server-side filters (when, source,
+   visibility). Adjacent pressed-button feedback per the project's
+   preference for inline button groups over dropdowns. */
+.argument-graph-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-pill);
+}
+
+.argument-graph-toggle-group .argument-graph-toggle-label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  padding: 0 6px 0 8px;
+}
+
+.argument-graph-toggle-group .btn {
+  border-radius: var(--radius-pill);
+  border-color: transparent;
+  padding: 4px 10px;
+  font-size: var(--fs-xs);
+}
+
+.argument-graph-toggle-group .btn.is-active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-bg);
+}
+
 .argument-graph-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;

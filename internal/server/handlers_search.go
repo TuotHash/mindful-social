@@ -130,6 +130,53 @@ func (s *Server) handleUsersSuggest(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.UsersSuggestDropdown(userHits(rows)))
 }
 
+// handleTagsSuggest returns a live-suggest fragment for the graph tag
+// filter at /tags/suggest?q=. The query is gated by visible-node count so
+// a tag that only sits on private nodes can't leak via the suggestion.
+func (s *Server) handleTagsSuggest(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		render(w, r, views.TagsSuggestDropdown(nil))
+		return
+	}
+	rows, err := s.queries.SearchTagsForViewer(r.Context(), db.SearchTagsForViewerParams{
+		Query:       q,
+		ViewerID:    viewerID(r),
+		ResultLimit: suggestLimit,
+	})
+	if err != nil {
+		s.logger.Error("suggest tags", "err", err, "q", q)
+		return
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.Name)
+	}
+	render(w, r, views.TagsSuggestDropdown(out))
+}
+
+// handleGroupsSuggest returns a live-suggest fragment for the graph group
+// filter at /groups/suggest?q=. Visibility branches mirror SearchGroups so
+// a non-member can't probe the existence of a private group through the
+// suggestion list.
+func (s *Server) handleGroupsSuggest(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		render(w, r, views.GroupsSuggestDropdown(nil))
+		return
+	}
+	rows, err := s.queries.SearchGroups(r.Context(), db.SearchGroupsParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+		ViewerID:    viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("suggest groups for graph", "err", err, "q", q)
+		return
+	}
+	render(w, r, views.GroupsSuggestDropdown(groupHits(rows)))
+}
+
 func searchHits(rows []db.SearchNodesRow) []views.SearchHit {
 	out := make([]views.SearchHit, 0, len(rows))
 	for _, row := range rows {

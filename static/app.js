@@ -558,6 +558,7 @@
       graph.dataset.argumentGraphReady = "true";
 
       var dataEl = graph.querySelector("[data-argument-graph-data]");
+      var filtersEl = graph.querySelector("[data-argument-graph-filters]");
       var svg = graph.querySelector("[data-graph-svg]");
       if (!dataEl || !svg) return;
 
@@ -566,6 +567,18 @@
         data = JSON.parse(dataEl.textContent || "{}") || data;
       } catch (e) {
         data = { nodes: [], edges: [] };
+      }
+      var initialFilters = { query: "", author: "", group: "", tags: [], since: "", sourced: "", visibility: "" };
+      if (filtersEl) {
+        try {
+          var parsedFilters = JSON.parse(filtersEl.textContent || "{}") || {};
+          Object.keys(initialFilters).forEach(function (key) {
+            if (parsedFilters[key] !== undefined && parsedFilters[key] !== null) {
+              initialFilters[key] = parsedFilters[key];
+            }
+          });
+          if (!Array.isArray(initialFilters.tags)) initialFilters.tags = [];
+        } catch (e) {}
       }
       var nodesByID = {};
       var edges = [];
@@ -602,7 +615,15 @@
       var authorClear = graph.querySelector("[data-graph-author-clear]");
       var authorPinBtn = graph.querySelector("[data-graph-author-pin]");
       var authorPinLabel = graph.querySelector("[data-graph-author-pin-label]");
+      var groupInput = graph.querySelector("[data-graph-group]");
+      var groupClear = graph.querySelector("[data-graph-group-clear]");
+      var tagChipsEl = graph.querySelector("[data-graph-tag-chips]");
+      var tagInput = graph.querySelector("[data-graph-tag-input]");
       var typeInputs = Array.from(graph.querySelectorAll("[data-graph-type]"));
+      var kindInputs = Array.from(graph.querySelectorAll("[data-graph-kind]"));
+      var sinceButtons = Array.from(graph.querySelectorAll("[data-graph-since]"));
+      var sourcedButtons = Array.from(graph.querySelectorAll("[data-graph-sourced]"));
+      var visibilityButtons = Array.from(graph.querySelectorAll("[data-graph-visibility]"));
       var depthInput = graph.querySelector("[data-graph-depth]");
       var depthValueEl = graph.querySelector("[data-graph-depth-value]");
       var visibleCount = graph.querySelector("[data-graph-visible-count]");
@@ -610,8 +631,27 @@
       var metaEl = graph.querySelector("[data-graph-meta]");
       var openEl = graph.querySelector("[data-graph-open]");
       var graphEndpoint = graph.dataset.argumentGraphEndpoint || "/graph/data";
-      var serverQuery = ((search && search.value) || "").trim().toLowerCase();
-      var serverAuthor = ((authorInput && authorInput.value) || "").trim();
+
+      // activeTags tracks the multi-select tag filter as a deduped array.
+      // It's seeded from the server-rendered filters so a deep link with
+      // ?tag=foo&tag=bar arrives with both chips already painted.
+      var activeTags = initialFilters.tags.slice();
+      var sinceValue = initialFilters.since || "";
+      var sourcedValue = initialFilters.sourced || "";
+      var visibilityValue = initialFilters.visibility || "";
+
+      // server* mirrors what the in-flight server response is filtering on
+      // so the client filter can fall back to a local match against the
+      // previous response while the next request is still in the air. Add
+      // a field here whenever you add a server-side filter, otherwise
+      // useMatchFlags below will trust stale match flags.
+      var serverQuery = initialFilters.query;
+      var serverAuthor = initialFilters.author;
+      var serverGroup = initialFilters.group;
+      var serverTags = initialFilters.tags.slice();
+      var serverSince = initialFilters.since;
+      var serverSourced = initialFilters.sourced;
+      var serverVisibility = initialFilters.visibility;
       var searchTimer = null;
       var searchSeq = 0;
       var markerPrefix = "argument-graph-arrow-" + Math.random().toString(36).slice(2);
@@ -653,6 +693,41 @@
         return active;
       }
 
+      // activeKinds drives the edge-kind chips. Unlike type filtering it
+      // only hides edges, not nodes — a node connected to its neighbour
+      // through an "opposes" edge should still be in the canvas if at
+      // least one of its other connections has a checked kind.
+      function activeKinds() {
+        var active = {};
+        kindInputs.forEach(function (input) {
+          active[input.value] = input.checked;
+        });
+        return active;
+      }
+
+      function currentGroup() {
+        return ((groupInput && groupInput.value) || "").trim();
+      }
+
+      function currentTags() {
+        return activeTags.slice();
+      }
+
+      function tagsEqual(a, b) {
+        if (a.length !== b.length) return false;
+        var as = a.slice().sort();
+        var bs = b.slice().sort();
+        for (var i = 0; i < as.length; i++) if (as[i] !== bs[i]) return false;
+        return true;
+      }
+
+      function normalizeTagInput(raw) {
+        return String(raw || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9_]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+      }
+
       function matchesQuery(node, query) {
         if (!query) return true;
         var haystack = [
@@ -686,8 +761,11 @@
         var active = activeTypes();
         var query = currentQuery();
         var author = currentAuthor().toLowerCase();
+        var group = currentGroup();
+        var tags = currentTags();
+        var anyServerFilter = !!(query || author || group || tags.length || sinceValue || sourcedValue || visibilityValue);
 
-        if (!query && !author) {
+        if (!anyServerFilter) {
           return data.nodes.filter(function (node) {
             return !!active[node.type];
           });
@@ -699,7 +777,19 @@
         // working both during typing and after settle — disabling the
         // client filter as soon as the server inputs matched would leave
         // the slider with nothing to do.
-        var useMatchFlags = (query === serverQuery && author === serverAuthor.toLowerCase());
+        //
+        // Most server-side predicates (group, tags, since, sourced,
+        // visibility) cannot be replayed client-side from the wire
+        // payload, so during the typing window we fall back to query +
+        // author for the local seed approximation and accept that the
+        // canvas may briefly show a superset until the server catches up.
+        var useMatchFlags = query === (serverQuery || "").toLowerCase()
+          && author === (serverAuthor || "").toLowerCase()
+          && group === serverGroup
+          && tagsEqual(tags, serverTags)
+          && sinceValue === serverSince
+          && sourcedValue === serverSourced
+          && visibilityValue === serverVisibility;
         var keep = {};
         var frontier = [];
         data.nodes.forEach(function (node) {
@@ -900,8 +990,13 @@
         nodes.forEach(function (node) {
           visible[node.id] = true;
         });
+        var kindOK = activeKinds();
         var visibleEdges = edges.filter(function (edge) {
-          return visible[edge.from] && visible[edge.to];
+          if (!visible[edge.from] || !visible[edge.to]) return false;
+          // Edge-kind filter: unknown / future kinds default to visible
+          // so a renamed enum doesn't silently disappear from the canvas.
+          if (kindOK[edge.kind] === false) return false;
+          return true;
         });
 
         if (selectedID && !visible[selectedID]) {
@@ -1015,27 +1110,64 @@
         render();
       }
 
-      function graphDataURL(query, author) {
+      // snapshotFilters captures the current server-side filter set in a
+      // single object so the fetch + re-render path can compare against
+      // the latest user input atomically (no race where one filter changes
+      // between request and response). Add a field here whenever a new
+      // server-side filter is introduced.
+      function snapshotFilters() {
+        return {
+          query: currentQuery(),
+          author: currentAuthor(),
+          group: currentGroup(),
+          tags: currentTags(),
+          since: sinceValue,
+          sourced: sourcedValue,
+          visibility: visibilityValue,
+        };
+      }
+
+      function filtersEqual(a, b) {
+        return a.query === b.query
+          && a.author === b.author
+          && a.group === b.group
+          && a.since === b.since
+          && a.sourced === b.sourced
+          && a.visibility === b.visibility
+          && tagsEqual(a.tags, b.tags);
+      }
+
+      function graphDataURL(f) {
         var url = new URL(graphEndpoint, window.location.href);
-        if (query) url.searchParams.set("q", query);
-        if (author) url.searchParams.set("author", author);
+        if (f.query) url.searchParams.set("q", f.query);
+        if (f.author) url.searchParams.set("author", f.author);
+        if (f.group) url.searchParams.set("group", f.group);
+        if (f.since) url.searchParams.set("since", f.since);
+        if (f.sourced) url.searchParams.set("sourced", f.sourced);
+        if (f.visibility) url.searchParams.set("visibility", f.visibility);
+        f.tags.forEach(function (t) { url.searchParams.append("tag", t); });
         return url.toString();
       }
 
-      function fetchServerGraph(query, author) {
+      function fetchServerGraph(f) {
         if (!window.fetch) return;
         var seq = ++searchSeq;
-        fetch(graphDataURL(query, author), {
+        fetch(graphDataURL(f), {
           headers: { "Accept": "application/json" },
           credentials: "same-origin",
         }).then(function (response) {
           if (!response.ok) throw new Error("graph search failed");
           return response.json();
         }).then(function (nextData) {
-          if (seq !== searchSeq || query !== currentQuery() || author !== currentAuthor()) return;
+          if (seq !== searchSeq || !filtersEqual(f, snapshotFilters())) return;
           normalizeGraphData(nextData);
-          serverQuery = query;
-          serverAuthor = author;
+          serverQuery = f.query;
+          serverAuthor = f.author;
+          serverGroup = f.group;
+          serverTags = f.tags.slice();
+          serverSince = f.since;
+          serverSourced = f.sourced;
+          serverVisibility = f.visibility;
           selectedID = "";
           resetView();
           render();
@@ -1043,6 +1175,11 @@
           if (seq === searchSeq) {
             serverQuery = "";
             serverAuthor = "";
+            serverGroup = "";
+            serverTags = [];
+            serverSince = "";
+            serverSourced = "";
+            serverVisibility = "";
           }
         });
       }
@@ -1050,7 +1187,7 @@
       function queueServerSearch() {
         if (searchTimer) clearTimeout(searchTimer);
         searchTimer = setTimeout(function () {
-          fetchServerGraph(currentQuery(), currentAuthor());
+          fetchServerGraph(snapshotFilters());
         }, 220);
       }
 
@@ -1094,6 +1231,145 @@
       });
       typeInputs.forEach(function (input) {
         input.addEventListener("change", renderFromFilter);
+      });
+
+      // Edge-kind toggles are a pure render concern — they hide edges
+      // without changing the node set, so we re-render but don't refetch.
+      kindInputs.forEach(function (input) {
+        input.addEventListener("change", render);
+      });
+
+      function syncGroupClear() {
+        if (!groupClear) return;
+        groupClear.hidden = currentGroup() === "";
+      }
+
+      if (groupInput) {
+        syncGroupClear();
+        groupInput.addEventListener("input", function () {
+          syncGroupClear();
+          renderFromFilter();
+          queueServerSearch();
+        });
+      }
+      if (groupClear) groupClear.addEventListener("click", function () {
+        if (!groupInput) return;
+        groupInput.value = "";
+        syncGroupClear();
+        renderFromFilter();
+        queueServerSearch();
+        groupInput.focus();
+      });
+
+      // renderTagChips paints the active-tag pills inside the tag input,
+      // each with a dismiss button. The chips are recreated wholesale on
+      // every state change — the active set is small enough that diffing
+      // would add complexity without saving anything measurable.
+      function renderTagChips() {
+        if (!tagChipsEl) return;
+        tagChipsEl.replaceChildren();
+        activeTags.forEach(function (tag) {
+          var chip = document.createElement("span");
+          chip.className = "tag-chip argument-graph-tag-chip";
+          var label = document.createElement("span");
+          label.textContent = "#" + tag;
+          chip.appendChild(label);
+          var remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "argument-graph-tag-chip-remove";
+          remove.setAttribute("aria-label", "Remove tag " + tag);
+          remove.textContent = "×";
+          remove.addEventListener("click", function () {
+            activeTags = activeTags.filter(function (t) { return t !== tag; });
+            renderTagChips();
+            renderFromFilter();
+            queueServerSearch();
+          });
+          chip.appendChild(remove);
+          tagChipsEl.appendChild(chip);
+        });
+        if (tagInput) {
+          tagInput.placeholder = activeTags.length === 0 ? "Tags" : "Add another tag";
+        }
+      }
+      renderTagChips();
+
+      function addTag(name) {
+        var normalized = normalizeTagInput(name);
+        if (!normalized) return false;
+        if (activeTags.indexOf(normalized) >= 0) return false;
+        activeTags.push(normalized);
+        renderTagChips();
+        renderFromFilter();
+        queueServerSearch();
+        return true;
+      }
+
+      if (tagInput) {
+        tagInput.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === ",") {
+            event.preventDefault();
+            if (addTag(tagInput.value)) {
+              tagInput.value = "";
+            }
+          } else if (event.key === "Backspace" && tagInput.value === "" && activeTags.length > 0) {
+            var removed = activeTags.pop();
+            renderTagChips();
+            renderFromFilter();
+            queueServerSearch();
+            // Removing via backspace is intentional; nothing else to do.
+            void removed;
+          }
+        });
+        tagInput.addEventListener("blur", function () {
+          if (tagInput.value.trim() !== "" && addTag(tagInput.value)) {
+            tagInput.value = "";
+          }
+        });
+      }
+
+      // Toggle-button groups for single-choice server-side filters. Each
+      // group sets one piece of state, repaints which button is pressed,
+      // and queues a re-fetch.
+      function bindToggleGroup(buttons, getter, setter) {
+        buttons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            var value = button.dataset[getter] || "";
+            setter(value);
+            buttons.forEach(function (b) {
+              var v = b.dataset[getter] || "";
+              if (v === value) {
+                b.classList.add("is-active");
+                b.classList.remove("ghost");
+              } else {
+                b.classList.remove("is-active");
+                b.classList.add("ghost");
+              }
+            });
+            renderFromFilter();
+            queueServerSearch();
+          });
+        });
+      }
+
+      bindToggleGroup(sinceButtons, "graphSince", function (v) { sinceValue = v; });
+      bindToggleGroup(sourcedButtons, "graphSourced", function (v) { sourcedValue = v; });
+      bindToggleGroup(visibilityButtons, "graphVisibility", function (v) { visibilityValue = v; });
+
+      // Delegated handler for tag-suggest clicks. Lives on the graph root
+      // so we don't have to re-bind whenever HTMX re-renders the suggest
+      // dropdown contents.
+      graph.addEventListener("click", function (event) {
+        var btn = event.target.closest && event.target.closest("[data-graph-tag-add]");
+        if (!btn || !graph.contains(btn)) return;
+        if (addTag(btn.dataset.fillValue || "")) {
+          if (tagInput) tagInput.value = "";
+        }
+        var suggest = btn.closest(".search-suggest");
+        if (suggest) {
+          suggest.innerHTML = "";
+          suggest.hidden = true;
+        }
       });
 
       function syncDepthDisplay() {

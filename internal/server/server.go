@@ -203,6 +203,8 @@ func (s *Server) routes() {
 	r.Get("/search/suggest", s.handleSearchSuggest)
 	r.Get("/graph/nodes/suggest", s.handleGraphNodesSuggest)
 	r.Get("/users/suggest", s.handleUsersSuggest)
+	r.Get("/tags/suggest", s.handleTagsSuggest)
+	r.Get("/groups/suggest", s.handleGroupsSuggest)
 
 	// Routes that require an authenticated user.
 	r.Group(func(r chi.Router) {

@@ -169,6 +169,55 @@ func (q *Queries) ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag,
 	return items, nil
 }
 
+const searchTagsForViewer = `-- name: SearchTagsForViewer :many
+SELECT t.id, t.name
+FROM tags t
+WHERE (
+    t.name ILIKE '%' || $1::text || '%'
+    OR t.name %> $1::text
+  )
+  AND EXISTS (
+    SELECT 1 FROM node_tags nt
+    JOIN nodes n ON n.id = nt.node_id
+    WHERE nt.tag_id = t.id
+      AND node_visible_to(n.*, $2::uuid)
+  )
+ORDER BY
+  CASE WHEN t.name ILIKE $1::text || '%' THEN 0 ELSE 1 END,
+  word_similarity($1::text, t.name) DESC,
+  t.name ASC
+LIMIT $3
+`
+
+type SearchTagsForViewerParams struct {
+	Query       string     `json:"query"`
+	ViewerID    *uuid.UUID `json:"viewer_id"`
+	ResultLimit int32      `json:"result_limit"`
+}
+
+// Live-suggest fuzzy match against tag names, gated by visible-node count so
+// a tag that only sits on private nodes doesn't leak via the suggestion. Used
+// by the graph viewer's tag filter at /tags/suggest.
+func (q *Queries) SearchTagsForViewer(ctx context.Context, arg SearchTagsForViewerParams) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, searchTagsForViewer, arg.Query, arg.ViewerID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertTag = `-- name: UpsertTag :one
 INSERT INTO tags (name) VALUES ($1)
 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name

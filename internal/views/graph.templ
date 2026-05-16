@@ -3,6 +3,7 @@ package views
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type ArgumentGraphNode struct {
@@ -31,12 +32,50 @@ type ArgumentGraphData struct {
 	Edges []ArgumentGraphEdge `json:"edges"`
 }
 
+// ArgumentGraphFilters mirrors the parsed filter set the handler hands to
+// the template. Empty fields render no chip / no preselection. The wire
+// format here matches the canonical query-string token the handler
+// already accepts (e.g. Since is "7d" / "30d" / "90d", Sourced is
+// "yes" / "no") so round-tripping through the URL is lossless.
+type ArgumentGraphFilters struct {
+	Query      string
+	Author     string
+	Group      string
+	Tags       []string
+	Since      string
+	Sourced    string
+	Visibility string
+}
+
 func argumentGraphDataJSON(data ArgumentGraphData) string {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return `{"nodes":[],"edges":[]}`
 	}
 	return string(b)
+}
+
+func graphFiltersJSON(f ArgumentGraphFilters) string {
+	b, err := json.Marshal(struct {
+		Query      string   `json:"query"`
+		Author     string   `json:"author"`
+		Group      string   `json:"group"`
+		Tags       []string `json:"tags"`
+		Since      string   `json:"since"`
+		Sourced    string   `json:"sourced"`
+		Visibility string   `json:"visibility"`
+	}{
+		Query: f.Query, Author: f.Author, Group: f.Group, Tags: f.Tags,
+		Since: f.Since, Sourced: f.Sourced, Visibility: f.Visibility,
+	})
+	if err != nil {
+		return `{}`
+	}
+	return string(b)
+}
+
+func graphTagsCSV(tags []string) string {
+	return strings.Join(tags, ",")
 }
 
 func graphCount(n int, noun string) string {
@@ -46,10 +85,22 @@ func graphCount(n int, noun string) string {
 	return fmt.Sprintf("%d %ss", n, noun)
 }
 
-templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
+// graphToggleClass returns "is-active" when the toggle button represents
+// the currently-selected value of a single-choice filter. Used to drive
+// the visual pressed/unpressed state without sprinkling conditionals
+// across the template.
+func graphToggleClass(current, value string) string {
+	if current == value {
+		return "btn sm is-active"
+	}
+	return "btn ghost sm"
+}
+
+templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraphFilters) {
 	@Layout("Argument graph", viewer) {
-		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data" data-graph-author-current={ author }>
+		<div class="graph-page" data-argument-graph data-argument-graph-endpoint="/graph/data" data-graph-author-current={ filters.Author }>
 			<template data-argument-graph-data>{ argumentGraphDataJSON(data) }</template>
+			<template data-argument-graph-filters>{ graphFiltersJSON(filters) }</template>
 			<header class="argument-graph-head">
 				<div class="col gap-12">
 					<span class="eyebrow">Graph</span>
@@ -69,7 +120,7 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 								type="search"
 								name="q"
 								data-graph-search
-								value={ q }
+								value={ filters.Query }
 								placeholder="Search graph"
 								autocomplete="off"
 								hx-get="/graph/nodes/suggest"
@@ -87,8 +138,8 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 								type="search"
 								name="author"
 								data-graph-author
-								value={ author }
-								placeholder="Filter by author"
+								value={ filters.Author }
+								placeholder="Author"
 								autocomplete="off"
 								hx-get="/users/suggest"
 								hx-trigger="input changed delay:200ms"
@@ -101,7 +152,48 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 							<span class="material-symbols-outlined">close</span>
 						</button>
 					</label>
+					<label class="argument-graph-group" aria-label="Filter by group">
+						<span class="material-symbols-outlined">group</span>
+						<div class="search-suggest-anchor">
+							<input
+								type="search"
+								name="group"
+								data-graph-group
+								value={ filters.Group }
+								placeholder="Group"
+								autocomplete="off"
+								hx-get="/groups/suggest"
+								hx-trigger="input changed delay:200ms"
+								hx-target="#graph-group-suggest"
+								hx-swap="innerHTML"
+							/>
+							<div id="graph-group-suggest" class="search-suggest" hidden></div>
+						</div>
+						<button type="button" class="argument-graph-author-clear" data-graph-group-clear hidden aria-label="Clear group filter">
+							<span class="material-symbols-outlined">close</span>
+						</button>
+					</label>
 					<div class="argument-graph-current" data-graph-visible-count>{ graphCount(len(data.Nodes), "node") } visible</div>
+				</div>
+				<div class="argument-graph-toolbar argument-graph-toolbar-filters">
+					<label class="argument-graph-tags" aria-label="Filter by tag">
+						<span class="material-symbols-outlined">sell</span>
+						<div class="argument-graph-tag-chips" data-graph-tag-chips></div>
+						<div class="search-suggest-anchor">
+							<input
+								type="search"
+								data-graph-tag-input
+								data-graph-tag-csv={ graphTagsCSV(filters.Tags) }
+								placeholder={ tagPlaceholder(len(filters.Tags)) }
+								autocomplete="off"
+								hx-get="/tags/suggest"
+								hx-trigger="input changed delay:200ms"
+								hx-target="#graph-tag-suggest"
+								hx-swap="innerHTML"
+							/>
+							<div id="graph-tag-suggest" class="search-suggest" hidden></div>
+						</div>
+					</label>
 					<fieldset class="argument-graph-types">
 						<legend>Types</legend>
 						<label class="chip topic">
@@ -120,6 +212,47 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 							Finding
 						</label>
 					</fieldset>
+					<fieldset class="argument-graph-types argument-graph-kinds" aria-label="Filter by relationship kind">
+						<legend>Edge kinds</legend>
+						<label class="chip kind-supports" title="Show supporting edges">
+							<input type="checkbox" value="supports" data-graph-kind checked/>
+							<span class="dot"></span>
+							Supports
+						</label>
+						<label class="chip kind-opposes" title="Show opposing edges">
+							<input type="checkbox" value="opposes" data-graph-kind checked/>
+							<span class="dot"></span>
+							Opposes
+						</label>
+						<label class="chip kind-related" title="Show related edges">
+							<input type="checkbox" value="related" data-graph-kind checked/>
+							<span class="dot"></span>
+							Related
+						</label>
+					</fieldset>
+					<div class="argument-graph-toggle-group" role="group" aria-label="Filter by recency">
+						<span class="argument-graph-toggle-label">When</span>
+						<button type="button" class={ graphToggleClass(filters.Since, "") } data-graph-since="">Any</button>
+						<button type="button" class={ graphToggleClass(filters.Since, "7d") } data-graph-since="7d">7d</button>
+						<button type="button" class={ graphToggleClass(filters.Since, "30d") } data-graph-since="30d">30d</button>
+						<button type="button" class={ graphToggleClass(filters.Since, "90d") } data-graph-since="90d">90d</button>
+					</div>
+					<div class="argument-graph-toggle-group" role="group" aria-label="Filter by source">
+						<span class="argument-graph-toggle-label">Source</span>
+						<button type="button" class={ graphToggleClass(filters.Sourced, "") } data-graph-sourced="">Any</button>
+						<button type="button" class={ graphToggleClass(filters.Sourced, "yes") } data-graph-sourced="yes" title="Only nodes that link to an external source">Sourced</button>
+						<button type="button" class={ graphToggleClass(filters.Sourced, "no") } data-graph-sourced="no" title="Only nodes without an external source link">Unsourced</button>
+					</div>
+					if viewer != nil {
+						<div class="argument-graph-toggle-group" role="group" aria-label="Filter by visibility">
+							<span class="argument-graph-toggle-label">Visibility</span>
+							<button type="button" class={ graphToggleClass(filters.Visibility, "") } data-graph-visibility="">Any</button>
+							<button type="button" class={ graphToggleClass(filters.Visibility, "public") } data-graph-visibility="public">Public</button>
+							<button type="button" class={ graphToggleClass(filters.Visibility, "connections") } data-graph-visibility="connections">Conn.</button>
+							<button type="button" class={ graphToggleClass(filters.Visibility, "group") } data-graph-visibility="group">Group</button>
+							<button type="button" class={ graphToggleClass(filters.Visibility, "private") } data-graph-visibility="private" title="Your own private nodes only">Private</button>
+						</div>
+					}
 					<label class="argument-graph-depth" title="How many extra hops of connected nodes to include around each match.">
 						<span class="argument-graph-depth-label">Depth</span>
 						<input
@@ -200,4 +333,11 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 			</section>
 		</div>
 	}
+}
+
+func tagPlaceholder(activeCount int) string {
+	if activeCount == 0 {
+		return "Tags"
+	}
+	return "Add another tag"
 }

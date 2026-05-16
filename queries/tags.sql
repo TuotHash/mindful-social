@@ -38,6 +38,28 @@ ORDER BY node_count DESC, t.name ASC;
 -- name: GetTagByName :one
 SELECT * FROM tags WHERE name = $1;
 
+-- name: SearchTagsForViewer :many
+-- Live-suggest fuzzy match against tag names, gated by visible-node count so
+-- a tag that only sits on private nodes doesn't leak via the suggestion. Used
+-- by the graph viewer's tag filter at /tags/suggest.
+SELECT t.id, t.name
+FROM tags t
+WHERE (
+    t.name ILIKE '%' || sqlc.arg(query)::text || '%'
+    OR t.name %> sqlc.arg(query)::text
+  )
+  AND EXISTS (
+    SELECT 1 FROM node_tags nt
+    JOIN nodes n ON n.id = nt.node_id
+    WHERE nt.tag_id = t.id
+      AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+  )
+ORDER BY
+  CASE WHEN t.name ILIKE sqlc.arg(query)::text || '%' THEN 0 ELSE 1 END,
+  word_similarity(sqlc.arg(query)::text, t.name) DESC,
+  t.name ASC
+LIMIT sqlc.arg(result_limit);
+
 -- name: ListNodesWithTagForViewer :many
 -- Nodes that carry a given tag, most recent first — for /tags/{name}.
 -- Filtered through node_visible_to() so a viewer only sees nodes they can.

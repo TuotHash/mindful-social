@@ -66,17 +66,45 @@ JOIN users u ON u.id = n.created_by
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 
--- name: ListArgumentGraphSeedsByAuthor :many
--- Visible node IDs authored by a given username. Used by the graph viewer's
--- author filter so the neighborhood walk can expand around that author's
--- contributions while still respecting per-node visibility for the viewer.
--- The cap mirrors the search seed budget: the canvas can't render more than
--- a few hundred nodes regardless of how prolific the author is.
+-- name: ListArgumentGraphSeeds :many
+-- Visible node IDs matching the active graph-viewer filters. All filter
+-- parameters are nullable / sentinel-blank: pass NULL (or an empty array
+-- for tag_names) to skip a predicate. The seeds returned here feed the
+-- neighborhood walk, so the depth slider can still expand context around
+-- whatever set the filters carve out. Combining filters behaves as AND
+-- from the user's perspective; tag_names itself requires every named
+-- tag to be attached to a node (intersection, not union). Free-text
+-- search is intentionally not part of this query — it stays in
+-- SearchNodes (which uses tsvector + trigram) and is intersected at the
+-- Go layer when both are active. The cap matches the canvas budget.
 SELECT n.id
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE u.username = sqlc.arg(author_username)::text
-  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+LEFT JOIN groups g ON g.id = n.group_id
+WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+  AND (sqlc.narg(author_username)::text IS NULL
+       OR u.username = sqlc.narg(author_username)::text)
+  AND (sqlc.narg(group_slug)::text IS NULL
+       OR g.slug = sqlc.narg(group_slug)::text)
+  AND (sqlc.narg(since)::timestamptz IS NULL
+       OR n.created_at >= sqlc.narg(since)::timestamptz)
+  AND (sqlc.narg(until)::timestamptz IS NULL
+       OR n.created_at <= sqlc.narg(until)::timestamptz)
+  AND (sqlc.narg(sourced)::bool IS NULL
+       OR (sqlc.narg(sourced)::bool
+           AND n.source_url IS NOT NULL AND n.source_url <> '')
+       OR (NOT sqlc.narg(sourced)::bool
+           AND (n.source_url IS NULL OR n.source_url = '')))
+  AND (sqlc.narg(visibility)::visibility_kind IS NULL
+       OR n.visibility = sqlc.narg(visibility)::visibility_kind)
+  AND (cardinality(sqlc.arg(tag_names)::text[]) = 0
+       OR (
+         SELECT count(DISTINCT t.name)
+         FROM node_tags nt
+         JOIN tags t ON t.id = nt.tag_id
+         WHERE nt.node_id = n.id
+           AND t.name = ANY(sqlc.arg(tag_names)::text[])
+       ) = cardinality(sqlc.arg(tag_names)::text[]))
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 

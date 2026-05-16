@@ -241,6 +241,213 @@ func TestArgumentGraphData_AuthorAndQueryIntersect(t *testing.T) {
 	}
 }
 
+// TestArgumentGraphData_SourcedFilter pins the contract of ?sourced=yes /
+// ?sourced=no: only nodes with (or without) a source_url come back as
+// seeds. Nodes returned via neighbourhood expansion don't need to match
+// the predicate — only the seed itself does — so the test asserts the
+// match flags on the seed nodes.
+func TestArgumentGraphData_SourcedFilter(t *testing.T) {
+	integrationDB(t)
+
+	c := newClient(t)
+	user := signupAndGetUser(t, c, "alicesource", "alicesource@example.com", "correct horse battery staple")
+
+	src := "https://example.com/paper"
+	sourced, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Sourced topic " + uuid.NewString()[:8],
+		Body:       "",
+		SourceUrl:  &src,
+		CreatedBy:  user.ID,
+		Slug:       "sourced-topic-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPublic,
+	})
+	if err != nil {
+		t.Fatalf("create sourced node: %v", err)
+	}
+	unsourced, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Unsourced topic " + uuid.NewString()[:8],
+		Body:       "",
+		CreatedBy:  user.ID,
+		Slug:       "unsourced-topic-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPublic,
+	})
+	if err != nil {
+		t.Fatalf("create unsourced node: %v", err)
+	}
+
+	cases := []struct {
+		name      string
+		query     string
+		wantSeed  uuid.UUID
+		denySeed  uuid.UUID
+	}{
+		{"sourced=yes", "sourced=yes", sourced.ID, unsourced.ID},
+		{"sourced=no", "sourced=no", unsourced.ID, sourced.ID},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := get(t, c, "/graph/data?"+tc.query)
+			defer resp.Body.Close()
+			var data views.ArgumentGraphData
+			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			byID := make(map[string]views.ArgumentGraphNode, len(data.Nodes))
+			for _, n := range data.Nodes {
+				byID[n.ID] = n
+			}
+			want, ok := byID[tc.wantSeed.String()]
+			if !ok {
+				t.Fatalf("expected seed %s missing; nodes=%+v", tc.wantSeed, data.Nodes)
+			}
+			if !want.Match {
+				t.Fatalf("expected node to be a seed (Match=true); got %+v", want)
+			}
+			if got, leaked := byID[tc.denySeed.String()]; leaked && got.Match {
+				t.Fatalf("filter leaked %s as a seed: %+v", tc.denySeed, got)
+			}
+		})
+	}
+}
+
+// TestArgumentGraphData_VisibilityFilter exercises ?visibility=private —
+// only the viewer's own private nodes should surface, never a public node.
+func TestArgumentGraphData_VisibilityFilter(t *testing.T) {
+	integrationDB(t)
+
+	c := newClient(t)
+	user := signupAndGetUser(t, c, "alicepriv", "alicepriv@example.com", "correct horse battery staple")
+
+	private, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Private only " + uuid.NewString()[:8],
+		Body:       "",
+		CreatedBy:  user.ID,
+		Slug:       "private-only-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPrivate,
+	})
+	if err != nil {
+		t.Fatalf("create private node: %v", err)
+	}
+	public, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Public only " + uuid.NewString()[:8],
+		Body:       "",
+		CreatedBy:  user.ID,
+		Slug:       "public-only-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPublic,
+	})
+	if err != nil {
+		t.Fatalf("create public node: %v", err)
+	}
+
+	resp := get(t, c, "/graph/data?visibility=private")
+	defer resp.Body.Close()
+	var data views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	byID := make(map[string]views.ArgumentGraphNode, len(data.Nodes))
+	for _, n := range data.Nodes {
+		byID[n.ID] = n
+	}
+	if seed, ok := byID[private.ID.String()]; !ok || !seed.Match {
+		t.Fatalf("private node should be a seed under visibility=private; nodes=%+v", data.Nodes)
+	}
+	if seed, ok := byID[public.ID.String()]; ok && seed.Match {
+		t.Fatalf("public node should not be a seed under visibility=private; got %+v", seed)
+	}
+}
+
+// TestArgumentGraphData_TagFilter pins single-tag and multi-tag
+// behaviour: passing two tags only seeds nodes carrying both.
+func TestArgumentGraphData_TagFilter(t *testing.T) {
+	integrationDB(t)
+
+	c := newClient(t)
+	user := signupAndGetUser(t, c, "alicetag", "alicetag@example.com", "correct horse battery staple")
+
+	both, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Has both tags " + uuid.NewString()[:8],
+		CreatedBy:  user.ID,
+		Slug:       "both-tags-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPublic,
+	})
+	if err != nil {
+		t.Fatalf("create both-tags node: %v", err)
+	}
+	onlyA, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      "Has only tag a " + uuid.NewString()[:8],
+		CreatedBy:  user.ID,
+		Slug:       "only-a-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindPublic,
+	})
+	if err != nil {
+		t.Fatalf("create only-a node: %v", err)
+	}
+
+	tagA := "graph-filter-a-" + uuid.NewString()[:6]
+	tagB := "graph-filter-b-" + uuid.NewString()[:6]
+	tagAID, err := testServer.queries.UpsertTag(t.Context(), tagA)
+	if err != nil {
+		t.Fatalf("upsert tag a: %v", err)
+	}
+	tagBID, err := testServer.queries.UpsertTag(t.Context(), tagB)
+	if err != nil {
+		t.Fatalf("upsert tag b: %v", err)
+	}
+	for _, attach := range []db.AttachTagParams{
+		{NodeID: both.ID, TagID: tagAID},
+		{NodeID: both.ID, TagID: tagBID},
+		{NodeID: onlyA.ID, TagID: tagAID},
+	} {
+		if err := testServer.queries.AttachTag(t.Context(), attach); err != nil {
+			t.Fatalf("attach tag: %v", err)
+		}
+	}
+
+	// Single-tag: both nodes match.
+	resp := get(t, c, "/graph/data?tag="+tagA)
+	defer resp.Body.Close()
+	var single views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&single); err != nil {
+		t.Fatalf("decode single: %v", err)
+	}
+	singleByID := make(map[string]views.ArgumentGraphNode, len(single.Nodes))
+	for _, n := range single.Nodes {
+		singleByID[n.ID] = n
+	}
+	if _, ok := singleByID[both.ID.String()]; !ok {
+		t.Fatalf("single-tag should include both.ID; got %+v", single.Nodes)
+	}
+	if _, ok := singleByID[onlyA.ID.String()]; !ok {
+		t.Fatalf("single-tag should include onlyA.ID; got %+v", single.Nodes)
+	}
+
+	// Multi-tag intersects: only `both` should remain a seed.
+	resp2 := get(t, c, "/graph/data?tag="+tagA+"&tag="+tagB)
+	defer resp2.Body.Close()
+	var multi views.ArgumentGraphData
+	if err := json.NewDecoder(resp2.Body).Decode(&multi); err != nil {
+		t.Fatalf("decode multi: %v", err)
+	}
+	multiByID := make(map[string]views.ArgumentGraphNode, len(multi.Nodes))
+	for _, n := range multi.Nodes {
+		multiByID[n.ID] = n
+	}
+	got, ok := multiByID[both.ID.String()]
+	if !ok || !got.Match {
+		t.Fatalf("multi-tag should seed `both`; got %+v", multi.Nodes)
+	}
+	if seed, ok := multiByID[onlyA.ID.String()]; ok && seed.Match {
+		t.Fatalf("multi-tag should not seed onlyA (missing tagB); got %+v", seed)
+	}
+}
+
 func TestArgumentGraph_RespectsVisibility(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)

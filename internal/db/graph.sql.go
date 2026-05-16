@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const listArgumentGraphEdgesForNodeIDs = `-- name: ListArgumentGraphEdgesForNodeIDs :many
@@ -262,29 +263,73 @@ func (q *Queries) ListArgumentGraphNodesForViewer(ctx context.Context, arg ListA
 	return items, nil
 }
 
-const listArgumentGraphSeedsByAuthor = `-- name: ListArgumentGraphSeedsByAuthor :many
+const listArgumentGraphSeeds = `-- name: ListArgumentGraphSeeds :many
 SELECT n.id
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE u.username = $1::text
-  AND node_visible_to(n.*, $2::uuid)
+LEFT JOIN groups g ON g.id = n.group_id
+WHERE node_visible_to(n.*, $1::uuid)
+  AND ($2::text IS NULL
+       OR u.username = $2::text)
+  AND ($3::text IS NULL
+       OR g.slug = $3::text)
+  AND ($4::timestamptz IS NULL
+       OR n.created_at >= $4::timestamptz)
+  AND ($5::timestamptz IS NULL
+       OR n.created_at <= $5::timestamptz)
+  AND ($6::bool IS NULL
+       OR ($6::bool
+           AND n.source_url IS NOT NULL AND n.source_url <> '')
+       OR (NOT $6::bool
+           AND (n.source_url IS NULL OR n.source_url = '')))
+  AND ($7::visibility_kind IS NULL
+       OR n.visibility = $7::visibility_kind)
+  AND (cardinality($8::text[]) = 0
+       OR (
+         SELECT count(DISTINCT t.name)
+         FROM node_tags nt
+         JOIN tags t ON t.id = nt.tag_id
+         WHERE nt.node_id = n.id
+           AND t.name = ANY($8::text[])
+       ) = cardinality($8::text[]))
 ORDER BY n.created_at DESC
-LIMIT $3
+LIMIT $9
 `
 
-type ListArgumentGraphSeedsByAuthorParams struct {
-	AuthorUsername string     `json:"author_username"`
-	ViewerID       *uuid.UUID `json:"viewer_id"`
-	ResultLimit    int32      `json:"result_limit"`
+type ListArgumentGraphSeedsParams struct {
+	ViewerID       *uuid.UUID         `json:"viewer_id"`
+	AuthorUsername *string            `json:"author_username"`
+	GroupSlug      *string            `json:"group_slug"`
+	Since          pgtype.Timestamptz `json:"since"`
+	Until          pgtype.Timestamptz `json:"until"`
+	Sourced        *bool              `json:"sourced"`
+	Visibility     *VisibilityKind    `json:"visibility"`
+	TagNames       []string           `json:"tag_names"`
+	ResultLimit    int32              `json:"result_limit"`
 }
 
-// Visible node IDs authored by a given username. Used by the graph viewer's
-// author filter so the neighborhood walk can expand around that author's
-// contributions while still respecting per-node visibility for the viewer.
-// The cap mirrors the search seed budget: the canvas can't render more than
-// a few hundred nodes regardless of how prolific the author is.
-func (q *Queries) ListArgumentGraphSeedsByAuthor(ctx context.Context, arg ListArgumentGraphSeedsByAuthorParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listArgumentGraphSeedsByAuthor, arg.AuthorUsername, arg.ViewerID, arg.ResultLimit)
+// Visible node IDs matching the active graph-viewer filters. All filter
+// parameters are nullable / sentinel-blank: pass NULL (or an empty array
+// for tag_names) to skip a predicate. The seeds returned here feed the
+// neighborhood walk, so the depth slider can still expand context around
+// whatever set the filters carve out. Combining filters behaves as AND
+// from the user's perspective; tag_names itself requires every named
+// tag to be attached to a node (intersection, not union). Free-text
+// search is intentionally not part of this query — it stays in
+// SearchNodes (which uses tsvector + trigram) and is intersected at the
+// Go layer when both are active. The cap matches the canvas budget.
+func (q *Queries) ListArgumentGraphSeeds(ctx context.Context, arg ListArgumentGraphSeedsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listArgumentGraphSeeds,
+		arg.ViewerID,
+		arg.AuthorUsername,
+		arg.GroupSlug,
+		arg.Since,
+		arg.Until,
+		arg.Sourced,
+		arg.Visibility,
+		arg.TagNames,
+		arg.ResultLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
