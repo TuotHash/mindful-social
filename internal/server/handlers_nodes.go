@@ -366,11 +366,13 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("create node: pin", "err", err)
 		}
 	}
-	if names := parseTagsInput(rawTags); len(names) > 0 {
-		if err := s.setTagsForNode(r, node.ID, names); err != nil {
+	tagNames := parseTagsInput(rawTags)
+	if len(tagNames) > 0 {
+		if err := s.setTagsForNode(r, node.ID, tagNames); err != nil {
 			s.logger.Error("create node: set tags", "err", err)
 		}
 	}
+	s.snapshotNodeRevision(r.Context(), node.ID, &user.ID, node.Title, node.Body, "Created.", tagNames)
 	// Modal submit: ask htmx to do a full navigation to the new post so the
 	// modal closes and the page actually changes. Non-htmx submits get the
 	// usual 303 redirect.
@@ -880,8 +882,17 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
-	if err := s.setTagsForNode(r, id, parseTagsInput(rawTags)); err != nil {
+	newTags := parseTagsInput(rawTags)
+	if err := s.setTagsForNode(r, id, newTags); err != nil {
 		s.logger.Error("update node: set tags", "err", err)
+	}
+	// Skip the snapshot when nothing meaningful changed (e.g. user re-saved
+	// the form without edits). GetLatestNodeRevision can't fail in normal
+	// operation thanks to the migration backfill; if it does, snapshot anyway
+	// so we don't silently lose a real edit.
+	latest, lerr := s.queries.GetLatestNodeRevision(r.Context(), id)
+	if lerr != nil || latest.Title != title || latest.Body != body || !sameStringSet(latest.TagNames, newTags) {
+		s.snapshotNodeRevision(r.Context(), id, &user.ID, title, body, "", newTags)
 	}
 	if isHTMX(r) {
 		w.Header().Set("HX-Redirect", "/nodes/"+node.Slug)

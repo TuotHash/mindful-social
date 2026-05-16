@@ -433,6 +433,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 						if canEdit {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						}
+						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/history") } class="btn ghost"><span class="material-symbols-outlined">history</span>History</a>
 						if pin == nil {
 							<a
 								href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }

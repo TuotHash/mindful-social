@@ -533,6 +533,18 @@ type NodeImage struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type NodeRevision struct {
+	ID          uuid.UUID          `json:"id"`
+	NodeID      uuid.UUID          `json:"node_id"`
+	Revision    int32              `json:"revision"`
+	Title       string             `json:"title"`
+	Body        string             `json:"body"`
+	TagNames    []string           `json:"tag_names"`
+	EditedBy    *uuid.UUID         `json:"edited_by"`
+	EditedAt    pgtype.Timestamptz `json:"edited_at"`
+	EditSummary string             `json:"edit_summary"`
+}
+
 type NodeTag struct {
 	NodeID uuid.UUID `json:"node_id"`
 	TagID  uuid.UUID `json:"tag_id"`

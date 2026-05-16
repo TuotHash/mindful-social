@@ -190,6 +190,8 @@ func (s *Server) routes() {
 	r.Get("/auth/callback/{provider}", s.handleOAuthCallback)
 
 	r.Get("/nodes/{id}", s.handleNodeDetail)
+	r.Get("/nodes/{id}/history", s.handleNodeHistory)
+	r.Get("/nodes/{id}/history/{revision}", s.handleNodeRevisionView)
 	r.Get("/graph", s.handleArgumentGraph)
 	r.Get("/graph/data", s.handleArgumentGraphData)
 	r.Get("/users/{username}", s.handleProfile)
@@ -220,6 +222,7 @@ func (s *Server) routes() {
 		r.Post("/nodes/{id}", s.handleNodeUpdate)
 		r.Get("/nodes/{id}/delete", s.handleNodeDeleteConfirm)
 		r.Post("/nodes/{id}/delete", s.handleNodeDelete)
+		r.Post("/nodes/{id}/history/{revision}/revert", s.handleNodeRevert)
 		r.Get("/nodes/{id}/edges/new", s.handleEdgeNew)
 		r.Get("/nodes/{id}/edges/picker", s.handleEdgePicker)
 		r.Post("/nodes/{id}/edges", s.handleEdgeCreate)

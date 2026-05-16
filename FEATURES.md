@@ -42,6 +42,7 @@ Edge highlighting marks key reasoning inline on the node page.
 - Clean deletes — no soft-delete. A confirmation step shows what cascades before committing.
 - Parent enforcement: views attach to a topic, findings attach to a view or another finding. Constraints are enforced at the schema level.
 - Findings are created inline from the **Connect** form on any view or finding — the source node becomes the parent and the chosen edge kind makes the link.
+- **Version history** — every edit snapshots title, body, and tags into `node_revisions`. The History button on any node lists revisions newest-first with editor + timestamp; opening a revision renders the full snapshot. Anyone with edit rights can revert in one click — the revert itself becomes a new revision, so it can be undone too.
 
 ---
 

@@ -50,6 +50,10 @@ type Querier interface {
 	CreateGroupInvite(ctx context.Context, arg CreateGroupInviteParams) (GroupInvite, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateNodeImage(ctx context.Context, arg CreateNodeImageParams) (NodeImage, error)
+	// Writes a new revision for a node, picking the next revision number atomically
+	// by reading max(revision)+1 in the same statement. The UNIQUE(node_id,
+	// revision) constraint backs this up if two updates race.
+	CreateNodeRevision(ctx context.Context, arg CreateNodeRevisionParams) (NodeRevision, error)
 	CreateNodeVideo(ctx context.Context, arg CreateNodeVideoParams) (NodeVideo, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
@@ -78,8 +82,15 @@ type Querier interface {
 	GetGroupMembership(ctx context.Context, arg GetGroupMembershipParams) (GroupMembership, error)
 	GetIdentityByProvider(ctx context.Context, arg GetIdentityByProviderParams) (AuthIdentity, error)
 	GetIdentityForUser(ctx context.Context, arg GetIdentityForUserParams) (AuthIdentity, error)
+	// The newest revision for a node. The update handler reads this to decide
+	// whether the incoming save actually changes anything — if title/body/tags
+	// all match, we skip writing a spurious duplicate.
+	GetLatestNodeRevision(ctx context.Context, nodeID uuid.UUID) (NodeRevision, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	GetNodeBySlug(ctx context.Context, slug string) (Node, error)
+	// A single revision identified by (node_id, revision). Returns the full body
+	// so the snapshot view can render it.
+	GetNodeRevision(ctx context.Context, arg GetNodeRevisionParams) (GetNodeRevisionRow, error)
 	// Lookup used by the password-login flow: find the user by email AND the
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
@@ -159,6 +170,10 @@ type Querier interface {
 	ListIdentitiesForUser(ctx context.Context, userID uuid.UUID) ([]AuthIdentity, error)
 	ListNodeImagesByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeImagesByUploaderRow, error)
 	ListNodeImagesForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeImagesForRootRow, error)
+	// All revisions for a node, newest first. editor_username is null when the
+	// user has been deleted (FK is ON DELETE SET NULL) — the UI shows "deleted
+	// user" in that case.
+	ListNodeRevisions(ctx context.Context, nodeID uuid.UUID) ([]ListNodeRevisionsRow, error)
 	ListNodeVideosByUploader(ctx context.Context, uploadedBy uuid.UUID) ([]ListNodeVideosByUploaderRow, error)
 	ListNodeVideosForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeVideosForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section

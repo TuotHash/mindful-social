@@ -3054,6 +3054,75 @@ header.node-header > .chip {
 }
 
 /* =========================================================================
+   Node revisions / history
+   ========================================================================= */
+
+.revision-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.revision-list-item {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev-1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.revision-list-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+}
+.revision-number {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.revision-number:hover {
+  color: var(--accent-strong);
+}
+.revision-author {
+  color: var(--text-muted);
+}
+.revision-author a {
+  color: var(--text);
+}
+.revision-time {
+  margin-left: auto;
+}
+.revision-title {
+  font-weight: 500;
+  color: var(--text);
+}
+.revision-summary {
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+.revision-actions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: 4px;
+}
+.revision-revert-form {
+  display: inline;
+}
+.revision-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+}
+
+/* =========================================================================
    Tags index
    ========================================================================= */
 

@@ -42,8 +42,6 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 ### Moderation & Trust
 
-- **Version history + rollback** — every body edit creates a versioned snapshot. Any user can view the history and revert. Turns wiki-open editing into a self-healing system.
-
 - **Trust score system** — per-user score derived from community signals:
   - **Net votes on authored nodes/edges** — primary signal of contribution quality.
   - **Revert rate** — fraction of edits to others' nodes that were rolled back.
@@ -89,6 +87,7 @@ Features that have shipped and are documented in [FEATURES.md](FEATURES.md).
 - **Content authoring** — Markdown bodies (EasyMDE), image uploads, video uploads with 1080p transcode; direct upload serving with directory listings disabled.
 - **Discussion** — view comment threads with one-level replies; author edit and soft-delete; visibility inherits from the parent view.
 - **Discovery** — full-text search, trigram fuzzy search, HTMX live search, tag system.
+- **Version history + rollback** — every edit snapshots title, body, and tags into `node_revisions`. Any user with edit rights can view past revisions and revert in one click. Reverts are themselves recorded as new revisions, so they're also reversible.
 - **Social foundation** — follow/connections, audience lists (Trusted + custom), per-node visibility levels, stance-only pins (Support/Oppose/Feature), home feed, public profiles; author bylines on node detail, home feed, and search results.
 - **Groups & communities** — collaborative spaces, group visibility modes, member roles, invites, group-scoped node visibility.
 - **Authentication** — password + OAuth/OIDC (Google, GitHub, any OIDC provider), auto-account linking, CSRF protection, Secure cookies when `PUBLIC_BASE_URL` uses HTTPS.

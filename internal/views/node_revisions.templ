@@ -1,0 +1,140 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/TuotHash/mindful-social/internal/db"
+)
+
+// RevisionRow is the slim row rendered in the history list — body is
+// intentionally omitted so the list query stays cheap on long histories.
+type RevisionRow struct {
+	Revision       int32
+	Title          string
+	TagNames       []string
+	EditorUsername *string
+	EditedAt       pgtype.Timestamptz
+	EditSummary    string
+}
+
+// RevisionDetail carries everything needed to render one historical snapshot,
+// including the full body for markdown rendering.
+type RevisionDetail struct {
+	Revision       int32
+	Title          string
+	Body           string
+	TagNames       []string
+	EditorUsername *string
+	EditedAt       pgtype.Timestamptz
+	EditSummary    string
+}
+
+templ NodeHistory(viewer *Viewer, node db.Node, revisions []RevisionRow, canEdit bool) {
+	@Layout("History — "+node.Title, viewer) {
+		<div class="page medium">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">History</span>
+				<h1 class="h-1">{ node.Title }</h1>
+				<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="muted">← Back to node</a>
+			</div>
+			if len(revisions) == 0 {
+				<p class="muted">No revisions yet.</p>
+			} else {
+				<ol class="revision-list">
+					for _, rev := range revisions {
+						@revisionListItem(node, rev, canEdit)
+					}
+				</ol>
+			}
+		</div>
+	}
+}
+
+templ revisionListItem(node db.Node, rev RevisionRow, canEdit bool) {
+	<li class="revision-list-item">
+		<div class="revision-list-meta">
+			<a href={ revisionURL(node, rev.Revision) } class="revision-number">Revision { strconv.Itoa(int(rev.Revision)) }</a>
+			<span class="revision-author">
+				by
+				if rev.EditorUsername != nil {
+					<a href={ templ.SafeURL("/users/" + *rev.EditorUsername) }>{ *rev.EditorUsername }</a>
+				} else {
+					<span class="muted">deleted user</span>
+				}
+			</span>
+			<time datetime={ timestampDatetime(rev.EditedAt) } class="revision-time muted">{ timestampRelative(rev.EditedAt) }</time>
+		</div>
+		<div class="revision-title">{ rev.Title }</div>
+		if rev.EditSummary != "" {
+			<div class="revision-summary muted">{ rev.EditSummary }</div>
+		}
+		<div class="revision-actions">
+			<a href={ revisionURL(node, rev.Revision) } class="btn ghost sm">View</a>
+			if canEdit {
+				<form method="post" action={ revertURL(node, rev.Revision) } class="revision-revert-form">
+					@CSRFField()
+					<button type="submit" class="btn ghost sm">Revert to this</button>
+				</form>
+			}
+		</div>
+	</li>
+}
+
+templ NodeRevisionView(viewer *Viewer, node db.Node, rev RevisionDetail, canEdit bool) {
+	@Layout("Revision "+strconv.Itoa(int(rev.Revision))+" — "+node.Title, viewer) {
+		<div class="page medium">
+			<div class="col gap-12" style="margin-bottom: 18px;">
+				<span class="eyebrow">Revision { strconv.Itoa(int(rev.Revision)) }</span>
+				<h1 class="h-1">{ rev.Title }</h1>
+				<div class="revision-meta muted">
+					if rev.EditorUsername != nil {
+						<a href={ templ.SafeURL("/users/" + *rev.EditorUsername) }>{ *rev.EditorUsername }</a>
+					} else {
+						<span>deleted user</span>
+					}
+					·
+					<time datetime={ timestampDatetime(rev.EditedAt) }>{ timestampRelative(rev.EditedAt) }</time>
+					if rev.EditSummary != "" {
+						· { rev.EditSummary }
+					}
+				</div>
+			</div>
+			<article class="node card" style="padding: 32px;">
+				if nodeMarkdownHasText(rev.Body) {
+					<section class="body markdown-body">
+						@NodeMarkdown(rev.Body)
+					</section>
+				} else {
+					<p class="muted">No body content in this revision.</p>
+				}
+				if len(rev.TagNames) > 0 {
+					<section class="node-tags" style="margin-top: 18px;">
+						for _, name := range rev.TagNames {
+							<a href={ templ.SafeURL("/tags/" + name) } class="chip">{ name }</a>
+						}
+					</section>
+				}
+			</article>
+			<div class="row gap-8" style="margin-top: 18px;">
+				<a href={ templ.SafeURL("/nodes/" + node.Slug + "/history") } class="btn ghost">← Back to history</a>
+				<a href={ templ.SafeURL("/nodes/" + node.Slug) } class="btn ghost">Back to node</a>
+				if canEdit {
+					<form method="post" action={ revertURL(node, rev.Revision) } style="display: inline;">
+						@CSRFField()
+						<button type="submit" class="btn accent">Revert to this revision</button>
+					</form>
+				}
+			</div>
+		</div>
+	}
+}
+
+func revisionURL(node db.Node, revision int32) templ.SafeURL {
+	return templ.SafeURL("/nodes/" + node.Slug + "/history/" + strconv.Itoa(int(revision)))
+}
+
+func revertURL(node db.Node, revision int32) templ.SafeURL {
+	return templ.SafeURL("/nodes/" + node.Slug + "/history/" + strconv.Itoa(int(revision)) + "/revert")
+}
