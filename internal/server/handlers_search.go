@@ -9,6 +9,7 @@ import (
 )
 
 const searchResultLimit = 50
+const suggestLimit = 4
 
 // handleSearch renders /search?q=...: full-text matches across node titles
 // and bodies, plus matching usernames and groups. Groups results are gated
@@ -51,6 +52,82 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, views.SearchResults(viewer, q, searchHits(nodeRows), userHits(userRows), groupHits(groupRows)))
+}
+
+// handleSearchSuggest returns a live-suggest HTML fragment for /search/suggest?q=.
+// Used by the nav-search pill and the main /search form while the user types.
+func (s *Server) handleSearchSuggest(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		render(w, r, views.SearchSuggestDropdown("", nil, nil, nil))
+		return
+	}
+	nodeRows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+		ViewerID:    viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("suggest nodes", "err", err, "q", q)
+		return
+	}
+	userRows, err := s.queries.SearchUsers(r.Context(), db.SearchUsersParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+	})
+	if err != nil {
+		s.logger.Error("suggest users", "err", err, "q", q)
+		return
+	}
+	groupRows, err := s.queries.SearchGroups(r.Context(), db.SearchGroupsParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+		ViewerID:    viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("suggest groups", "err", err, "q", q)
+		return
+	}
+	render(w, r, views.SearchSuggestDropdown(q, searchHits(nodeRows), userHits(userRows), groupHits(groupRows)))
+}
+
+// handleGraphNodesSuggest returns a live-suggest fragment for the argument-graph
+// search box at /graph/nodes/suggest?q=.
+func (s *Server) handleGraphNodesSuggest(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		render(w, r, views.GraphNodesSuggestDropdown(nil))
+		return
+	}
+	rows, err := s.queries.SearchNodes(r.Context(), db.SearchNodesParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+		ViewerID:    viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("suggest graph nodes", "err", err, "q", q)
+		return
+	}
+	render(w, r, views.GraphNodesSuggestDropdown(searchHits(rows)))
+}
+
+// handleUsersSuggest returns a live-suggest fragment for the graph author
+// filter at /users/suggest?q=.
+func (s *Server) handleUsersSuggest(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		render(w, r, views.UsersSuggestDropdown(nil))
+		return
+	}
+	rows, err := s.queries.SearchUsers(r.Context(), db.SearchUsersParams{
+		Query:       q,
+		ResultLimit: suggestLimit,
+	})
+	if err != nil {
+		s.logger.Error("suggest users", "err", err, "q", q)
+		return
+	}
+	render(w, r, views.UsersSuggestDropdown(userHits(rows)))
 }
 
 func searchHits(rows []db.SearchNodesRow) []views.SearchHit {

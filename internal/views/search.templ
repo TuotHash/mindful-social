@@ -52,7 +52,20 @@ templ SearchResults(viewer *Viewer, q string, hits []SearchHit, users []UserSear
 				<h1 class="h-1">Search the graph</h1>
 			</div>
 			<form method="get" action="/search" class="search-form">
-				<input type="search" name="q" value={ q } placeholder="search people, groups, node titles, and bodies..."/>
+				<div class="search-input-wrap">
+					<input
+						type="search"
+						name="q"
+						value={ q }
+						placeholder="search people, groups, node titles, and bodies..."
+						autocomplete="off"
+						hx-get="/search/suggest"
+						hx-trigger="input changed delay:200ms"
+						hx-target="#search-page-suggest"
+						hx-swap="innerHTML"
+					/>
+					<div id="search-page-suggest" class="search-suggest" hidden></div>
+				</div>
 				<button type="submit" class="btn accent">Search</button>
 			</form>
 			if q == "" {

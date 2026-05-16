@@ -64,11 +64,39 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, q, author string) {
 				<div class="argument-graph-toolbar">
 					<label class="argument-graph-search" aria-label="Search graph">
 						<span class="material-symbols-outlined">search</span>
-						<input type="search" data-graph-search value={ q } placeholder="Search graph" autocomplete="off"/>
+						<div class="search-suggest-anchor">
+							<input
+								type="search"
+								name="q"
+								data-graph-search
+								value={ q }
+								placeholder="Search graph"
+								autocomplete="off"
+								hx-get="/graph/nodes/suggest"
+								hx-trigger="input changed delay:200ms"
+								hx-target="#graph-search-suggest"
+								hx-swap="innerHTML"
+							/>
+							<div id="graph-search-suggest" class="search-suggest" hidden></div>
+						</div>
 					</label>
 					<label class="argument-graph-author" aria-label="Filter by author">
 						<span class="material-symbols-outlined">person</span>
-						<input type="search" data-graph-author value={ author } placeholder="Filter by author" autocomplete="off"/>
+						<div class="search-suggest-anchor">
+							<input
+								type="search"
+								name="author"
+								data-graph-author
+								value={ author }
+								placeholder="Filter by author"
+								autocomplete="off"
+								hx-get="/users/suggest"
+								hx-trigger="input changed delay:200ms"
+								hx-target="#graph-author-suggest"
+								hx-swap="innerHTML"
+							/>
+							<div id="graph-author-suggest" class="search-suggest" hidden></div>
+						</div>
 						<button type="button" class="argument-graph-author-clear" data-graph-author-clear hidden aria-label="Clear author filter">
 							<span class="material-symbols-outlined">close</span>
 						</button>

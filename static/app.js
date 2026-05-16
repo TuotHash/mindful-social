@@ -1169,4 +1169,48 @@
     initMarkdownEditors(event.target || document);
     initArgumentGraphs(event.target || document);
   });
+
+  // Show/hide suggest dropdowns based on whether HTMX just put content in them.
+  document.addEventListener("htmx:afterSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || !target.classList.contains("search-suggest")) return;
+    var input = target.parentElement && target.parentElement.querySelector("input[type='search']");
+    var focused = input && document.activeElement === input;
+    target.hidden = !focused || target.children.length === 0;
+  });
+
+  // Close all suggest dropdowns when clicking outside their anchor.
+  document.addEventListener("click", function (event) {
+    document.querySelectorAll(".search-suggest").forEach(function (el) {
+      var anchor = el.parentElement;
+      if (anchor && !anchor.contains(event.target)) {
+        el.innerHTML = "";
+        el.hidden = true;
+      }
+    });
+  });
+
+  // Close suggest dropdowns on Escape.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    document.querySelectorAll(".search-suggest").forEach(function (el) {
+      el.innerHTML = "";
+      el.hidden = true;
+    });
+  });
+
+  // Fill the target input when a suggest button is clicked (graph boxes).
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-fill-target]");
+    if (!btn) return;
+    var input = document.querySelector(btn.dataset.fillTarget);
+    if (!input) return;
+    input.value = btn.dataset.fillValue;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    var suggest = btn.closest(".search-suggest");
+    if (suggest) {
+      suggest.innerHTML = "";
+      suggest.hidden = true;
+    }
+  });
 })();

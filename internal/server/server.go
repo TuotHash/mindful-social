@@ -198,6 +198,9 @@ func (s *Server) routes() {
 	r.Get("/groups", s.handleGroupsIndex)
 	r.Get("/groups/{slug}", s.handleGroupDetail)
 	r.Get("/search", s.handleSearch)
+	r.Get("/search/suggest", s.handleSearchSuggest)
+	r.Get("/graph/nodes/suggest", s.handleGraphNodesSuggest)
+	r.Get("/users/suggest", s.handleUsersSuggest)
 
 	// Routes that require an authenticated user.
 	r.Group(func(r chi.Router) {

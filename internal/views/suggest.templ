@@ -1,0 +1,74 @@
+package views
+
+import "net/url"
+
+// SearchSuggestDropdown renders the live-suggest list for the main-search and
+// nav-search inputs. Returns an empty fragment when there are no results,
+// causing the target div to empty out and hide via JS.
+templ SearchSuggestDropdown(q string, nodes []SearchHit, users []UserSearchHit, groups []GroupSearchHit) {
+	if len(nodes) > 0 || len(users) > 0 || len(groups) > 0 {
+		if len(users) > 0 {
+			<p class="search-suggest-label">People</p>
+			for _, u := range users {
+				<a href={ templ.SafeURL("/users/" + u.Username) } class="search-suggest-item">
+					@Avatar(u.Username, 20)
+					<span>{ u.Username }</span>
+				</a>
+			}
+		}
+		if len(groups) > 0 {
+			<p class="search-suggest-label">Groups</p>
+			for _, g := range groups {
+				<a href={ templ.SafeURL("/groups/" + g.Slug) } class="search-suggest-item">
+					<span class="search-suggest-badge">{ groupVisibilityLabel(g.Visibility) }</span>
+					<span>{ g.Name }</span>
+				</a>
+			}
+		}
+		if len(nodes) > 0 {
+			<p class="search-suggest-label">Graph</p>
+			for _, n := range nodes {
+				<a href={ templ.SafeURL("/nodes/" + n.Slug) } class="search-suggest-item">
+					@nodeTypeChip(n.Type)
+					<span class="search-suggest-title">{ n.Title }</span>
+				</a>
+			}
+		}
+		<a href={ templ.SafeURL("/search?q=" + url.QueryEscape(q)) } class="search-suggest-footer">
+			See all results
+		</a>
+	}
+}
+
+// GraphNodesSuggestDropdown renders suggest buttons for the argument-graph
+// search box. Clicking a button fills the search input and triggers the
+// existing JS graph-search logic.
+templ GraphNodesSuggestDropdown(nodes []SearchHit) {
+	for _, n := range nodes {
+		<button
+			type="button"
+			class="search-suggest-item"
+			data-fill-target="[data-graph-search]"
+			data-fill-value={ n.Title }
+		>
+			@nodeTypeChip(n.Type)
+			<span class="search-suggest-title">{ n.Title }</span>
+		</button>
+	}
+}
+
+// UsersSuggestDropdown renders suggest buttons for the argument-graph author
+// filter. Clicking fills the author input and triggers the filter.
+templ UsersSuggestDropdown(users []UserSearchHit) {
+	for _, u := range users {
+		<button
+			type="button"
+			class="search-suggest-item"
+			data-fill-target="[data-graph-author]"
+			data-fill-value={ u.Username }
+		>
+			@Avatar(u.Username, 20)
+			<span>{ u.Username }</span>
+		</button>
+	}
+}

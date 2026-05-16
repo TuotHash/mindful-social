@@ -2905,6 +2905,104 @@ header.node-header > .chip {
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* search-input-wrap — positions the suggest dropdown relative to the input */
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+.search-input-wrap input[type="search"] {
+  width: 100%;
+}
+
+/* search-suggest-anchor — same inside the graph toolbar pills */
+.search-suggest-anchor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.search-suggest-anchor input[type="search"] {
+  width: 100%;
+}
+
+/* floating suggest dropdown */
+.search-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-width: 200px;
+}
+.nav-search .search-suggest {
+  top: calc(100% + 8px);
+}
+.search-suggest-label {
+  margin: 0;
+  padding: 8px 12px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.search-suggest-label:first-child {
+  padding-top: 10px;
+}
+.search-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.search-suggest-item:hover,
+.search-suggest-item:focus-visible {
+  background: var(--bg-elev-2);
+  outline: none;
+}
+.search-suggest-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.search-suggest-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--bg-elev-3);
+  color: var(--text-muted);
+  flex: none;
+}
+.search-suggest-footer {
+  display: block;
+  padding: 7px 12px;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  text-decoration: none;
+  border-top: 1px solid var(--border);
+}
+.search-suggest-footer:hover {
+  background: var(--bg-elev-2);
+}
+
 .search-results {
   list-style: none;
   margin: 0;
