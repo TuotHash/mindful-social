@@ -693,10 +693,10 @@
         return active;
       }
 
-      // activeKinds drives the edge-kind chips. Unlike type filtering it
-      // only hides edges, not nodes — a node connected to its neighbour
-      // through an "opposes" edge should still be in the canvas if at
-      // least one of its other connections has a checked kind.
+      // activeKinds drives the edge-kind chips. Edges of unchecked kinds
+      // are stripped from the canvas, and the depth-slider BFS does not
+      // cross them — so a node only stays visible if at least one path of
+      // checked-kind edges reaches it from a seed within the depth limit.
       function activeKinds() {
         var active = {};
         kindInputs.forEach(function (input) {
@@ -808,16 +808,35 @@
           }
         });
 
+        // liveAdjacency rebuilds the neighbour map using only edges whose
+        // kind is currently checked. Walking the static adjacency would
+        // bridge two nodes across an edge we then strip at draw time,
+        // leaving an unexplained floating neighbour. Neighbour types are
+        // checked at hop time so hidden-type nodes cannot bridge further
+        // hops either — both filters now affect reachability, not just
+        // the final draw pass.
+        var activeKindMap = activeKinds();
+        var liveAdjacency = {};
+        edges.forEach(function (edge) {
+          if (activeKindMap[edge.kind] === false) return;
+          liveAdjacency[edge.from] = liveAdjacency[edge.from] || {};
+          liveAdjacency[edge.to] = liveAdjacency[edge.to] || {};
+          liveAdjacency[edge.from][edge.to] = true;
+          liveAdjacency[edge.to][edge.from] = true;
+        });
+
         var depth = currentDepth();
         for (var hop = 0; hop < depth && frontier.length > 0; hop++) {
           var next = [];
           for (var i = 0; i < frontier.length; i++) {
-            var neighbors = adjacency[frontier[i]];
+            var neighbors = liveAdjacency[frontier[i]];
             if (!neighbors) continue;
             var ids = Object.keys(neighbors);
             for (var j = 0; j < ids.length; j++) {
               var nid = ids[j];
               if (keep[nid]) continue;
+              var neighbor = nodesByID[nid];
+              if (!neighbor || !active[neighbor.type]) continue;
               keep[nid] = true;
               next.push(nid);
             }
