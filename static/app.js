@@ -612,11 +612,9 @@
 
       var search = graph.querySelector("[data-graph-search]");
       var authorInput = graph.querySelector("[data-graph-author]");
-      var authorClear = graph.querySelector("[data-graph-author-clear]");
       var authorPinBtn = graph.querySelector("[data-graph-author-pin]");
       var authorPinLabel = graph.querySelector("[data-graph-author-pin-label]");
       var groupInput = graph.querySelector("[data-graph-group]");
-      var groupClear = graph.querySelector("[data-graph-group-clear]");
       var tagChipsEl = graph.querySelector("[data-graph-tag-chips]");
       var tagInput = graph.querySelector("[data-graph-tag-input]");
       var typeInputs = Array.from(graph.querySelectorAll("[data-graph-type]"));
@@ -1210,31 +1208,16 @@
         }, 220);
       }
 
-      function syncAuthorClear() {
-        if (!authorClear) return;
-        authorClear.hidden = currentAuthor() === "";
-      }
-
       if (search) search.addEventListener("input", function () {
         renderFromFilter();
         queueServerSearch();
       });
       if (authorInput) {
-        syncAuthorClear();
         authorInput.addEventListener("input", function () {
-          syncAuthorClear();
           renderFromFilter();
           queueServerSearch();
         });
       }
-      if (authorClear) authorClear.addEventListener("click", function () {
-        if (!authorInput) return;
-        authorInput.value = "";
-        syncAuthorClear();
-        renderFromFilter();
-        queueServerSearch();
-        authorInput.focus();
-      });
       if (authorPinBtn) authorPinBtn.addEventListener("click", function () {
         var node = nodesByID[selectedID];
         if (!node || !authorInput) return;
@@ -1243,7 +1226,6 @@
         // author clears the filter, matching the visual cue from the
         // pin/unpin button label.
         authorInput.value = current === (node.authorUsername || "").toLowerCase() ? "" : (node.authorUsername || "");
-        syncAuthorClear();
         renderInspector();
         renderFromFilter();
         queueServerSearch();
@@ -1258,27 +1240,12 @@
         input.addEventListener("change", render);
       });
 
-      function syncGroupClear() {
-        if (!groupClear) return;
-        groupClear.hidden = currentGroup() === "";
-      }
-
       if (groupInput) {
-        syncGroupClear();
         groupInput.addEventListener("input", function () {
-          syncGroupClear();
           renderFromFilter();
           queueServerSearch();
         });
       }
-      if (groupClear) groupClear.addEventListener("click", function () {
-        if (!groupInput) return;
-        groupInput.value = "";
-        syncGroupClear();
-        renderFromFilter();
-        queueServerSearch();
-        groupInput.focus();
-      });
 
       // renderTagChips paints the active-tag pills inside the tag input,
       // each with a dismiss button. The chips are recreated wholesale on

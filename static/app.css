@@ -1713,20 +1713,6 @@ label.field {
   width: 100%;
 }
 
-.argument-graph-author-clear {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-subtle);
-}
-
-.argument-graph-author-clear:hover {
-  color: var(--text);
-}
-
 .argument-graph-current {
   color: var(--text-muted);
   font-size: var(--fs-xs);
