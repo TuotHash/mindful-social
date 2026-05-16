@@ -215,7 +215,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" placeholder=\"Search graph\" autocomplete=\"off\" hx-get=\"/graph/nodes/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-search-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-search-suggest\" class=\"search-suggest\" hidden></div></div></label> <label class=\"argument-graph-author\" aria-label=\"Filter by author\"><span class=\"material-symbols-outlined\">person</span><div class=\"search-suggest-anchor\"><input type=\"search\" name=\"author\" data-graph-author value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" placeholder=\"Search graph\" autocomplete=\"off\" hx-get=\"/graph/nodes/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-search-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-search-suggest\" class=\"search-suggest\" hidden></div></div></label> <label class=\"argument-graph-author\" aria-label=\"Filter by author\"><span class=\"material-symbols-outlined\">person</span><div class=\"search-suggest-anchor\"><input type=\"text\" name=\"author\" data-graph-author value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -228,7 +228,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"Author\" autocomplete=\"off\" hx-get=\"/users/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-author-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-author-suggest\" class=\"search-suggest\" hidden></div></div><button type=\"button\" class=\"argument-graph-author-clear\" data-graph-author-clear hidden aria-label=\"Clear author filter\"><span class=\"material-symbols-outlined\">close</span></button></label> <label class=\"argument-graph-group\" aria-label=\"Filter by group\"><span class=\"material-symbols-outlined\">group</span><div class=\"search-suggest-anchor\"><input type=\"search\" name=\"group\" data-graph-group value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"Author\" autocomplete=\"off\" hx-get=\"/users/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-author-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-author-suggest\" class=\"search-suggest\" hidden></div></div><button type=\"button\" class=\"argument-graph-author-clear\" data-graph-author-clear hidden aria-label=\"Clear author filter\"><span class=\"material-symbols-outlined\">close</span></button></label> <label class=\"argument-graph-group\" aria-label=\"Filter by group\"><span class=\"material-symbols-outlined\">group</span><div class=\"search-suggest-anchor\"><input type=\"text\" name=\"group\" data-graph-group value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
