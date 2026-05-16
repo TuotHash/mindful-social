@@ -18,9 +18,6 @@ type Querier interface {
 	// Implemented in SQL so handlers can call it without re-implementing the
 	// mutual-follow logic.
 	CanEditNode(ctx context.Context, arg CanEditNodeParams) (bool, error)
-	// True when `viewer` is permitted to create an edge touching `node` under
-	// its link_policy.
-	CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error)
 	// Single-group visibility probe used by resolveGroup() to gate the
 	// detail page for non-public groups. Mirrors the visibility branches
 	// in ListVisibleGroups: members always pass, connections groups pass

@@ -32,25 +32,6 @@ func (q *Queries) CanEditNode(ctx context.Context, arg CanEditNodeParams) (bool,
 	return allowed, err
 }
 
-const canLinkToNode = `-- name: CanLinkToNode :one
-SELECT node_action_allowed(n.link_policy, n.created_by, $2::uuid)::bool AS allowed
-FROM nodes n WHERE n.id = $1
-`
-
-type CanLinkToNodeParams struct {
-	ID       uuid.UUID  `json:"id"`
-	ViewerID *uuid.UUID `json:"viewer_id"`
-}
-
-// True when `viewer` is permitted to create an edge touching `node` under
-// its link_policy.
-func (q *Queries) CanLinkToNode(ctx context.Context, arg CanLinkToNodeParams) (bool, error) {
-	row := q.db.QueryRow(ctx, canLinkToNode, arg.ID, arg.ViewerID)
-	var allowed bool
-	err := row.Scan(&allowed)
-	return allowed, err
-}
-
 const canViewNode = `-- name: CanViewNode :one
 SELECT node_visible_to(n.*, $2::uuid)::bool AS visible
 FROM nodes n
@@ -126,7 +107,7 @@ INSERT INTO nodes (
     parent_node_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id
 `
 
 type CreateNodeParams struct {
@@ -169,7 +150,6 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.Slug,
 		&i.Visibility,
 		&i.EditPolicy,
-		&i.LinkPolicy,
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
@@ -187,7 +167,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -206,7 +186,6 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.Slug,
 		&i.Visibility,
 		&i.EditPolicy,
-		&i.LinkPolicy,
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
@@ -215,7 +194,7 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 }
 
 const getNodeBySlug = `-- name: GetNodeBySlug :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE slug = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE slug = $1
 `
 
 func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
@@ -234,7 +213,6 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 		&i.Slug,
 		&i.Visibility,
 		&i.EditPolicy,
-		&i.LinkPolicy,
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
@@ -243,7 +221,7 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 }
 
 const listNodesAuthoredByForViewer = `-- name: ListNodesAuthoredByForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
 WHERE n.created_by = $1
   AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
@@ -281,7 +259,6 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 			&i.Slug,
 			&i.Visibility,
 			&i.EditPolicy,
-			&i.LinkPolicy,
 			&i.ParentNodeID,
 			&i.GroupID,
 			&i.VisibilityGroupID,
@@ -297,7 +274,7 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes
 WHERE type = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -330,7 +307,6 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.Slug,
 			&i.Visibility,
 			&i.EditPolicy,
-			&i.LinkPolicy,
 			&i.ParentNodeID,
 			&i.GroupID,
 			&i.VisibilityGroupID,
@@ -665,10 +641,9 @@ SET title = $2,
     visibility_group_id = $6,
     group_id = $7,
     edit_policy = $8,
-    link_policy = $9,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, link_policy, parent_node_id, group_id, visibility_group_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id
 `
 
 type UpdateNodeParams struct {
@@ -680,7 +655,6 @@ type UpdateNodeParams struct {
 	VisibilityGroupID *uuid.UUID       `json:"visibility_group_id"`
 	GroupID           *uuid.UUID       `json:"group_id"`
 	EditPolicy        NodeActionPolicy `json:"edit_policy"`
-	LinkPolicy        NodeActionPolicy `json:"link_policy"`
 }
 
 func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error) {
@@ -693,7 +667,6 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		arg.VisibilityGroupID,
 		arg.GroupID,
 		arg.EditPolicy,
-		arg.LinkPolicy,
 	)
 	var i Node
 	err := row.Scan(
@@ -709,7 +682,6 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.Slug,
 		&i.Visibility,
 		&i.EditPolicy,
-		&i.LinkPolicy,
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,

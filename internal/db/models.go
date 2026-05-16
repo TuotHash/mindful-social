@@ -517,7 +517,6 @@ type Node struct {
 	Slug              string             `json:"slug"`
 	Visibility        VisibilityKind     `json:"visibility"`
 	EditPolicy        NodeActionPolicy   `json:"edit_policy"`
-	LinkPolicy        NodeActionPolicy   `json:"link_policy"`
 	ParentNodeID      *uuid.UUID         `json:"parent_node_id"`
 	GroupID           *uuid.UUID         `json:"group_id"`
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`

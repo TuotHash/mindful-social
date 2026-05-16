@@ -69,24 +69,13 @@ type preparedNodeImage struct {
 // debug log line so operators can diagnose "why are my uploads still so
 // big" without instrumenting the pipeline.
 //
-// Authorization: the viewer must have link permission on the given node
-// (i.e. they are able to add content under it). That keeps the upload
-// surface aligned with "who is allowed to author here at all".
+// Authorization: requireUser ensures the viewer is logged in and
+// resolveNode confirms they can see the target node. Per the "anyone who
+// can see can connect" rule, that is the full gate for uploads too.
 func (s *Server) handleNodeImageUpload(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	node, ok := s.resolveNode(w, r)
 	if !ok {
-		return
-	}
-
-	allowed, err := s.canLinkToNode(r.Context(), node, user)
-	if err != nil {
-		s.logger.Error("node image upload: link policy", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-	if !allowed {
-		writeNodeImageError(w, http.StatusForbidden, "noPermission")
 		return
 	}
 

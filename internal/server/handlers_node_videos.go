@@ -52,17 +52,6 @@ func (s *Server) handleNodeVideoUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed, err := s.canLinkToNode(r.Context(), node, user)
-	if err != nil {
-		s.logger.Error("node video upload: link policy", "err", err)
-		writeNodeImageError(w, http.StatusInternalServerError, "importError")
-		return
-	}
-	if !allowed {
-		writeNodeImageError(w, http.StatusForbidden, "noPermission")
-		return
-	}
-
 	rootID, err := s.queries.FindRootTopicForNode(r.Context(), node.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

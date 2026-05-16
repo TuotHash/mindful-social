@@ -390,7 +390,7 @@ templ nodeTypeChip(t db.NodeType) {
 	</span>
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, tags []db.Tag, canEdit, canLink, canDelete bool) {
+templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, tags []db.Tag, canEdit, canDelete bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -421,15 +421,13 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 				}
 				if viewer != nil {
 					<div class="node-actions" style="margin-top: 22px;">
-						if canLink {
-							<a
-								href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
-								class="btn"
-								hx-get={ "/nodes/" + node.Slug + "/edges/new" }
-								hx-target="#modal"
-								hx-swap="innerHTML"
-							><span class="material-symbols-outlined">conversion_path</span>Connect</a>
-						}
+						<a
+							href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
+							class="btn"
+							hx-get={ "/nodes/" + node.Slug + "/edges/new" }
+							hx-target="#modal"
+							hx-swap="innerHTML"
+						><span class="material-symbols-outlined">conversion_path</span>Connect</a>
 						if canEdit {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						}
@@ -691,7 +689,7 @@ templ CommentEdit(viewer *Viewer, node db.Node, comment Comment, flash, formBody
 	}
 }
 
-templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, groups []db.ListGroupsForUserRow, isAuthor, canChangeVisibility bool, formEditPolicy, formLinkPolicy string) {
+templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, formSourceURL, formTags, formVisibility string, groups []db.ListGroupsForUserRow, isAuthor, canChangeVisibility bool, formEditPolicy string) {
 	@Layout("Edit "+node.Title, viewer) {
 		<div class="page narrow">
 			<div class="row gap-12 wrap center" style="margin-bottom: 18px;">
@@ -733,9 +731,8 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 				}
 				if isAuthor {
 					@actionPolicySelect("edit_policy", "Who can edit this node", formEditPolicy)
-					@actionPolicySelect("link_policy", "Who can connect to this node", formLinkPolicy)
 				} else if canChangeVisibility {
-					<p class="muted" style="font-size: 12px; margin: 0;">You're editing as staff. Visibility is adjustable; edit and link permissions remain author-only.</p>
+					<p class="muted" style="font-size: 12px; margin: 0;">You're editing as staff. Visibility is adjustable; edit permission remains author-only.</p>
 				} else {
 					<p class="muted" style="font-size: 12px; margin: 0;">Visibility and permissions can only be changed by the node's author.</p>
 				}
@@ -749,8 +746,7 @@ templ NodeEdit(viewer *Viewer, node db.Node, flash string, formTitle, formBody, 
 }
 
 // actionPolicySelect renders the three-level author/connections/public
-// toggle for edit_policy and link_policy. fieldName is the form input
-// name so one template renders both policies.
+// toggle used for edit_policy.
 templ actionPolicySelect(fieldName, legend, selected string) {
 	<fieldset class="toggle-group">
 		<legend>{ legend }</legend>

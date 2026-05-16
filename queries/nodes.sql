@@ -50,7 +50,6 @@ SET title = $2,
     visibility_group_id = $6,
     group_id = $7,
     edit_policy = $8,
-    link_policy = $9,
     updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -60,12 +59,6 @@ RETURNING *;
 -- Implemented in SQL so handlers can call it without re-implementing the
 -- mutual-follow logic.
 SELECT node_action_allowed(n.edit_policy, n.created_by, sqlc.narg(viewer_id)::uuid)::bool AS allowed
-FROM nodes n WHERE n.id = $1;
-
--- name: CanLinkToNode :one
--- True when `viewer` is permitted to create an edge touching `node` under
--- its link_policy.
-SELECT node_action_allowed(n.link_policy, n.created_by, sqlc.narg(viewer_id)::uuid)::bool AS allowed
 FROM nodes n WHERE n.id = $1;
 
 -- name: CountNodes :one

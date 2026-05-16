@@ -23,11 +23,6 @@ func (s *Server) canEditNode(ctx context.Context, node db.Node, viewer *db.User)
 	return s.evaluatePolicy(ctx, node.EditPolicy, node.CreatedBy, viewer)
 }
 
-// canLinkToNode is the link_policy equivalent of canEditNode.
-func (s *Server) canLinkToNode(ctx context.Context, node db.Node, viewer *db.User) (bool, error) {
-	return s.evaluatePolicy(ctx, node.LinkPolicy, node.CreatedBy, viewer)
-}
-
 // canDeleteNode is author-only by default; site staff and the node's
 // hosting-group editors / admins / owners can also delete it.
 func (s *Server) canDeleteNode(ctx context.Context, node db.Node, viewer *db.User) (bool, error) {

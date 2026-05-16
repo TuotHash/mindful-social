@@ -209,12 +209,9 @@ func TestNodeUpdate_AdminCanChangeVisibility(t *testing.T) {
 		t.Fatalf("visibility = %q, want private", got.Visibility)
 	}
 	// Author-only fields must remain untouched even though the admin's POST
-	// did not include edit_policy / link_policy.
+	// did not include edit_policy.
 	if got.EditPolicy != node.EditPolicy {
 		t.Fatalf("edit_policy mutated: was %q, now %q", node.EditPolicy, got.EditPolicy)
-	}
-	if got.LinkPolicy != node.LinkPolicy {
-		t.Fatalf("link_policy mutated: was %q, now %q", node.LinkPolicy, got.LinkPolicy)
 	}
 }
 

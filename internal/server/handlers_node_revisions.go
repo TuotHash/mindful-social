@@ -185,7 +185,6 @@ func (s *Server) handleNodeRevert(w http.ResponseWriter, r *http.Request) {
 		VisibilityGroupID: node.VisibilityGroupID,
 		GroupID:           node.GroupID,
 		EditPolicy:        node.EditPolicy,
-		LinkPolicy:        node.LinkPolicy,
 	}); err != nil {
 		s.logger.Error("revert: update node", "err", err, "node_id", node.ID)
 		http.Error(w, "Could not revert.", http.StatusInternalServerError)

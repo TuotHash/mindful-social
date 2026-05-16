@@ -228,15 +228,12 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	needsParent := nt == db.NodeTypeView || nt == db.NodeTypeFinding || (nt == db.NodeTypeTopic && rawTopicParentMode == "sub")
 	if flash == "" && needsParent {
 		missingMsg := "A view must be connected to a parent topic. Search and select one above."
-		rejectMsg := "That topic doesn't accept new linked views from you."
 		mustBeTopic := true
 		switch nt {
 		case db.NodeTypeTopic:
 			missingMsg = "A sub-topic must be connected to a parent topic. Search and select one above."
-			rejectMsg = "That topic doesn't accept new sub-topics from you."
 		case db.NodeTypeFinding:
 			missingMsg = "A finding must attach to an existing node. Search and select one above."
-			rejectMsg = "That node doesn't accept new findings from you."
 			mustBeTopic = false
 		}
 		if rawParentNodeID == "" {
@@ -263,18 +260,11 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 						flash = "The selected parent was not found."
 						break
 					}
-					if ok, perr := s.canLinkToNode(r.Context(), parentNode, user); perr != nil {
-						s.logger.Error("create node: parent link policy", "err", perr)
-						flash = "Could not check parent permissions. Please try again."
-					} else if !ok {
-						flash = rejectMsg
-					} else {
-						parentID = pid
-						parentNodeID = &parentID
-						parentGroupID = parentNode.GroupID
-						if parentGroupID == nil {
-							parentGroupID = parentNode.VisibilityGroupID
-						}
+					parentID = pid
+					parentNodeID = &parentID
+					parentGroupID = parentNode.GroupID
+					if parentGroupID == nil {
+						parentGroupID = parentNode.VisibilityGroupID
 					}
 				}
 			}
@@ -451,12 +441,6 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	canLink, err := s.canLinkToNode(r.Context(), node, user)
-	if err != nil {
-		s.logger.Error("node detail: link policy", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
 	canDelete, err := s.canDeleteNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: delete policy", "err", err)
@@ -503,7 +487,6 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		pin,
 		tags,
 		canEdit,
-		canLink,
 		canDelete,
 	))
 }
@@ -747,7 +730,7 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	if !isAuthor {
 		visGroups = nil
 	}
-	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityGroupID), visGroups, isAuthor, canChangeVisibility, string(node.EditPolicy), string(node.LinkPolicy)))
+	render(w, r, views.NodeEdit(viewerFor(user), node, "", node.Title, node.Body, src, joinTagNames(tags), formatNodeVisibility(node.Visibility, node.VisibilityGroupID), visGroups, isAuthor, canChangeVisibility, string(node.EditPolicy)))
 }
 
 // joinTagNames flattens a tag list into the comma-separated string the form
@@ -799,7 +782,6 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		rawVisibility = formatNodeVisibility(node.Visibility, node.VisibilityGroupID)
 	}
 	rawEditPolicy := strings.TrimSpace(r.PostFormValue("edit_policy"))
-	rawLinkPolicy := strings.TrimSpace(r.PostFormValue("link_policy"))
 
 	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if groupsErr != nil {
@@ -834,17 +816,13 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		groupID = visGroupID
 	}
-	// Policies are author-only: non-author edits silently keep the existing
-	// values, so the form re-renders with the author's settings even after
+	// edit_policy is author-only: non-author edits silently keep the existing
+	// value, so the form re-renders with the author's settings even after
 	// a no-op submission from an editor.
 	editPolicy := node.EditPolicy
-	linkPolicy := node.LinkPolicy
 	if isAuthor {
 		if v, ok := parseActionPolicy(rawEditPolicy, node.EditPolicy); ok || rawEditPolicy == "" {
 			editPolicy = v
-		}
-		if v, ok := parseActionPolicy(rawLinkPolicy, node.LinkPolicy); ok || rawLinkPolicy == "" {
-			linkPolicy = v
 		}
 	}
 	if flash != "" {
@@ -852,7 +830,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		if !isAuthor {
 			formGroups = nil
 		}
-		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, flash, title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy)))
 		return
 	}
 
@@ -870,7 +848,6 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		VisibilityGroupID: visGroupID,
 		GroupID:           groupID,
 		EditPolicy:        editPolicy,
-		LinkPolicy:        linkPolicy,
 	})
 	if err != nil {
 		s.logger.Error("update node", "err", err)
@@ -878,7 +855,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		if !isAuthor {
 			formGroups = nil
 		}
-		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy), string(linkPolicy)))
+		render(w, r, views.NodeEdit(viewerFor(user), node, "Could not save changes. Please try again.", title, body, sourceURL, rawTags, rawVisibility, formGroups, isAuthor, canChangeVisibility, string(editPolicy)))
 		return
 	}
 	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
@@ -1017,15 +994,6 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok, err := s.canLinkToNode(r.Context(), fromNode, user); err != nil {
-		s.logger.Error("edge create: link policy from", "err", err)
-		rerender("Could not create connection. Please try again.")
-		return
-	} else if !ok {
-		rerender("You don't have permission to link from this node.")
-		return
-	}
-
 	// Branch: pick an existing target, or create a new finding inline.
 	// The "new" branch always produces a finding parented to fromNode and
 	// inheriting its visibility/group; that scoping is the whole reason
@@ -1080,12 +1048,12 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 			rerender("Target node not found.")
 			return
 		}
-		if ok, err := s.canLinkToNode(r.Context(), toNode, user); err != nil {
-			s.logger.Error("edge create: link policy to", "err", err)
+		if visible, err := s.canViewNode(r.Context(), toNode, &user.ID); err != nil {
+			s.logger.Error("edge create: target visibility", "err", err)
 			rerender("Could not create connection. Please try again.")
 			return
-		} else if !ok {
-			rerender("That target doesn't accept new links from you.")
+		} else if !visible {
+			rerender("Target node not found.")
 			return
 		}
 		toID = parsed
