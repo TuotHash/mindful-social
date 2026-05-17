@@ -159,6 +159,9 @@ func (s *Server) routes() {
 	// The bridge inside csrfMiddleware copies the per-request token onto
 	// our ctx so templates can render the hidden input via views.CSRFField.
 	r.Use(s.csrf)
+	// Defense-in-depth headers. Sits after CSRF so the CSRF error page
+	// also carries CSP/X-Frame-Options/etc.
+	r.Use(securityHeaders)
 
 	r.Get("/healthz", s.handleHealth)
 
