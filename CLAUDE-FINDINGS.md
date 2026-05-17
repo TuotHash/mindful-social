@@ -32,9 +32,45 @@ from that pass are summarised under "Status of prior findings" below.
 
 ---
 
+## Status of 2026-05-17 findings
+
+All Critical, High, and Medium findings have been addressed. Low / improvement
+items are still open except where noted. Each fixed entry below also carries
+an inline `**Status:**` note at the top of its detail section.
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Stored XSS via `source_url` | Fixed in `6900782` (template uses `templ.URL`; handler rejects non-http(s)). |
+| 2 | Missing edit-permission check on edge creation | Fixed in `9c3c7c1` (handler + GET form + Connect button gated). |
+| 3 | OIDC `email_verified` discarded | Fixed in `1088575` (claim carried through `Identity`; auto-link requires verified). |
+| 4 | Uploaded media served with public cache regardless of visibility | Fixed in `4ff6957` (visibility-gated `/uploads/*` handler, private no-store on protected scopes). |
+| 5 | GIF passthrough + no `nosniff` on `/uploads/*` | Fixed in `4ff6957` + `6d58636` (nosniff + sandbox CSP; GIF re-encoded; video tmp out of `UploadDir`). |
+| 6 | No security headers anywhere | Fixed in `319d55c` (CSP / X-Frame-Options / Referrer-Policy / nosniff middleware). |
+| 7 | OAuth username squat on first sign-in | Fixed in `1088575` (placeholder `u_<hash>` username; DisplayName never used). |
+| 8 | Decompression bomb on image upload | Fixed in `6d58636` (`image.DecodeConfig` cap at 50 MP on both node and profile paths). |
+| 9 | Login allows email enumeration via timing | Fixed in `b2743b9` (`auth.EqualizePasswordTiming` runs a dummy bcrypt on ErrNoRows / nil hash). Rate-limiting still open. |
+| 10 | Sessions not revoked on password / email change | Fixed in `b2743b9` (`auth.RevokeUserSessions` via `sm.Iterate`). |
+| 11 | `AddGroupMember` silently downgrades existing admins/editors | Fixed in `05a3fda` (`ON CONFLICT DO NOTHING`). Invite-flow still recommended; group_invites table already exists. |
+| 12 | Member-visibility silently defaults to most permissive | Fixed in `05a3fda` (`parseMemberVisibility` / `parseGroupVisibility` now return `(value, ok)`; handler rejects unknown). |
+| 13 | Tag set replacement non-atomic | Fixed in `4776f8d` (delete + per-tag attach wrapped in `s.db.Begin`). |
+| 14 | Slug-generation race on concurrent inserts | Fixed in `4776f8d` (`createNodeWithUniqueSlug` retries on 23505 against `nodes_slug_idx`). |
+| 15 | Node-revision race + swallowed snapshot errors | Fixed in `4776f8d` (`snapshotNodeRevision` retries on `(node_id, revision)` UNIQUE up to 5 times). |
+| 16 | No "last admin" guard | Fixed in `4776f8d` (`CountAdmins` check before demotion). |
+| 17 | Pin delete silently succeeds on non-existent pin | Fixed in `4776f8d` (`DeletePin` → `:execrows`; handler 404s on zero rows). |
+| L19 | GitHub `userResp.Email` used even when unverified | Fixed in `1088575` (always prefer `/user/emails` verified primary; fallback marked unverified). |
+
+The remaining Low / improvement items (L1–L18, L20–L22) are unchanged and
+still open.
+
+---
+
 ## Critical
 
 ### 1. Stored XSS via node `source_url` (`templ.SafeURL` is a pass-through cast)
+
+**Status:** Fixed in `6900782`. `internal/views/nodes.templ:412` now uses
+`templ.URL`; `validateSourceURL` in `internal/server/handlers_nodes.go`
+rejects anything that isn't an http/https URL with a host.
 
 **Severity:** Critical
 **Verified:** Yes, by reading `~/go/pkg/mod/github.com/a-h/templ@v0.3.1001/url.go:22-23` and the templates.
@@ -80,6 +116,12 @@ Both layers together. Server validation is the real defense; the
 template fix is defense in depth.
 
 ### 2. Missing edit-permission check on edge creation
+
+**Status:** Fixed in `9c3c7c1`. `handleEdgeCreate`, `handleEdgeNew`, and
+`handleEdgePicker` now call `requireEditPermission(fromNode)`; the
+Connect button in `internal/views/nodes.templ` is hidden when `canEdit`
+is false. Integration tests cover both the existing-target and inline
+-finding attack flows.
 
 **Severity:** Critical
 **Verified:** Yes, by reading `internal/server/handlers_nodes.go:948-1087`.
@@ -129,6 +171,11 @@ Fix:
   handlers to match. The current state is inconsistent.
 
 ### 3. OIDC `email_verified` claim is parsed and then discarded
+
+**Status:** Fixed in `1088575`. `Identity` carries `EmailVerified`; OIDC
+populates it from claims; `FindOrCreateOAuthUser` only auto-links when
+the claim is true. Unverified addresses are also dropped at user
+creation (we use a deterministic `u_<hash>@no-email.local` placeholder).
 
 **Severity:** Critical
 **Verified:** Yes, by reading `internal/auth/oauth.go:63-101`,
@@ -181,6 +228,12 @@ Fix:
 
 ### 4. Uploaded media served with `Cache-Control: public, max-age=86400` regardless of node visibility
 
+**Status:** Fixed in `4ff6957`. `/uploads/*` no longer goes through
+`http.FileServer`; `handleUpload` routes by scope — `profiles` stays
+public, `topics/<root>` gates on `canViewNode`, `drafts` requires a
+logged-in viewer. Protected scopes set `Cache-Control: private,
+no-store`.
+
 **Severity:** High
 **Verified:** Yes, by reading `internal/server/handlers.go:26-36`
 and `internal/server/server.go:179-180`.
@@ -214,6 +267,14 @@ Profile images (`/uploads/profiles/...`) are intentionally public and
 can keep the existing cache lifetime.
 
 ### 5. GIF passthrough + no `X-Content-Type-Options: nosniff` on `/uploads/*`
+
+**Status:** Fixed in `4ff6957` + `6d58636`. Every `/uploads/*` response
+now carries `X-Content-Type-Options: nosniff` and
+`Content-Security-Policy: sandbox; default-src 'none'`. GIF uploads are
+re-encoded through `gif.DecodeAll`/`gif.EncodeAll`, which discards any
+bytes hiding past the trailer. The video staging file moved from
+`<UploadDir>/tmp/in-*.bin` to `<os.TempDir()>/mindful-social-video/`
+so unsanitized input never lives inside the served tree.
 
 **Severity:** High (medium today, high once the allow-list widens)
 **Verified:** Yes, by reading
@@ -260,6 +321,15 @@ Fix:
 
 ### 6. No security headers anywhere (CSP, X-Frame-Options, Referrer-Policy, nosniff)
 
+**Status:** Fixed in `319d55c`. New `securityHeaders` middleware sets
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: same-origin`, and a CSP that locks down
+`frame-ancestors`, `form-action`, `base-uri`, and `object-src`. The
+CSP still allows `'unsafe-inline'` for `script-src` so the existing
+inline `onclick`/`onsubmit` handlers in modals/confirms keep working;
+follow-up work should refactor those to event delegation and drop
+`'unsafe-inline'` in favour of a strict nonce policy.
+
 **Severity:** High (defense in depth)
 **Verified:** Yes — `grep -r Content-Security-Policy internal/`
 returns nothing; `cacheStatic` and `csrfMiddleware` are the only
@@ -298,6 +368,12 @@ will need either nonces (cleanest with templ — propagate via
 
 ### 7. OAuth username squat on first sign-in
 
+**Status:** Fixed in `1088575`. `suggestIdentity` now derives the
+username from `sha256(provider:subject)[:4]` (formatted as `u_xxxxxxxx`)
+rather than the IdP's `DisplayName`, so an attacker setting their
+display name to "alice" can no longer claim that handle on first
+sign-in. Users can rename themselves on `/account` once they're in.
+
 **Severity:** High
 **Verified:** Yes, by reading `internal/auth/identities.go:141-223`.
 
@@ -326,6 +402,12 @@ username. Server-side: maybe seed a placeholder like
 
 ### 8. Decompression bomb on image upload
 
+**Status:** Fixed in `6d58636`. Both `prepareNodeImageUpload` and the
+profile-image handler call `image.DecodeConfig` first and reject any
+input declaring more than `maxDecodedPixels` (50 MP) before the full
+`image.Decode` allocates the pixel buffer. Integration test crafts a
+fake IHDR claiming 40000×40000 and asserts a 413.
+
 **Severity:** High
 **Verified:** Yes, by reading
 `internal/server/handlers_node_images.go:193-198` and
@@ -349,6 +431,13 @@ node and profile image paths.
 ## Medium
 
 ### 9. Login allows email enumeration via timing
+
+**Status:** Partially fixed in `b2743b9`. The unknown-email and
+nil-hash branches of `AuthenticatePassword` now call
+`EqualizePasswordTiming`, which runs a fixed-cost bcrypt comparison
+against a one-time dummy hash so all three failure modes take roughly
+the same wall-clock time. Rate-limiting / lockout on `/login` is still
+open.
 
 **Severity:** Medium
 **Verified:** Yes, by reading
@@ -374,6 +463,13 @@ Fix:
 
 ### 10. Sessions are not revoked on password or email change
 
+**Status:** Fixed in `b2743b9`. New `auth.RevokeUserSessions` walks
+`scs.SessionManager.Iterate` and destroys every session whose stored
+`user_id` matches. `handleAccountPasswordSet` keeps the current
+session (so the user isn't bounced to `/login`); the admin email and
+password handlers nuke every session for the target. Integration test
+covers the multi-device case.
+
 **Severity:** Medium
 **Verified:** Yes — `internal/auth/identities.go` `ChangePassword`
 and `AdminUpdateEmail` update the row but never iterate scs sessions.
@@ -387,6 +483,12 @@ Fix: after a password change or email change, iterate sessions with
 every one whose stored `user_id` matches.
 
 ### 11. Group `AddGroupMember` can silently downgrade admins/editors
+
+**Status:** Fixed in `05a3fda`. `AddGroupMember`'s ON CONFLICT branch
+is now `DO NOTHING`, so re-adding an existing member by username never
+touches their role. Intentional role changes still go through
+`SetGroupMemberRole`. The invite-vs-direct-add UX is still a follow-up
+(the `group_invites` table already exists).
 
 **Severity:** Medium
 **Verified:** Yes, by reading `queries/groups.sql:12-19` and
@@ -420,6 +522,12 @@ Fix:
 
 ### 12. Member-visibility setting silently defaults to the most permissive value
 
+**Status:** Fixed in `05a3fda`. `parseMemberVisibility` and
+`parseGroupVisibility` now return `(value, ok)`. The settings handler
+short-circuits with a `Pick a valid …` flash on `!ok` rather than
+writing the most-open default; the create-group flow rejects the
+post too.
+
 **Severity:** Medium
 **Verified:** By the audit; spot-check before fixing.
 Files: `internal/server/handlers_groups.go:270-368`.
@@ -440,6 +548,11 @@ preserve the current value.
 
 ### 13. Tag set replacement is non-atomic
 
+**Status:** Fixed in `4776f8d`. `setTagsForNode` now runs
+`DeleteTagsForNode` + the per-tag `UpsertTag`/`AttachTag` loop inside
+`s.db.Begin` / `tx.Commit`, so a timeout or concurrent edit can no
+longer leave the node with a partial tag set.
+
 **Severity:** Medium
 **Verified:** By the audit.
 Files: `internal/server/handlers_tags.go:72-87`.
@@ -454,6 +567,13 @@ Fix: wrap the delete + per-tag attach in `s.tx(ctx, func(q
 `internal/auth/identities.go:158`.
 
 ### 14. Slug-generation race on concurrent inserts
+
+**Status:** Fixed in `4776f8d`. New `createNodeWithUniqueSlug` wraps
+`uniqueSlug` + `CreateNode` in a small retry loop; on a 23505 against
+`nodes_slug_idx` it re-runs `uniqueSlug` (which now walks past the
+just-taken candidate) and retries. Both call sites — the standalone
+create and the inline-finding path in `handleEdgeCreate` — go through
+the helper.
 
 **Severity:** Medium
 **Verified:** By the audit; the SQL has a unique index, so the race
@@ -472,6 +592,13 @@ with the next-numbered suffix transparently. Or restructure to
 the suffix server-side.
 
 ### 15. Node-revision number race + swallowed snapshot errors
+
+**Status:** Fixed in `4776f8d`. `snapshotNodeRevision` now retries on a
+23505 against the `node_revisions_node_id_revision_key` constraint
+(up to 5 attempts). Each retry re-runs `CreateNodeRevision`, which
+recomputes `max(revision)+1`, so a colliding concurrent edit still
+gets its own snapshot rather than the loser disappearing from
+history.
 
 **Severity:** Medium
 **Verified:** By the audit.
@@ -492,6 +619,13 @@ on `node_id`.
 
 ### 16. No "last admin" guard
 
+**Status:** Fixed in `4776f8d`. New `CountAdmins` query feeds a check
+in `handleAdminSetRole`: any demotion of an admin while `count(*) <= 1`
+is refused with a flash. The pre-existing self-demote check still
+fires first when the actor is the sole admin, so the new guard
+matters in the race / coordinated-demote case where two admins try
+to demote each other.
+
 **Severity:** Medium
 **Verified:** By the audit.
 Files: `internal/server/handlers_admin.go:49-93`.
@@ -507,6 +641,10 @@ COUNT(*) FROM users WHERE role = 'admin'` and refuse if the demotion
 would drop the count to zero.
 
 ### 17. Pin delete silently succeeds on a non-existent pin
+
+**Status:** Fixed in `4776f8d`. `DeletePin` is now `:execrows`;
+`handlePinDelete` 404s on zero rows, matching the pattern already
+used by edge delete / highlight / unhighlight.
 
 **Severity:** Medium (cosmetic today; structural risk if reused).
 Verified by reading `queries/pins.sql:13` and
@@ -686,6 +824,11 @@ inheriting; otherwise create the child without a `group_id`.
 
 ### L19. GitHub `userResp.Email` used even when unverified
 
+**Status:** Fixed in `1088575`. `githubProvider.Identify` now always
+hits `/user/emails` and uses the verified primary; `/user.email` is
+only a last-resort fallback and is marked unverified so the linker
+refuses to use it for account matching.
+
 Tightening to "always prefer the verified primary" is straightforward
 and pairs naturally with Critical #3's fix. Treat the `/user` email
 as unverified unless re-confirmed via `/user/emails`.
@@ -723,20 +866,21 @@ The first three are real exploits accessible to a logged-in user.
 Everything else needs either an attacker-controlled IdP, a misconfigured
 deploy, or specific timing.
 
-1. **#1 source_url XSS** — one-line template change plus a scheme
-   check in two handlers.
-2. **#2 edge create permission** — one-line guard in
-   `handleEdgeCreate`.
-3. **#3 OIDC `email_verified` + L19 GitHub email + #7 username squat**
-   — all live in `internal/auth/`; bundle as one PR.
-4. **#4 + #5 + #6 — uploads and security headers** — one PR adding a
-   header middleware plus the private-uploads visibility gate.
-5. **#8 decompression bomb**, **#9 login timing**, **#10 session
-   revoke**, **#11 + #12 group settings**.
-6. **#13 tag transaction**, **#14 slug race**, **#15 revision race**,
-   **#16 last-admin guard**, **#17 pin delete rowcount** — data-
-   integrity polish.
-7. Low-severity items as time allows.
+1. ~~**#1 source_url XSS**~~ — done (`6900782`).
+2. ~~**#2 edge create permission**~~ — done (`9c3c7c1`).
+3. ~~**#3 OIDC `email_verified` + L19 GitHub email + #7 username squat**~~
+   — done (`1088575`).
+4. ~~**#4 + #5 + #6 — uploads and security headers**~~ — done
+   (`319d55c`, `4ff6957`, `6d58636`). Strict CSP (drop `'unsafe-inline'`
+   for scripts) is the remaining follow-up.
+5. ~~**#8 decompression bomb**, **#9 login timing**, **#10 session
+   revoke**, **#11 + #12 group settings**~~ — done (`6d58636`,
+   `b2743b9`, `05a3fda`). Rate-limiting on `/login` is the residual
+   piece of #9.
+6. ~~**#13 tag transaction**, **#14 slug race**, **#15 revision race**,
+   **#16 last-admin guard**, **#17 pin delete rowcount**~~ — done
+   (`4776f8d`).
+7. Low-severity items: L19 done (`1088575`). L1–L18 and L20–L22 remain.
 
 Items marked "Verified: Yes" were re-checked against the live code at
 audit time; the rest were reported by the audit agents and should be
