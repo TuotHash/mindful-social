@@ -36,7 +36,7 @@ func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	description := strings.TrimSpace(r.PostFormValue("description"))
-	visibility := parseGroupVisibility(r.PostFormValue("visibility"))
+	visibility, visibilityOK := parseGroupVisibility(r.PostFormValue("visibility"))
 
 	rerender := func(flash string) {
 		rows, err := s.queries.ListVisibleGroups(r.Context(), viewerID(r))
@@ -57,6 +57,9 @@ func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	case len(description) > maxGroupDescriptionLen:
 		rerender("Group description is too long.")
+		return
+	case !visibilityOK:
+		rerender("Pick a valid group visibility.")
 		return
 	}
 
@@ -267,7 +270,15 @@ func (s *Server) handleGroupSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	memberVis := parseMemberVisibility(r.PostFormValue("member_visibility"))
+	// parseMemberVisibility returns ok=false on missing/unknown input so a
+	// partial form submission (or a future template change that drops the
+	// hidden input) can't silently overwrite the current value with the
+	// most-open option.
+	memberVis, ok := parseMemberVisibility(r.PostFormValue("member_visibility"))
+	if !ok {
+		s.renderGroupDetail(w, r, group, membership, "Pick a valid member-list visibility.")
+		return
+	}
 	if err := s.queries.UpdateGroupMemberVisibility(r.Context(), db.UpdateGroupMemberVisibilityParams{
 		ID:               group.ID,
 		MemberVisibility: memberVis,
@@ -283,7 +294,11 @@ func (s *Server) handleGroupSettings(w http.ResponseWriter, r *http.Request) {
 	// hides the radios for them, so reaching this branch only happens
 	// when somebody POSTs by hand.
 	if rawVis := r.PostFormValue("visibility"); rawVis != "" && canOwnGroup(membership) {
-		visibility := parseGroupVisibility(rawVis)
+		visibility, ok := parseGroupVisibility(rawVis)
+		if !ok {
+			s.renderGroupDetail(w, r, group, membership, "Pick a valid group visibility.")
+			return
+		}
 		if visibility != group.Visibility {
 			if err := s.queries.UpdateGroupVisibility(r.Context(), db.UpdateGroupVisibilityParams{
 				ID:         group.ID,
@@ -324,17 +339,16 @@ func (s *Server) handleGroupRemoveMember(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
 }
 
-func parseGroupVisibility(raw string) db.GroupVisibilityKind {
+func parseGroupVisibility(raw string) (db.GroupVisibilityKind, bool) {
 	switch strings.TrimSpace(raw) {
 	case "public":
-		return db.GroupVisibilityKindPublic
+		return db.GroupVisibilityKindPublic, true
 	case "connections":
-		return db.GroupVisibilityKindConnections
-	default:
-		// Private is the safer default — losing access is recoverable,
-		// accidentally exposing a group is not.
-		return db.GroupVisibilityKindPrivate
+		return db.GroupVisibilityKindConnections, true
+	case "private":
+		return db.GroupVisibilityKindPrivate, true
 	}
+	return "", false
 }
 
 // parseAssignableRole decodes the role value coming from the role
@@ -354,17 +368,21 @@ func parseAssignableRole(raw string) (db.GroupMemberRole, bool) {
 }
 
 // parseMemberVisibility decodes the value from the settings form's
-// member-visibility selector. Falls back to 'member' (the default).
-func parseMemberVisibility(raw string) db.GroupMemberRole {
+// member-visibility selector. Returns ok=false on unknown/empty input so
+// the caller can refuse the write rather than silently overwriting the
+// stored value with the most-open option (member).
+func parseMemberVisibility(raw string) (db.GroupMemberRole, bool) {
 	switch strings.TrimSpace(raw) {
 	case "owner":
-		return db.GroupMemberRoleOwner
+		return db.GroupMemberRoleOwner, true
 	case "admin":
-		return db.GroupMemberRoleAdmin
+		return db.GroupMemberRoleAdmin, true
 	case "editor":
-		return db.GroupMemberRoleEditor
+		return db.GroupMemberRoleEditor, true
+	case "member":
+		return db.GroupMemberRoleMember, true
 	}
-	return db.GroupMemberRoleMember
+	return "", false
 }
 
 func canManageGroup(membership *db.GroupMembership) bool {

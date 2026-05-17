@@ -435,3 +435,69 @@ func TestGroups_MemberVisibilityOwnerHidesListFromMembers(t *testing.T) {
 		t.Fatalf("owner should see member list under owner-only visibility; excerpt: %s", snippet(body))
 	}
 }
+
+// AddGroupMember by username on a user who is already an admin must not
+// downgrade them to plain member. Before the ON CONFLICT change, the
+// handler would silently flip a co-admin's role back to member every
+// time another admin re-added them.
+func TestGroups_AddMemberPreservesExistingRole(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	slug, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleAdmin, "no-downgrade-group")
+
+	resp := formPost(t, alice, "/groups/"+slug+"/members", url.Values{
+		"username": {"bob"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("re-add member: status %d", resp.StatusCode)
+	}
+
+	row, err := testServer.queries.GetGroupMembership(t.Context(), db.GetGroupMembershipParams{
+		GroupID: groupID, UserID: bobUser.ID,
+	})
+	if err != nil {
+		t.Fatalf("lookup membership: %v", err)
+	}
+	if row.Role != db.GroupMemberRoleAdmin {
+		t.Fatalf("admin was downgraded by re-add; role=%s, want admin", row.Role)
+	}
+}
+
+// Posting group settings without member_visibility used to silently
+// default to the most-open option (member). Now the handler rejects the
+// missing value and leaves the stored setting alone.
+func TestGroups_SettingsRejectsMissingMemberVisibility(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	aliceUser := signupAndGetUser(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	bob := newClient(t)
+	bobUser := signupAndGetUser(t, bob, "bob", "bob@example.com", "correct horse battery staple")
+	slug, groupID := seedGroupWith(t, alice, aliceUser, bobUser, db.GroupMemberRoleMember, "vis-required-group")
+
+	// Owner sets member_visibility to owner (most restrictive).
+	if err := testServer.queries.UpdateGroupMemberVisibility(t.Context(), db.UpdateGroupMemberVisibilityParams{
+		ID: groupID, MemberVisibility: db.GroupMemberRoleOwner,
+	}); err != nil {
+		t.Fatalf("seed member visibility: %v", err)
+	}
+
+	// Partial form post — no member_visibility field. The handler should
+	// re-render with a flash and leave the stored value alone.
+	resp := formPost(t, alice, "/groups/"+slug+"/settings", url.Values{})
+	body := readBody(t, resp)
+	if !strings.Contains(body, "Pick a valid member-list visibility") {
+		t.Fatalf("expected validation flash, got: %s", snippet(body))
+	}
+
+	g, err := testServer.queries.GetGroup(t.Context(), groupID)
+	if err != nil {
+		t.Fatalf("get group: %v", err)
+	}
+	if g.MemberVisibility != db.GroupMemberRoleOwner {
+		t.Fatalf("stored member_visibility changed despite missing form value; got %s, want owner", g.MemberVisibility)
+	}
+}

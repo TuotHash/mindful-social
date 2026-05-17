@@ -34,11 +34,7 @@ func (q *Queries) AcceptGroupInvite(ctx context.Context, arg AcceptGroupInvitePa
 const addGroupMember = `-- name: AddGroupMember :exec
 INSERT INTO group_memberships (group_id, user_id, role)
 VALUES ($1, $2, $3)
-ON CONFLICT (group_id, user_id) DO UPDATE
-SET role = CASE
-  WHEN group_memberships.role = 'owner' THEN group_memberships.role
-  ELSE EXCLUDED.role
-END
+ON CONFLICT (group_id, user_id) DO NOTHING
 `
 
 type AddGroupMemberParams struct {
@@ -47,6 +43,10 @@ type AddGroupMemberParams struct {
 	Role    GroupMemberRole `json:"role"`
 }
 
+// Idempotent insert. If the user is already a member the existing row is
+// left untouched, so an admin re-adding an existing admin or editor by
+// username can't silently downgrade them to member. Role changes go
+// through SetGroupMemberRole.
 func (q *Queries) AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error {
 	_, err := q.db.Exec(ctx, addGroupMember, arg.GroupID, arg.UserID, arg.Role)
 	return err

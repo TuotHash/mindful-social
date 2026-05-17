@@ -10,13 +10,13 @@ SELECT * FROM groups WHERE id = $1;
 SELECT * FROM groups WHERE slug = $1;
 
 -- name: AddGroupMember :exec
+-- Idempotent insert. If the user is already a member the existing row is
+-- left untouched, so an admin re-adding an existing admin or editor by
+-- username can't silently downgrade them to member. Role changes go
+-- through SetGroupMemberRole.
 INSERT INTO group_memberships (group_id, user_id, role)
 VALUES ($1, $2, $3)
-ON CONFLICT (group_id, user_id) DO UPDATE
-SET role = CASE
-  WHEN group_memberships.role = 'owner' THEN group_memberships.role
-  ELSE EXCLUDED.role
-END;
+ON CONFLICT (group_id, user_id) DO NOTHING;
 
 -- name: RemoveGroupMember :exec
 DELETE FROM group_memberships
