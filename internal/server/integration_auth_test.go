@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/TuotHash/mindful-social/internal/auth"
 )
 
 func TestSignup_Success(t *testing.T) {
@@ -80,6 +82,52 @@ func TestLogout_ClearsSession(t *testing.T) {
 	}
 	if !strings.Contains(body, "Sign in") {
 		t.Fatalf("home after logout missing Sign in link; excerpt: %s", snippet(body))
+	}
+}
+
+// Mallory controls an OIDC tenant and signs in claiming alice@example.com.
+// The IdP does not assert email_verified, so FindOrCreateOAuthUser must
+// refuse to link Mallory's identity to Alice's existing account.
+func TestOAuth_UnverifiedEmailDoesNotLinkToExistingUser(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	alice := signupAndGetUser(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	user, err := testServer.authSvc.FindOrCreateOAuthUser(t.Context(), "oidc", auth.Identity{
+		Subject:       "mallory-subject-1",
+		Email:         "alice@example.com",
+		EmailVerified: false,
+		DisplayName:   "alice",
+	})
+	if err != nil {
+		t.Fatalf("FindOrCreateOAuthUser: %v", err)
+	}
+	if user.ID == alice.ID {
+		t.Fatalf("unverified OIDC email took over alice's account (user_id=%s)", user.ID)
+	}
+	if user.Username == "alice" {
+		t.Fatalf("DisplayName 'alice' was used as username, squatting the handle")
+	}
+}
+
+// Same flow but with email_verified=true behaves as before: the new OIDC
+// identity links to the existing user, no second account is created.
+func TestOAuth_VerifiedEmailLinksToExistingUser(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	alice := signupAndGetUser(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	user, err := testServer.authSvc.FindOrCreateOAuthUser(t.Context(), "oidc", auth.Identity{
+		Subject:       "alice-real-subject",
+		Email:         "alice@example.com",
+		EmailVerified: true,
+		DisplayName:   "Alice",
+	})
+	if err != nil {
+		t.Fatalf("FindOrCreateOAuthUser: %v", err)
+	}
+	if user.ID != alice.ID {
+		t.Fatalf("verified OIDC email did not link to existing alice (got user_id=%s, want %s)", user.ID, alice.ID)
 	}
 }
 

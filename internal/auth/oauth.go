@@ -34,9 +34,10 @@ type Provider interface {
 // Identity is the per-login result from a provider, just enough to look up
 // or create a user.
 type Identity struct {
-	Subject     string // stable, opaque user id at the IdP
-	Email       string // may be empty
-	DisplayName string // may be empty
+	Subject       string // stable, opaque user id at the IdP
+	Email         string // may be empty
+	EmailVerified bool   // true only when the provider explicitly attests it
+	DisplayName   string // may be empty
 }
 
 // ----- OIDC (generic, also Google) -----
@@ -94,9 +95,10 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 		display = claims.Name
 	}
 	return Identity{
-		Subject:     claims.Sub,
-		Email:       claims.Email,
-		DisplayName: display,
+		Subject:       claims.Sub,
+		Email:         claims.Email,
+		EmailVerified: claims.EmailVerified,
+		DisplayName:   display,
 	}, nil
 }
 
@@ -146,7 +148,9 @@ func (p *githubProvider) Identify(ctx context.Context, code string) (Identity, e
 	}
 	client := p.oauth.Client(ctx, tok)
 
-	// /user gives us id + (sometimes) public email.
+	// /user gives us id, login, name, and sometimes a public email. The
+	// public email is not necessarily verified — GitHub lets users mark any
+	// email public — so we never treat it as verified.
 	var userResp struct {
 		ID    int64  `json:"id"`
 		Login string `json:"login"`
@@ -157,23 +161,31 @@ func (p *githubProvider) Identify(ctx context.Context, code string) (Identity, e
 		return Identity{}, err
 	}
 
-	email := userResp.Email
-	if email == "" {
-		// GitHub keeps email private by default; the user:email scope lets
-		// us read the verified primary even when it's not public.
-		var emails []struct {
-			Email    string `json:"email"`
-			Primary  bool   `json:"primary"`
-			Verified bool   `json:"verified"`
-		}
-		if err := getJSON(ctx, client, "https://api.github.com/user/emails", &emails); err == nil {
-			for _, e := range emails {
-				if e.Primary && e.Verified {
-					email = e.Email
-					break
-				}
+	// Always pull /user/emails. The user:email scope guarantees access; if
+	// it fails we treat the response as if there were no verified primary.
+	var email string
+	var emailVerified bool
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := getJSON(ctx, client, "https://api.github.com/user/emails", &emails); err == nil {
+		for _, e := range emails {
+			if e.Primary && e.Verified {
+				email = e.Email
+				emailVerified = true
+				break
 			}
 		}
+	}
+	if email == "" && userResp.Email != "" {
+		// Last-resort fallback: surface whatever email GitHub returned on
+		// /user so the new account has a stable handle for the user. Mark
+		// it unverified so the downstream linker doesn't treat it as proof
+		// of address ownership.
+		email = userResp.Email
+		emailVerified = false
 	}
 
 	display := userResp.Name
@@ -181,9 +193,10 @@ func (p *githubProvider) Identify(ctx context.Context, code string) (Identity, e
 		display = userResp.Login
 	}
 	return Identity{
-		Subject:     strconv.FormatInt(userResp.ID, 10),
-		Email:       email,
-		DisplayName: display,
+		Subject:       strconv.FormatInt(userResp.ID, 10),
+		Email:         email,
+		EmailVerified: emailVerified,
+		DisplayName:   display,
 	}, nil
 }
 

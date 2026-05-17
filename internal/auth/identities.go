@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -119,8 +121,11 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 		return db.User{}, err
 	}
 
-	// No identity yet. Try to attach to an existing user by email.
-	if ident.Email != "" {
+	// No identity yet. Try to attach to an existing user by email — but only
+	// when the IdP attests the email is verified. Otherwise an attacker who
+	// controls a tenant on a generic OIDC issuer could pick any victim's
+	// email, complete the IdP flow, and land in the victim's account.
+	if ident.Email != "" && ident.EmailVerified {
 		if existing, err := s.q.GetUserByEmail(ctx, strings.ToLower(ident.Email)); err == nil {
 			_, err := s.q.CreateAuthIdentity(ctx, db.CreateAuthIdentityParams{
 				UserID:   existing.ID,
@@ -138,7 +143,7 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 	}
 
 	// Fresh user.
-	username, email := suggestIdentity(ident)
+	username, email := suggestIdentity(provider, ident)
 	var user db.User
 	err := s.tx(ctx, func(q *db.Queries) error {
 		uname, err := s.uniqueUsername(ctx, q, username)
@@ -165,41 +170,28 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 }
 
 // suggestIdentity picks a starting username + email for an OAuth signup.
-// Username may collide; uniqueUsername resolves that downstream.
-func suggestIdentity(ident Identity) (username, email string) {
-	email = strings.ToLower(strings.TrimSpace(ident.Email))
-	switch {
-	case ident.DisplayName != "":
-		username = sanitizeUsername(ident.DisplayName)
-	case email != "":
-		username = sanitizeUsername(strings.SplitN(email, "@", 2)[0])
-	default:
-		username = "user"
-	}
-	if username == "" {
-		username = "user"
+// The username is a stable placeholder derived from sha256(provider:subject)
+// rather than the IdP's display name, so an attacker can't set their display
+// name to "alice" and squat the handle before the real Alice signs up. The
+// user can rename via /account once they're in.
+//
+// The email is only carried over when the IdP attested verification.
+// Otherwise we use a per-subject placeholder so an attacker can't block
+// real signups by claiming a victim's address at the IdP.
+func suggestIdentity(provider string, ident Identity) (username, email string) {
+	h := sha256.Sum256([]byte(provider + ":" + ident.Subject))
+	short := hex.EncodeToString(h[:4]) // 8 hex chars
+	username = "u_" + short
+	if ident.EmailVerified {
+		email = strings.ToLower(strings.TrimSpace(ident.Email))
 	}
 	if email == "" {
-		// Fallback for providers (e.g., GitHub with hidden email): use a
-		// placeholder; user can change it later. UNIQUE on users.email
-		// means we still need a real-looking value.
-		email = ident.Subject + "@no-email.local"
+		// UNIQUE on users.email means we still need a real-looking value.
+		// Deterministic so a re-attempted signup with the same (provider,
+		// subject) doesn't burn through a fresh address each time.
+		email = "u_" + short + "@no-email.local"
 	}
 	return username, email
-}
-
-var sanitizeRE = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
-
-func sanitizeUsername(s string) string {
-	s = strings.TrimSpace(s)
-	s = sanitizeRE.ReplaceAllString(s, "_")
-	if len(s) > 32 {
-		s = s[:32]
-	}
-	if len(s) < 3 {
-		s = "user_" + s
-	}
-	return s
 }
 
 // uniqueUsername returns base, base2, base3, … until it finds one that's
