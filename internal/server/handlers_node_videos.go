@@ -126,7 +126,12 @@ func (s *Server) storeNodeVideoUpload(w http.ResponseWriter, r *http.Request, di
 	}
 	defer file.Close()
 
-	tmpDir := filepath.Join(s.cfg.UploadDir, "tmp")
+	// Stage the upload outside UploadDir so the raw attacker bytes are
+	// never reachable via the static tree — even though /uploads/* is now
+	// gated, keeping unsanitized input out of the served root removes a
+	// whole class of accidents (a future static-handler regression, an
+	// admin running `find UploadDir`, etc.).
+	tmpDir := filepath.Join(os.TempDir(), "mindful-social-video")
 	if err := os.MkdirAll(tmpDir, nodeImageDirPerm); err != nil {
 		s.logger.Error("node video upload: mkdir tmp", "err", err)
 		writeNodeImageError(w, http.StatusInternalServerError, "importError")

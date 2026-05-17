@@ -2,9 +2,12 @@ package server
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
 	"image"
 	"image/color"
+	"image/gif"
 	"image/png"
 	"io"
 	"mime/multipart"
@@ -122,6 +125,54 @@ func TestNodeImageUpload_RejectsAnonymous(t *testing.T) {
 	}
 }
 
+// TestNodeImageUpload_RejectsDecompressionBomb covers the pre-decode
+// header check: a PNG whose IHDR declares dimensions beyond our pixel
+// budget must be rejected before image.Decode allocates the full pixel
+// buffer (which would OOM the process on a 40000x40000 RGBA).
+func TestNodeImageUpload_RejectsDecompressionBomb(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	topicID := createNode(t, c, "topic", "A topic", "")
+
+	bomb := forgedHugePNGHeader(t, 40000, 40000)
+	resp := uploadImage(t, c, "/nodes/"+topicID.String()+"/images", "bomb.png", bomb)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("decompression bomb: status %d, want 413", resp.StatusCode)
+	}
+}
+
+// TestNodeImageUpload_GifPolyglotStripsTrailingBytes covers the GIF
+// passthrough hardening: bytes hidden after the GIF trailer must not
+// survive storage. image.Decode validates the GIF header and stops at
+// the trailer, accepting <valid_GIF><HTML_or_JS> polyglots; the re-encode
+// through gif.DecodeAll/EncodeAll discards them.
+func TestNodeImageUpload_GifPolyglotStripsTrailingBytes(t *testing.T) {
+	s := integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	topicID := createNode(t, c, "topic", "A topic", "")
+
+	polyglot := tinyGIF(t)
+	const sentinel = "<script>alert(\"xss\")</script>"
+	polyglot = append(polyglot, []byte(sentinel)...)
+
+	resp := uploadImage(t, c, "/nodes/"+topicID.String()+"/images", "tracker.gif", polyglot)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("gif polyglot upload: status %d", resp.StatusCode)
+	}
+	path := decodeFilePath(t, resp)
+	stored, err := os.ReadFile(filepath.Join(s.cfg.UploadDir, strings.TrimPrefix(path, "/uploads/")))
+	if err != nil {
+		t.Fatalf("read stored gif: %v", err)
+	}
+	if bytes.Contains(stored, []byte(sentinel)) {
+		t.Fatalf("polyglot trailer survived storage (%d bytes stored)", len(stored))
+	}
+}
+
 // TestNodeImageUpload_RejectsNonImage covers the format gate: a text/plain
 // blob should come back as a JSON error, not a 200 with a filePath.
 func TestNodeImageUpload_RejectsNonImage(t *testing.T) {
@@ -147,6 +198,41 @@ func tinyPNG(t *testing.T) []byte {
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatalf("encode png: %v", err)
 	}
+	return buf.Bytes()
+}
+
+// tinyGIF renders a single-pixel single-frame GIF.
+func tinyGIF(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewPaletted(image.Rect(0, 0, 1, 1), color.Palette{color.Black, color.White})
+	var buf bytes.Buffer
+	if err := gif.Encode(&buf, img, nil); err != nil {
+		t.Fatalf("encode gif: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// forgedHugePNGHeader fabricates a PNG that only contains the signature
+// plus a valid IHDR claiming the given width and height. image.DecodeConfig
+// reads just enough to extract those dimensions; image.Decode would fail
+// later because there is no IDAT, but the decompression-bomb gate trips
+// first.
+func forgedHugePNGHeader(t *testing.T, w, h int) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	buf.Write([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})
+	var ihdr bytes.Buffer
+	ihdr.Write([]byte("IHDR"))
+	_ = binary.Write(&ihdr, binary.BigEndian, uint32(w))
+	_ = binary.Write(&ihdr, binary.BigEndian, uint32(h))
+	ihdr.WriteByte(8) // bit depth
+	ihdr.WriteByte(2) // color type RGB
+	ihdr.WriteByte(0) // compression
+	ihdr.WriteByte(0) // filter
+	ihdr.WriteByte(0) // interlace
+	_ = binary.Write(&buf, binary.BigEndian, uint32(13))
+	buf.Write(ihdr.Bytes())
+	_ = binary.Write(&buf, binary.BigEndian, crc32.ChecksumIEEE(ihdr.Bytes()))
 	return buf.Bytes()
 }
 

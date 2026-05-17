@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
-	_ "image/gif"
+	"image/gif"
 	"image/jpeg"
 	_ "image/png"
 	"io"
@@ -20,6 +20,14 @@ import (
 
 	"github.com/TuotHash/mindful-social/internal/db"
 )
+
+// maxDecodedPixels caps the pixel area a single upload may decode. PNG
+// allows pathological compression ratios (a 40000×40000 single-colour PNG
+// fits in <100 KiB but allocates >5 GiB of RGBA when decoded), so the
+// MaxBytesReader on the request body is not enough on its own. 50 MP is
+// roughly an 8K image (7680×4320) — generous for everyday content and
+// well under what would OOM the process.
+const maxDecodedPixels = 50_000_000
 
 const (
 	nodeImageFormField  = "image"
@@ -190,6 +198,26 @@ func (s *Server) prepareNodeImageUpload(w http.ResponseWriter, r *http.Request, 
 	)
 	s.logger.Debug("node image upload: received", receivedAttrs...)
 
+	// Cheap header parse first: rejects decompression bombs before we
+	// allocate the full pixel buffer. image.Decode below would otherwise
+	// allocate width*height*4 bytes for a hostile PNG.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		s.logger.Debug("node image upload: decode config failed", "err", err)
+		writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
+		return preparedNodeImage{}, false
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > maxDecodedPixels {
+		s.logger.Debug("node image upload: image too large",
+			"width", cfg.Width,
+			"height", cfg.Height,
+			"pixels", int64(cfg.Width)*int64(cfg.Height),
+			"max_pixels", maxDecodedPixels,
+		)
+		writeNodeImageError(w, http.StatusRequestEntityTooLarge, "fileTooLarge")
+		return preparedNodeImage{}, false
+	}
+
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		s.logger.Debug("node image upload: decode failed", "err", err)
@@ -214,13 +242,31 @@ func (s *Server) prepareNodeImageUpload(w http.ResponseWriter, r *http.Request, 
 	storedData, storedExt, storedContentType := data, ext, contentType
 	storedW, storedH := srcW, srcH
 	if format == "gif" {
-		// Animated GIFs can't survive a still-frame re-encode. Skip
-		// compression and the resize — operators rely on the upload
-		// ceiling to keep these in check.
-		s.logger.Debug("node image upload: gif passthrough",
+		// Re-encode the GIF through gif.DecodeAll/EncodeAll so we keep
+		// animation but discard any bytes hiding past the GIF trailer.
+		// image.Decode validates the header but stops at the trailer,
+		// happily accepting polyglot files like
+		// <valid_GIF><HTML_or_JS>. Round-tripping through the encoder
+		// gives us a freshly-formed GIF and no suffix.
+		decoded, gerr := gif.DecodeAll(bytes.NewReader(data))
+		if gerr != nil {
+			s.logger.Debug("node image upload: gif decode failed", "err", gerr)
+			writeNodeImageError(w, http.StatusBadRequest, "typeNotAllowed")
+			return preparedNodeImage{}, false
+		}
+		var buf bytes.Buffer
+		if eerr := gif.EncodeAll(&buf, decoded); eerr != nil {
+			s.logger.Error("node image upload: gif re-encode", "err", eerr)
+			writeNodeImageError(w, http.StatusInternalServerError, "importError")
+			return preparedNodeImage{}, false
+		}
+		storedData = buf.Bytes()
+		s.logger.Debug("node image upload: gif sanitized",
 			"width", srcW,
 			"height", srcH,
-			"bytes", len(data),
+			"bytes_in", len(data),
+			"bytes_out", len(storedData),
+			"frames", len(decoded.Image),
 		)
 	} else {
 		processed, pw, ph, err := s.compressNodeImage(img, srcW, srcH, len(data))

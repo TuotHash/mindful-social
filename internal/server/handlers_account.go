@@ -213,6 +213,18 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Decompression-bomb gate: parse the header only and bail out before
+	// image.Decode allocates the full pixel buffer.
+	if cfg, _, derr := image.DecodeConfig(bytes.NewReader(data)); derr != nil {
+		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	} else if int64(cfg.Width)*int64(cfg.Height) > maxDecodedPixels {
+		s.flashAccount(r, "Profile pictures are limited to 50 megapixels before decoding.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		s.flashAccount(r, "Profile pictures must be PNG, JPEG, or GIF images.")
