@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
@@ -142,6 +143,11 @@ func (s *Server) handleAdminUpdateEmail(w http.ResponseWriter, r *http.Request) 
 		s.redirectAdminEdit(w, r, target.ID)
 		return
 	}
+	// Sign every session for the target out — the admin isn't the user, so
+	// there's no "current" session to keep.
+	if err := auth.RevokeUserSessions(r.Context(), s.sessions, target.ID, false); err != nil {
+		s.logger.Error("admin update email: revoke sessions", "err", err, "target", target.ID)
+	}
 	s.successAdmin(r, "Email updated.")
 	s.redirectAdminEdit(w, r, target.ID)
 }
@@ -170,6 +176,9 @@ func (s *Server) handleAdminResetPassword(w http.ResponseWriter, r *http.Request
 		s.flashAdmin(r, humanizeAuthErr(err))
 		s.redirectAdminEdit(w, r, target.ID)
 		return
+	}
+	if err := auth.RevokeUserSessions(r.Context(), s.sessions, target.ID, false); err != nil {
+		s.logger.Error("admin reset password: revoke sessions", "err", err, "target", target.ID)
 	}
 	s.successAdmin(r, "Password reset. The user can now sign in with their email and the new password.")
 	s.redirectAdminEdit(w, r, target.ID)

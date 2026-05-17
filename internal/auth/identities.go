@@ -82,17 +82,22 @@ func (s *Service) SignupWithPassword(ctx context.Context, username, email, passw
 
 // AuthenticatePassword returns the user id on a successful email+password
 // match, ErrInvalidLogin otherwise. The error message is intentionally
-// vague to avoid leaking whether the email exists.
+// vague to avoid leaking whether the email exists, and the unknown-email
+// branch runs a dummy bcrypt comparison so its wall-clock time matches
+// the wrong-password branch (otherwise ~1 ms vs ~80 ms reveals the
+// difference).
 func (s *Service) AuthenticatePassword(ctx context.Context, email, password string) (uuid.UUID, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	row, err := s.q.GetPasswordIdentityForLogin(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			EqualizePasswordTiming()
 			return uuid.Nil, ErrInvalidLogin
 		}
 		return uuid.Nil, err
 	}
 	if row.PasswordHash == nil {
+		EqualizePasswordTiming()
 		return uuid.Nil, ErrInvalidLogin
 	}
 	if err := CheckPassword(*row.PasswordHash, password); err != nil {

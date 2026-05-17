@@ -61,3 +61,28 @@ func CurrentUserID(ctx context.Context, sm *scs.SessionManager) (uuid.UUID, bool
 	}
 	return id, true
 }
+
+// RevokeUserSessions destroys every active session belonging to userID.
+// When preserveCurrent is true, the session attached to ctx is left
+// alone so the caller stays logged in — useful for self-service
+// password/email changes. Admin-triggered changes pass false to log the
+// target out of every device.
+func RevokeUserSessions(ctx context.Context, sm *scs.SessionManager, userID uuid.UUID, preserveCurrent bool) error {
+	keep := ""
+	if preserveCurrent {
+		keep = sm.Token(ctx)
+	}
+	target := userID.String()
+	// Iterate runs against a fresh background context internally so we
+	// pass one rather than the request ctx, which may carry a deadline
+	// short enough to kill the loop midway.
+	return sm.Iterate(context.Background(), func(c context.Context) error {
+		if keep != "" && sm.Token(c) == keep {
+			return nil
+		}
+		if sm.GetString(c, sessionUserKey) != target {
+			return nil
+		}
+		return sm.Destroy(c)
+	})
+}

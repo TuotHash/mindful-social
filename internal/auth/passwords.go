@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"sync"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
@@ -37,3 +38,27 @@ func HashPassword(password string) (string, error) {
 func CheckPassword(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
+
+// EqualizePasswordTiming runs a bcrypt comparison against a fixed dummy
+// hash so the unknown-email login path takes the same wall-clock time as
+// the wrong-password path. Without this, a single failed login leaks
+// "email exists" via response time (~1 ms vs ~80 ms at default cost).
+// The hash is computed once on first use and reused thereafter.
+func EqualizePasswordTiming() {
+	dummyHashOnce.Do(func() {
+		// The password text doesn't matter — CompareHashAndPassword runs
+		// the same way for matching and non-matching inputs.
+		h, err := bcrypt.GenerateFromPassword([]byte("equalize-login-timing"), bcrypt.DefaultCost)
+		if err == nil {
+			dummyHash = h
+		}
+	})
+	if dummyHash != nil {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte("equalize-login-timing"))
+	}
+}
+
+var (
+	dummyHashOnce sync.Once
+	dummyHash     []byte
+)

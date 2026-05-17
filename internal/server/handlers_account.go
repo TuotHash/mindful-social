@@ -408,6 +408,12 @@ func (s *Server) handleAccountPasswordSet(w http.ResponseWriter, r *http.Request
 			http.Redirect(w, r, "/account", http.StatusSeeOther)
 			return
 		}
+		// Sign every other device out so a stolen-cookie attacker loses
+		// access immediately. The current request's session is preserved
+		// so the user isn't bounced back to /login mid-flow.
+		if err := auth.RevokeUserSessions(r.Context(), s.sessions, user.ID, true); err != nil {
+			s.logger.Error("account: revoke sessions after password change", "err", err, "user_id", user.ID)
+		}
 		s.successAccount(r, "Password updated.")
 	} else {
 		if err := s.authSvc.SetInitialPassword(r.Context(), user.ID, newPw); err != nil {
