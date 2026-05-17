@@ -179,8 +179,7 @@ func (s *Server) routes() {
 	}
 	staticFS := http.FileServer(http.FS(staticSub))
 	r.Handle("/static/*", http.StripPrefix("/static/", cacheStatic(staticFS)))
-	uploadFS := http.FileServer(noDirectoryListing(http.Dir(s.cfg.UploadDir)))
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", cacheStatic(uploadFS)))
+	r.Handle("/uploads/*", http.HandlerFunc(s.handleUpload))
 
 	r.Get("/", s.handleLanding)
 
