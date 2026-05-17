@@ -65,8 +65,8 @@ templ landingMarketing(viewer *Viewer) {
 					</div>
 					<div class="row gap-24 wrap" style="margin-top: 12px; color: var(--ink-3); font-size: 13px;">
 						<span class="row gap-8">@checkIcon() Open source · AGPL</span>
-						<span class="row gap-8">@checkIcon() No ads · ever</span>
-						<span class="row gap-8">@checkIcon() Federation-ready</span>
+						<span class="row gap-8">@checkIcon() No ads · not ever</span>
+						<span class="row gap-8">@checkIcon() Federation coming soon™</span>
 					</div>
 				</div>
 				<div style="position: relative; height: 520px; display: flex; align-items: center; justify-content: center;">
@@ -111,7 +111,7 @@ templ landingMarketing(viewer *Viewer) {
 				<div class="row between wrap gap-16" style="margin-bottom: 18px;">
 					<div>
 						<span class="eyebrow">Edges</span>
-						<div class="h-2" style="margin-top: 4px;">Five named relationships.</div>
+						<div class="h-2" style="margin-top: 4px;">Three named relationships.</div>
 					</div>
 					<p class="muted" style="margin: 0; max-width: 360px; font-size: 14px;">
 						Every link between two nodes carries a kind — so disagreement is structural, not interpretive.
@@ -134,7 +134,7 @@ templ landingMarketing(viewer *Viewer) {
 			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
 				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-views and finding chains expand below.")
 				@stepCard("02", "Read the views and their findings", "Each view shows who commits, opposing views, and cited findings.")
-				@stepCard("03", "Share your own findings", "Pin your stance with a paragraph in your own words. Link findings you find compelling.")
+				@stepCard("03", "Share your own findings", "Pin your stance — Support, Oppose, or Feature — then link the findings that shaped it.")
 				@stepCard("04", "Watch the graph rebuild itself", "Your contribution rewires the conversation — visible, named, accountable.")
 			</div>
 		</div>
@@ -146,7 +146,7 @@ templ landingMarketing(viewer *Viewer) {
 			<div style="position: relative; z-index: 2; max-width: 640px; margin: 0 auto;">
 				<h2 class="h-1" style="font-size: 56px;">Stop dunking. Start <em style="font-style: italic; color: var(--accent-deep);">thinking together.</em></h2>
 				<p class="lede" style="margin: 20px auto 32px;">
-					Free forever. No advertisers, no algorithm. Just you, your findings, and a slowly-better-organized internet.
+					Free forever. No ads, not ever. No algorithm. Just you, your findings, and a slowly-better-organized internet.
 				</p>
 				<div class="row gap-12" style="justify-content: center;">
 					if SignupEnabled() {
@@ -357,7 +357,7 @@ templ siteFooter(viewer *Viewer) {
 				<div class="row gap-12 center">
 					<span class="brand-mark" style="width: 22px; height: 22px;"></span>
 					<span style="font-family: var(--serif); font-size: 18px;">Mindful Social</span>
-					<span class="muted" style="font-size: 12px; font-family: var(--mono);">v0.4 · early development</span>
+					<span class="muted" style="font-size: 12px; font-family: var(--mono);">v{ Version() } · early development</span>
 				</div>
 				<div class="row gap-24 wrap" style="font-size: 13px; color: var(--ink-3);">
 					if viewer != nil {
@@ -367,6 +367,7 @@ templ siteFooter(viewer *Viewer) {
 					}
 					<a href="/tags" style="text-decoration: none;">Tags</a>
 					<a href="/search" style="text-decoration: none;">Search</a>
+					<a href={ templ.SafeURL(SourceURL) } rel="noopener" target="_blank" style="text-decoration: none;">Source</a>
 				</div>
 			</div>
 		</div>

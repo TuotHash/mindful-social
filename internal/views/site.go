@@ -26,6 +26,13 @@ func SetSignupEnabled(b bool) { signupEnabledFlag = b }
 // rendered. OAuth/SSO is unaffected by this flag.
 func SignupEnabled() bool { return signupEnabledFlag }
 
+// Version returns the embedded build version string for display in the UI.
+func Version() string { return mindfulsocial.Version }
+
+// SourceURL is the canonical public location of the project source code,
+// surfaced in the footer.
+const SourceURL = "https://github.com/TuotHash/mindful-social"
+
 // StaticAsset appends a content hash to mutable embedded assets so browsers
 // don't keep using an old app.js/app.css after a deploy.
 func StaticAsset(path string) templ.SafeURL {

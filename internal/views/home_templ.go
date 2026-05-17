@@ -171,7 +171,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "No ads · ever</span> <span class=\"row gap-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "No ads · not ever</span> <span class=\"row gap-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -179,7 +179,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "Federation-ready</span></div></div><div style=\"position: relative; height: 520px; display: flex; align-items: center; justify-content: center;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "Federation coming soon™</span></div></div><div style=\"position: relative; height: 520px; display: flex; align-items: center; justify-content: center;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -215,7 +215,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><div class=\"card\" style=\"margin-top: 32px; padding: 28px;\"><div class=\"row between wrap gap-16\" style=\"margin-bottom: 18px;\"><div><span class=\"eyebrow\">Edges</span><div class=\"h-2\" style=\"margin-top: 4px;\">Five named relationships.</div></div><p class=\"muted\" style=\"margin: 0; max-width: 360px; font-size: 14px;\">Every link between two nodes carries a kind — so disagreement is structural, not interpretive.</p></div><div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><div class=\"card\" style=\"margin-top: 32px; padding: 28px;\"><div class=\"row between wrap gap-16\" style=\"margin-bottom: 18px;\"><div><span class=\"eyebrow\">Edges</span><div class=\"h-2\" style=\"margin-top: 4px;\">Three named relationships.</div></div><p class=\"muted\" style=\"margin: 0; max-width: 360px; font-size: 14px;\">Every link between two nodes carries a kind — so disagreement is structural, not interpretive.</p></div><div style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -243,7 +243,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = stepCard("03", "Share your own findings", "Pin your stance with a paragraph in your own words. Link findings you find compelling.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = stepCard("03", "Share your own findings", "Pin your stance — Support, Oppose, or Feature — then link the findings that shaped it.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -263,7 +263,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div style=\"position: relative; z-index: 2; max-width: 640px; margin: 0 auto;\"><h2 class=\"h-1\" style=\"font-size: 56px;\">Stop dunking. Start <em style=\"font-style: italic; color: var(--accent-deep);\">thinking together.</em></h2><p class=\"lede\" style=\"margin: 20px auto 32px;\">Free forever. No advertisers, no algorithm. Just you, your findings, and a slowly-better-organized internet.</p><div class=\"row gap-12\" style=\"justify-content: center;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div style=\"position: relative; z-index: 2; max-width: 640px; margin: 0 auto;\"><h2 class=\"h-1\" style=\"font-size: 56px;\">Stop dunking. Start <em style=\"font-style: italic; color: var(--accent-deep);\">thinking together.</em></h2><p class=\"lede\" style=\"margin: 20px auto 32px;\">Free forever. No ads, not ever. No algorithm. Just you, your findings, and a slowly-better-organized internet.</p><div class=\"row gap-12\" style=\"justify-content: center;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -816,22 +816,48 @@ func siteFooter(viewer *Viewer) templ.Component {
 			templ_7745c5c3_Var34 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<footer class=\"site-footer\"><div class=\"page\" style=\"padding-top: 48px; padding-bottom: 48px;\"><div class=\"row between wrap gap-16\"><div class=\"row gap-12 center\"><span class=\"brand-mark\" style=\"width: 22px; height: 22px;\"></span> <span style=\"font-family: var(--serif); font-size: 18px;\">Mindful Social</span> <span class=\"muted\" style=\"font-size: 12px; font-family: var(--mono);\">v0.4 · early development</span></div><div class=\"row gap-24 wrap\" style=\"font-size: 13px; color: var(--ink-3);\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<footer class=\"site-footer\"><div class=\"page\" style=\"padding-top: 48px; padding-bottom: 48px;\"><div class=\"row between wrap gap-16\"><div class=\"row gap-12 center\"><span class=\"brand-mark\" style=\"width: 22px; height: 22px;\"></span> <span style=\"font-family: var(--serif); font-size: 18px;\">Mindful Social</span> <span class=\"muted\" style=\"font-size: 12px; font-family: var(--mono);\">v")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var35 string
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(Version())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 360, Col: 88}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, " · early development</span></div><div class=\"row gap-24 wrap\" style=\"font-size: 13px; color: var(--ink-3);\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if viewer != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<a href=\"/home\" style=\"text-decoration: none;\">Home</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<a href=\"/home\" style=\"text-decoration: none;\">Home</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<a href=\"/\" style=\"text-decoration: none;\">Home</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<a href=\"/\" style=\"text-decoration: none;\">Home</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<a href=\"/tags\" style=\"text-decoration: none;\">Tags</a> <a href=\"/search\" style=\"text-decoration: none;\">Search</a></div></div></div></footer>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<a href=\"/tags\" style=\"text-decoration: none;\">Tags</a> <a href=\"/search\" style=\"text-decoration: none;\">Search</a> <a href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var36 templ.SafeURL
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(SourceURL))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home.templ`, Line: 370, Col: 39}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" rel=\"noopener\" target=\"_blank\" style=\"text-decoration: none;\">Source</a></div></div></div></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
