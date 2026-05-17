@@ -409,7 +409,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 				}
 				if node.SourceUrl != nil && *node.SourceUrl != "" {
 					<section class="source" style="margin-top: 14px;">
-						<a href={ templ.SafeURL(*node.SourceUrl) } target="_blank" rel="noopener">↗ { *node.SourceUrl }</a>
+						<a href={ templ.URL(*node.SourceUrl) } target="_blank" rel="noopener">↗ { *node.SourceUrl }</a>
 					</section>
 				}
 				if len(tags) > 0 {

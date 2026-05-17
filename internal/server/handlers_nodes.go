@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,6 +13,28 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
+
+// validateSourceURL accepts empty input (the field is optional) and otherwise
+// requires an http or https URL with a host. Returns a flash string on
+// rejection. The template path also uses templ.URL to collapse anything else
+// to the failed-sanitization sentinel, but the server check is the real gate.
+func validateSourceURL(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "Source URL is not a valid URL."
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "Source URL must start with http:// or https://."
+	}
+	if u.Host == "" {
+		return "Source URL must include a host."
+	}
+	return ""
+}
 
 // resolveNode loads a node by the URL param "id". The param may be either a
 // UUID or a slug — UUID is tried first (parses as a uuid.UUID), slug is the
@@ -796,6 +819,11 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		flash = "Title is required."
 	case len(title) > 200:
 		flash = "Title is too long (max 200 characters)."
+	}
+	if flash == "" {
+		if msg := validateSourceURL(sourceURL); msg != "" {
+			flash = msg
+		}
 	}
 	visKind := node.Visibility
 	visGroupID := node.VisibilityGroupID

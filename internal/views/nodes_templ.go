@@ -702,9 +702,9 @@ func NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var18 templ.SafeURL
-				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(*node.SourceUrl))
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(*node.SourceUrl))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 412, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 412, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -717,7 +717,7 @@ func NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(*node.SourceUrl)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 412, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/nodes.templ`, Line: 412, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
