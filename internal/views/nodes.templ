@@ -421,14 +421,14 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 				}
 				if viewer != nil {
 					<div class="node-actions" style="margin-top: 22px;">
-						<a
-							href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
-							class="btn"
-							hx-get={ "/nodes/" + node.Slug + "/edges/new" }
-							hx-target="#modal"
-							hx-swap="innerHTML"
-						><span class="material-symbols-outlined">conversion_path</span>Connect</a>
 						if canEdit {
+							<a
+								href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
+								class="btn"
+								hx-get={ "/nodes/" + node.Slug + "/edges/new" }
+								hx-target="#modal"
+								hx-swap="innerHTML"
+							><span class="material-symbols-outlined">conversion_path</span>Connect</a>
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						}
 						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/history") } class="btn ghost"><span class="material-symbols-outlined">history</span>History</a>

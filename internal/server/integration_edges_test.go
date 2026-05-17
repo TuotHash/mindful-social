@@ -186,6 +186,69 @@ func TestEdgeCreate_InlineFindingRequiresTitle(t *testing.T) {
 	}
 }
 
+// Ensures edge creation honors edit_policy on the source node, matching
+// the existing gate on highlight/unhighlight/delete. Without this gate,
+// any logged-in viewer of a public node could attach attacker-authored
+// child findings inheriting that node's visibility and group.
+func TestEdgeCreate_RequiresEditPermissionOnSource(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	signup(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	from := createNode(t, alice, "view", "Alice essay", "")
+
+	mallory := newClient(t)
+	signup(t, mallory, "mallory", "mallory@example.com", "correct horse battery staple")
+
+	to := createNodeDirect(t, mallory, "finding", "Mallory finding", "")
+
+	resp := formPost(t, mallory, "/nodes/"+from.String()+"/edges", url.Values{
+		"kind":  {"supports"},
+		"to_id": {to.String()},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("edge create by non-editor: status %d, want 403", resp.StatusCode)
+	}
+
+	rows, err := testServer.queries.ListEdgesFromNodeForViewer(t.Context(), db.ListEdgesFromNodeForViewerParams{
+		FromNode: from,
+		ViewerID: nil,
+	})
+	if err != nil {
+		t.Fatalf("list edges: %v", err)
+	}
+	for _, row := range rows {
+		if row.ToID == to {
+			t.Fatalf("edge to mallory finding was created despite forbidden response")
+		}
+	}
+}
+
+func TestEdgeCreate_InlineFindingRequiresEditPermission(t *testing.T) {
+	integrationDB(t)
+	alice := newClient(t)
+	signup(t, alice, "alice", "alice@example.com", "correct horse battery staple")
+	from := createNode(t, alice, "view", "Alice essay", "")
+
+	mallory := newClient(t)
+	signup(t, mallory, "mallory", "mallory@example.com", "correct horse battery staple")
+
+	resp := formPost(t, mallory, "/nodes/"+from.String()+"/edges", url.Values{
+		"kind":              {"opposes"},
+		"to_mode":           {"new"},
+		"new_finding_title": {"Alice fabricated her data"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("inline finding edge by non-editor: status %d, want 403", resp.StatusCode)
+	}
+
+	body := readBody(t, get(t, alice, "/nodes/"+from.String()))
+	if strings.Contains(body, "Alice fabricated her data") {
+		t.Fatalf("smear finding leaked onto source page; excerpt: %s", snippet(body))
+	}
+}
+
 func TestEdgeCreate_RejectsSelfEdge(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)

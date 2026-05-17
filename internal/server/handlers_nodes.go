@@ -912,6 +912,9 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.requireEditPermission(w, r, node) {
+		return
+	}
 	id := node.ID
 	find := strings.TrimSpace(r.URL.Query().Get("find"))
 	candidates, err := s.searchEdgeCandidates(r, id, find)
@@ -935,6 +938,9 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
 	node, ok := s.resolveNode(w, r)
 	if !ok {
+		return
+	}
+	if !s.requireEditPermission(w, r, node) {
 		return
 	}
 	id := node.ID
@@ -981,6 +987,9 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	fromNode, ok := s.resolveNode(w, r)
 	if !ok {
+		return
+	}
+	if !s.requireEditPermission(w, r, fromNode) {
 		return
 	}
 	fromID := fromNode.ID
