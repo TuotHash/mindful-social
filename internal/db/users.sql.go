@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countAdmins = `-- name: CountAdmins :one
+SELECT count(*)::bigint FROM users WHERE role = 'admin'
+`
+
+// Used to refuse demotions that would leave the instance with no admins.
+// A site with zero admins can't be managed through the UI; recovery
+// requires either ADMIN_USERS at boot or a DB-level fix.
+func (q *Queries) CountAdmins(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdmins)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)

@@ -80,12 +80,17 @@ func (s *Server) handlePinDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.queries.DeletePin(r.Context(), db.DeletePinParams{
+	rows, err := s.queries.DeletePin(r.Context(), db.DeletePinParams{
 		UserID: user.ID,
 		NodeID: node.ID,
-	}); err != nil {
+	})
+	if err != nil {
 		s.logger.Error("pin delete", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0 {
+		http.NotFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)

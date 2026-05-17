@@ -237,3 +237,19 @@ func createNodeForUser(t *testing.T, userID uuid.UUID, nodeType db.NodeType, tit
 	}
 	return node.ID
 }
+
+// Unpinning a node the user never pinned returns 404 rather than 303 OK.
+// Before the :execrows change, the SQL silently succeeded on zero rows and
+// the handler reported success.
+func TestUnpin_NonexistentReturns404(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	view := createNode(t, c, "view", "View A", "")
+
+	resp := formPost(t, c, "/nodes/"+view.String()+"/unpin", url.Values{})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unpin without prior pin: status %d, want 404", resp.StatusCode)
+	}
+}

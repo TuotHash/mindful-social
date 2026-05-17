@@ -65,25 +65,32 @@ func normalizeTag(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// setTagsForNode replaces the node's tag set with the given names. Each name
-// is upserted into tags, then attached. Existing tags not in the new set are
-// removed. Errors are returned but not reported to the user — tag editing is
-// a soft path.
+// setTagsForNode replaces the node's tag set with the given names. The
+// delete and the per-tag attach run inside a single transaction so a
+// timeout, network blip, or concurrent save can't leave a partial tag
+// set (otherwise the node would briefly carry zero tags or only some of
+// them, depending on where the loop stopped).
 func (s *Server) setTagsForNode(r *http.Request, nodeID uuid.UUID, names []string) error {
 	ctx := r.Context()
-	if err := s.queries.DeleteTagsForNode(ctx, nodeID); err != nil {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	q := s.queries.WithTx(tx)
+	if err := q.DeleteTagsForNode(ctx, nodeID); err != nil {
 		return err
 	}
 	for _, name := range names {
-		tagID, err := s.queries.UpsertTag(ctx, name)
+		tagID, err := q.UpsertTag(ctx, name)
 		if err != nil {
 			return err
 		}
-		if err := s.queries.AttachTag(ctx, db.AttachTagParams{NodeID: nodeID, TagID: tagID}); err != nil {
+		if err := q.AttachTag(ctx, db.AttachTagParams{NodeID: nodeID, TagID: tagID}); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 // handleTagsIndex renders /tags: every tag with the count of nodes carrying it.

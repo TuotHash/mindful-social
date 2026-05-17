@@ -10,7 +10,10 @@ ON CONFLICT (user_id, node_id) DO UPDATE SET
     created_at = now()
 RETURNING id;
 
--- name: DeletePin :exec
+-- name: DeletePin :execrows
+-- Returns the number of removed rows so callers can 404 a request to
+-- unpin a node the user never pinned. Mirrors the pattern on the edge
+-- delete / highlight / unhighlight queries.
 DELETE FROM user_node_pins WHERE user_id = $1 AND node_id = $2;
 
 -- name: GetPinForUserAndNode :one

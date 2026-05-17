@@ -40,6 +40,12 @@ ORDER BY
 -- name: UpdateUserRole :exec
 UPDATE users SET role = $2 WHERE id = $1;
 
+-- name: CountAdmins :one
+-- Used to refuse demotions that would leave the instance with no admins.
+-- A site with zero admins can't be managed through the UI; recovery
+-- requires either ADMIN_USERS at boot or a DB-level fix.
+SELECT count(*)::bigint FROM users WHERE role = 'admin';
+
 -- name: UpdateUserUsername :exec
 UPDATE users SET username = $2 WHERE id = $1;
 

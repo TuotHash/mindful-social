@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const deletePin = `-- name: DeletePin :exec
+const deletePin = `-- name: DeletePin :execrows
 DELETE FROM user_node_pins WHERE user_id = $1 AND node_id = $2
 `
 
@@ -21,9 +21,15 @@ type DeletePinParams struct {
 	NodeID uuid.UUID `json:"node_id"`
 }
 
-func (q *Queries) DeletePin(ctx context.Context, arg DeletePinParams) error {
-	_, err := q.db.Exec(ctx, deletePin, arg.UserID, arg.NodeID)
-	return err
+// Returns the number of removed rows so callers can 404 a request to
+// unpin a node the user never pinned. Mirrors the pattern on the edge
+// delete / highlight / unhighlight queries.
+func (q *Queries) DeletePin(ctx context.Context, arg DeletePinParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePin, arg.UserID, arg.NodeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getPinForUserAndNode = `-- name: GetPinForUserAndNode :one

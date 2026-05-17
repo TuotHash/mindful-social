@@ -2,20 +2,33 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
 
+// nodeRevisionUniqueConstraint matches the (node_id, revision) UNIQUE
+// constraint declared in migration 00026. We retry on a 23505 against
+// just this name; other unique violations should surface as errors.
+const nodeRevisionUniqueConstraint = "node_revisions_node_id_revision_key"
+
 // snapshotNodeRevision writes one row into node_revisions for the supplied
 // content. Errors are only logged — failing to snapshot must never undo the
-// user's actual save. tagNames should be the names currently attached to the
-// node (i.e. the result of parseTagsInput applied to the form value).
+// user's actual save. tagNames should be the names currently attached to
+// the node (i.e. the result of parseTagsInput applied to the form value).
+//
+// CreateNodeRevision picks revision = max(revision)+1 in a single
+// statement, but at READ COMMITTED two concurrent edits can both compute
+// the same value; the loser hits the (node_id, revision) UNIQUE
+// constraint. We retry a few times so a colliding edit still gets its
+// own snapshot rather than silently going missing from history.
 func (s *Server) snapshotNodeRevision(
 	ctx context.Context,
 	nodeID uuid.UUID,
@@ -26,16 +39,28 @@ func (s *Server) snapshotNodeRevision(
 	if tagNames == nil {
 		tagNames = []string{}
 	}
-	if _, err := s.queries.CreateNodeRevision(ctx, db.CreateNodeRevisionParams{
-		NodeID:      nodeID,
-		Title:       title,
-		Body:        body,
-		TagNames:    tagNames,
-		EditedBy:    editorID,
-		EditSummary: summary,
-	}); err != nil {
+	for attempt := 0; attempt < 5; attempt++ {
+		_, err := s.queries.CreateNodeRevision(ctx, db.CreateNodeRevisionParams{
+			NodeID:      nodeID,
+			Title:       title,
+			Body:        body,
+			TagNames:    tagNames,
+			EditedBy:    editorID,
+			EditSummary: summary,
+		})
+		if err == nil {
+			return
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == nodeRevisionUniqueConstraint {
+			// Concurrent snapshot took our revision number. Recompute
+			// max(revision)+1 and try again.
+			continue
+		}
 		s.logger.Error("snapshot node revision", "err", err, "node_id", nodeID)
+		return
 	}
+	s.logger.Error("snapshot node revision: revision-number race did not resolve in 5 retries", "node_id", nodeID)
 }
 
 // sameStringSet reports whether a and b contain the same elements ignoring

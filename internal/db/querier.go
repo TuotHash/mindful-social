@@ -12,6 +12,10 @@ import (
 
 type Querier interface {
 	AcceptGroupInvite(ctx context.Context, arg AcceptGroupInviteParams) (int64, error)
+	// Idempotent insert. If the user is already a member the existing row is
+	// left untouched, so an admin re-adding an existing admin or editor by
+	// username can't silently downgrade them to member. Role changes go
+	// through SetGroupMemberRole.
 	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
 	AttachTag(ctx context.Context, arg AttachTagParams) error
 	// True when `viewer` is permitted to edit `node` under its edit_policy.
@@ -25,6 +29,10 @@ type Querier interface {
 	// membership.
 	CanViewGroup(ctx context.Context, arg CanViewGroupParams) (bool, error)
 	CanViewNode(ctx context.Context, arg CanViewNodeParams) (bool, error)
+	// Used to refuse demotions that would leave the instance with no admins.
+	// A site with zero admins can't be managed through the UI; recovery
+	// requires either ADMIN_USERS at boot or a DB-level fix.
+	CountAdmins(ctx context.Context) (int64, error)
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
@@ -60,7 +68,10 @@ type Querier interface {
 	DeleteEdge(ctx context.Context, arg DeleteEdgeParams) (int64, error)
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
 	DeleteNode(ctx context.Context, id uuid.UUID) error
-	DeletePin(ctx context.Context, arg DeletePinParams) error
+	// Returns the number of removed rows so callers can 404 a request to
+	// unpin a node the user never pinned. Mirrors the pattern on the edge
+	// delete / highlight / unhighlight queries.
+	DeletePin(ctx context.Context, arg DeletePinParams) (int64, error)
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.
 	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error

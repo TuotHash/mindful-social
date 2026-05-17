@@ -321,24 +321,19 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slug, err := s.uniqueSlug(r.Context(), slugify(title))
-	if err != nil {
-		s.logger.Error("create node: unique slug", "err", err)
-		rerender("Could not create post. Please try again.")
-		return
-	}
-
-	node, err := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
-		Type:              nt,
-		Title:             title,
-		Body:              body,
-		SourceUrl:         nil,
-		CreatedBy:         user.ID,
-		Slug:              slug,
-		Visibility:        visKind,
-		VisibilityGroupID: visGroupID,
-		GroupID:           groupID,
-		ParentNodeID:      parentNodeID,
+	node, err := s.createNodeWithUniqueSlug(r.Context(), slugify(title), func(slug string) db.CreateNodeParams {
+		return db.CreateNodeParams{
+			Type:              nt,
+			Title:             title,
+			Body:              body,
+			SourceUrl:         nil,
+			CreatedBy:         user.ID,
+			Slug:              slug,
+			Visibility:        visKind,
+			VisibilityGroupID: visGroupID,
+			GroupID:           groupID,
+			ParentNodeID:      parentNodeID,
+		}
 	})
 	if err != nil {
 		s.logger.Error("create node", "err", err)
@@ -1045,23 +1040,19 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 			rerender("Finding title is too long (max 200 characters).")
 			return
 		}
-		slug, slugErr := s.uniqueSlug(r.Context(), slugify(rawNewFindingTitle))
-		if slugErr != nil {
-			s.logger.Error("edge create: unique slug", "err", slugErr)
-			rerender("Could not create the finding. Please try again.")
-			return
-		}
-		newNode, createErr := s.queries.CreateNode(r.Context(), db.CreateNodeParams{
-			Type:              db.NodeTypeFinding,
-			Title:             rawNewFindingTitle,
-			Body:              "",
-			SourceUrl:         nil,
-			CreatedBy:         user.ID,
-			Slug:              slug,
-			Visibility:        fromNode.Visibility,
-			VisibilityGroupID: fromNode.VisibilityGroupID,
-			GroupID:           fromNode.GroupID,
-			ParentNodeID:      &fromID,
+		newNode, createErr := s.createNodeWithUniqueSlug(r.Context(), slugify(rawNewFindingTitle), func(slug string) db.CreateNodeParams {
+			return db.CreateNodeParams{
+				Type:              db.NodeTypeFinding,
+				Title:             rawNewFindingTitle,
+				Body:              "",
+				SourceUrl:         nil,
+				CreatedBy:         user.ID,
+				Slug:              slug,
+				Visibility:        fromNode.Visibility,
+				VisibilityGroupID: fromNode.VisibilityGroupID,
+				GroupID:           fromNode.GroupID,
+				ParentNodeID:      &fromID,
+			}
 		})
 		if createErr != nil {
 			s.logger.Error("edge create: new finding", "err", createErr)

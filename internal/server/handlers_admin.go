@@ -80,6 +80,22 @@ func (s *Server) handleAdminSetRole(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
+	// Last-admin guard: refuse a demotion that would leave the instance
+	// with no admins at all. Two admins demoting each other through
+	// separate requests would otherwise lock everyone out of the UI.
+	if target.Role == db.UserRoleAdmin && role != db.UserRoleAdmin {
+		count, countErr := s.queries.CountAdmins(r.Context())
+		if countErr != nil {
+			s.logger.Error("admin set role: count admins", "err", countErr)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if count <= 1 {
+			s.flashAdmin(r, "Can't demote the last admin. Promote another user first.")
+			http.Redirect(w, r, "/admin", http.StatusSeeOther)
+			return
+		}
+	}
 	if err := s.queries.UpdateUserRole(r.Context(), db.UpdateUserRoleParams{
 		ID:   target.ID,
 		Role: role,
