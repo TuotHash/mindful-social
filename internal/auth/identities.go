@@ -175,10 +175,20 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 }
 
 // suggestIdentity picks a starting username + email for an OAuth signup.
-// The username is a stable placeholder derived from sha256(provider:subject)
-// rather than the IdP's display name, so an attacker can't set their display
-// name to "alice" and squat the handle before the real Alice signs up. The
-// user can rename via /account once they're in.
+//
+// Username preference order:
+//  1. The IdP's display-name claim (OIDC preferred_username / name,
+//     GitHub login), sanitised into the local handle alphabet.
+//  2. A deterministic u_<sha256(provider:subject)[:8]> placeholder when
+//     the claim is absent or unusable.
+//
+// Trading off: using preferred_username spares the user a rename, but
+// on a multi-tenant OIDC issuer an attacker could set their own
+// preferred_username to "alice" and grab that handle before the real
+// Alice signs up. We accept that risk for the self-hosted / trusted-IdP
+// case; uniqueUsername still appends a numeric suffix on collisions so
+// the worst case is "alice2", not a hijack of an existing account
+// (identity linking still requires email_verified).
 //
 // The email is only carried over when the IdP attested verification.
 // Otherwise we use a per-subject placeholder so an attacker can't block
@@ -186,7 +196,10 @@ func (s *Service) FindOrCreateOAuthUser(ctx context.Context, provider string, id
 func suggestIdentity(provider string, ident Identity) (username, email string) {
 	h := sha256.Sum256([]byte(provider + ":" + ident.Subject))
 	short := hex.EncodeToString(h[:4]) // 8 hex chars
-	username = "u_" + short
+	username = cleanUsernameSeed(ident.DisplayName)
+	if username == "" {
+		username = "u_" + short
+	}
 	if ident.EmailVerified {
 		email = strings.ToLower(strings.TrimSpace(ident.Email))
 	}
@@ -197,6 +210,38 @@ func suggestIdentity(provider string, ident Identity) (username, email string) {
 		email = "u_" + short + "@no-email.local"
 	}
 	return username, email
+}
+
+// cleanUsernameSeed coerces an IdP-supplied handle into the local
+// username alphabet. Characters outside [a-zA-Z0-9._-] are dropped
+// (so "John Doe" → "JohnDoe", "alice@example.com" → "aliceexample.com"),
+// leading/trailing punctuation is trimmed, and the result is returned
+// only when it matches usernameValidRegex. Anything else yields "" so
+// the caller falls back to the hash placeholder.
+func cleanUsernameSeed(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	for _, r := range raw {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '.', r == '_', r == '-':
+			b.WriteRune(r)
+		}
+	}
+	cleaned := strings.Trim(b.String(), "._-")
+	if len(cleaned) > 32 {
+		cleaned = strings.TrimRight(cleaned[:32], "._-")
+	}
+	if !usernameValidRegex.MatchString(cleaned) {
+		return ""
+	}
+	return cleaned
 }
 
 // uniqueUsername returns base, base2, base3, … until it finds one that's

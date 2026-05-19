@@ -5,31 +5,69 @@ import (
 	"testing"
 )
 
-func TestSuggestIdentity_IgnoresDisplayName(t *testing.T) {
+func TestSuggestIdentity_UsesDisplayNameWhenValid(t *testing.T) {
 	t.Parallel()
 
-	// Attacker sets DisplayName to "alice" hoping to squat that handle.
-	// The fix is to derive the placeholder username from a stable hash of
-	// the provider+subject pair instead.
+	// A clean preferred_username should land on the new user row as-is so
+	// they don't have to rename after their first sign-in.
 	username, _ := suggestIdentity("oidc", Identity{
-		Subject:     "attacker-subject-123",
-		DisplayName: "alice",
-		Email:       "mallory@example.com",
+		Subject:     "sub-123",
+		DisplayName: "pxct",
 	})
-	if username == "alice" {
-		t.Fatalf("suggestIdentity must not use DisplayName as username")
-	}
-	if !strings.HasPrefix(username, "u_") {
-		t.Fatalf("expected u_-prefixed placeholder, got %q", username)
-	}
-	if len(username) != 2+8 {
-		t.Fatalf("expected 10-char placeholder (u_ + 8 hex), got %q", username)
+	if username != "pxct" {
+		t.Fatalf("expected DisplayName 'pxct' to be used, got %q", username)
 	}
 }
 
-func TestSuggestIdentity_DeterministicPerSubject(t *testing.T) {
+func TestSuggestIdentity_SanitisesDisplayName(t *testing.T) {
 	t.Parallel()
 
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{"John Doe", "JohnDoe"},
+		{"alice@example.com", "aliceexample.com"},
+		{"  pxct  ", "pxct"},
+		{"--alice--", "alice"},
+		{"🌟dragon🌟", "dragon"},
+	}
+	for _, c := range cases {
+		got, _ := suggestIdentity("oidc", Identity{
+			Subject:     "sub-" + c.raw,
+			DisplayName: c.raw,
+		})
+		if got != c.want {
+			t.Errorf("DisplayName %q: got %q, want %q", c.raw, got, c.want)
+		}
+	}
+}
+
+func TestSuggestIdentity_FallsBackOnEmptyOrInvalidDisplayName(t *testing.T) {
+	t.Parallel()
+
+	// Empty, too-short-after-sanitising, or all-punctuation handles must
+	// fall through to the u_<hash> placeholder rather than dropping a
+	// blank username on the user row.
+	for _, raw := range []string{"", "ab", "@@@@@", "..-.."} {
+		username, _ := suggestIdentity("oidc", Identity{
+			Subject:     "sub-fb",
+			DisplayName: raw,
+		})
+		if !strings.HasPrefix(username, "u_") || len(username) != 2+8 {
+			t.Errorf("DisplayName %q: expected u_<8hex> fallback, got %q", raw, username)
+		}
+	}
+}
+
+func TestSuggestIdentity_DeterministicPerSubjectFallback(t *testing.T) {
+	t.Parallel()
+
+	// When DisplayName is empty the username comes from a hash of
+	// (provider, subject). Same input → same output; different inputs →
+	// different outputs. Locks in the property that re-attempted signups
+	// with the same identity don't churn through new placeholder
+	// usernames each try.
 	a, _ := suggestIdentity("github", Identity{Subject: "12345"})
 	b, _ := suggestIdentity("github", Identity{Subject: "12345"})
 	if a != b {
