@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestCommentCreate_RendersOnViewOnly(t *testing.T) {
+func TestCommentCreate_OnAnyNode(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)
 	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
@@ -19,25 +19,33 @@ func TestCommentCreate_RendersOnViewOnly(t *testing.T) {
 		"body": {"First plain-text comment."},
 	})
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("create comment: status %d", resp.StatusCode)
+		t.Fatalf("create comment on view: status %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 
 	body := readBody(t, get(t, c, "/nodes/"+viewID.String()))
 	if !strings.Contains(body, "First plain-text comment.") {
-		t.Fatalf("detail page missing comment; excerpt: %s", snippet(body))
+		t.Fatalf("view detail missing comment; excerpt: %s", snippet(body))
 	}
 	if !strings.Contains(body, "1 comment") {
-		t.Fatalf("detail page missing comment count; excerpt: %s", snippet(body))
+		t.Fatalf("view detail missing comment count; excerpt: %s", snippet(body))
 	}
 
-	topicID := createNode(t, c, "topic", "Not a comment thread", "")
+	// Comments now attach to any non-comment node, not just views. The
+	// previous "view-only" restriction was removed when comments became
+	// first-class nodes.
+	topicID := createNode(t, c, "topic", "Comment on topic", "")
 	resp = formPost(t, c, "/nodes/"+topicID.String()+"/comments", url.Values{
-		"body": {"Should fail"},
+		"body": {"Comment on a topic"},
 	})
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("comment on topic: status %d, want 400", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("create comment on topic: status %d, want 200", resp.StatusCode)
+	}
+	resp.Body.Close()
+	body = readBody(t, get(t, c, "/nodes/"+topicID.String()))
+	if !strings.Contains(body, "Comment on a topic") {
+		t.Fatalf("topic detail missing comment; excerpt: %s", snippet(body))
 	}
 }
 
