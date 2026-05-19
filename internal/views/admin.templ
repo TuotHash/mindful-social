@@ -1,6 +1,8 @@
 package views
 
 import (
+	"strconv"
+
 	"github.com/google/uuid"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -27,14 +29,11 @@ func roleLabel(r db.UserRole) string {
 	return "User"
 }
 
-func roleBadgeClass(r db.UserRole) string {
-	switch r {
-	case db.UserRoleAdmin:
-		return "badge danger"
-	case db.UserRoleModerator:
-		return "badge accent"
-	}
-	return "badge"
+// allRoles returns every role in the canonical low-to-high order used by
+// the role dropdown. Order matters: the select renders options in this
+// sequence and the visual rank should match the privilege rank.
+func allRoles() []db.UserRole {
+	return []db.UserRole{db.UserRoleUser, db.UserRoleModerator, db.UserRoleAdmin}
 }
 
 templ AdminUsers(viewer *Viewer, users []AdminUserRow, flash, success string) {
@@ -49,79 +48,78 @@ templ AdminUsers(viewer *Viewer, users []AdminUserRow, flash, success string) {
 			if success != "" {
 				<div class="flash" role="status" style="background: color-mix(in oklch, var(--supports) 14%, var(--bg)); border-color: color-mix(in oklch, var(--supports) 40%, transparent);">{ success }</div>
 			}
-			<section class="card" style="padding: 20px;">
-				<h2 style="margin-top: 0;">Roster</h2>
-				if len(users) == 0 {
-					<p class="muted">No users yet.</p>
-				} else {
-					<ul class="list-rows">
-						for _, u := range users {
-							<li class="list-row">
-								<a href={ templ.SafeURL("/users/" + u.Username) } class="list-row-main">
-									@Avatar(u.Username, 32)
-									<div class="col gap-4">
-										<div class="row gap-8 wrap" style="align-items: center;">
-											<span style="font-weight: 500;">{ u.Username }</span>
-											<span class={ roleBadgeClass(u.Role) }>{ roleLabel(u.Role) }</span>
-											if u.IsSelf {
-												<span class="muted" style="font-size: 12px;">(you)</span>
-											}
-										</div>
-										<span class="muted" style="font-size: 12px;">{ u.Email }</span>
-									</div>
-								</a>
-								<div class="row gap-8 wrap">
-									<a class="btn ghost sm" href={ templ.SafeURL("/admin/users/" + u.ID.String() + "/edit") }>Edit</a>
-									for _, target := range otherRoles(u.Role) {
-										if !(u.IsSelf && target != db.UserRoleAdmin) {
-											<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID.String() + "/role") } class="inline">
-												@CSRFField()
-												<input type="hidden" name="role" value={ string(target) }/>
-												<button type="submit" class="btn ghost sm">{ roleActionLabel(u.Role, target) }</button>
-											</form>
+			if len(users) == 0 {
+				<p class="muted">No users yet.</p>
+			} else {
+				<ul class="admin-roster">
+					for _, u := range users {
+						<li class="admin-roster-row">
+							<a href={ templ.SafeURL("/users/" + u.Username) } class="admin-roster-main">
+								@Avatar(u.Username, 32)
+								<div class="col gap-4">
+									<div class="row gap-8 wrap" style="align-items: center;">
+										<span style="font-weight: 500;">{ u.Username }</span>
+										if u.IsSelf {
+											<span class="muted" style="font-size: 12px;">(you)</span>
 										}
-									}
+									</div>
+									<span class="muted" style="font-size: 12px;">{ u.Email }</span>
 								</div>
-							</li>
-						}
-					</ul>
-				}
-			</section>
+							</a>
+							<div class="admin-roster-actions">
+								@adminRoleSelect(u)
+								<a class="btn ghost sm icon-only" href={ templ.SafeURL("/admin/users/" + u.ID.String() + "/edit") } title="Edit user" aria-label={ "Edit " + u.Username }>
+									@iconPencil()
+								</a>
+								if !u.IsSelf {
+									<a class="btn danger sm icon-only" href={ templ.SafeURL("/admin/users/" + u.ID.String() + "/delete") } title="Delete user" aria-label={ "Delete " + u.Username }>
+										@iconTrash()
+									</a>
+								}
+							</div>
+						</li>
+					}
+				</ul>
+			}
 		</div>
 	}
 }
 
-// otherRoles returns the role values different from `current` so the UI
-// can render one button per change-target instead of a radio group.
-func otherRoles(current db.UserRole) []db.UserRole {
-	all := []db.UserRole{db.UserRoleUser, db.UserRoleModerator, db.UserRoleAdmin}
-	out := make([]db.UserRole, 0, 2)
-	for _, r := range all {
-		if r != current {
-			out = append(out, r)
-		}
-	}
-	return out
+// adminRoleSelect renders the inline role-change widget. A bare <select>
+// inside a tiny form auto-submits on change, so the admin doesn't need a
+// separate "save" button. For the viewing admin's own row we disable the
+// select — they can't demote themselves and have no other valid choice
+// from this widget. The server enforces the same rule independently.
+templ adminRoleSelect(u AdminUserRow) {
+	<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID.String() + "/role") } class="inline">
+		@CSRFField()
+		<select name="role" class="role-select" onchange="this.form.submit()" disabled?={ u.IsSelf } aria-label={ "Role for " + u.Username }>
+			for _, r := range allRoles() {
+				<option value={ string(r) } selected?={ r == u.Role }>{ roleLabel(r) }</option>
+			}
+		</select>
+	</form>
 }
 
-// roleActionLabel verbalises the change so the button reads as an action
-// ("Promote to admin", "Demote to user"). Direction is purely cosmetic;
-// the server doesn't care.
-func roleActionLabel(from, to db.UserRole) string {
-	if roleRank(to) > roleRank(from) {
-		return "Promote to " + string(to)
-	}
-	return "Demote to " + string(to)
+// iconPencil is the 16px outline-style edit glyph. Inlined so we don't
+// pull in an icon font and so the stroke colour follows currentColor.
+templ iconPencil() {
+	<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<path d="M12 20h9"></path>
+		<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+	</svg>
 }
 
-func roleRank(r db.UserRole) int {
-	switch r {
-	case db.UserRoleAdmin:
-		return 2
-	case db.UserRoleModerator:
-		return 1
-	}
-	return 0
+// iconTrash is the 16px outline-style delete glyph. Same conventions as
+// iconPencil — currentColor for theming, inline for portability.
+templ iconTrash() {
+	<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<polyline points="3 6 5 6 21 6"></polyline>
+		<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+		<path d="M10 11v6"></path>
+		<path d="M14 11v6"></path>
+		<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+	</svg>
 }
 
 // AdminUserEdit is the per-user admin page with three independent forms:
@@ -186,6 +184,55 @@ templ AdminUserEdit(viewer *Viewer, target db.User, flash, success string) {
 						<button type="submit" class="btn accent">Reset password</button>
 					</div>
 				</form>
+			</section>
+		</div>
+	}
+}
+
+// AdminUserDelete is the "are you sure?" confirmation page. We render
+// the target's username explicitly and call out the cascade so the admin
+// understands what they're agreeing to. isSelf only ever shows the
+// blocked variant — the admin can navigate here from a bookmarked URL,
+// and the server refuses the POST either way.
+templ AdminUserDelete(viewer *Viewer, target db.User, nodeCount int64, isSelf bool) {
+	@Layout("Admin — delete " + target.Username, viewer) {
+		<div class="page narrow">
+			<div class="col gap-12" style="margin-bottom: 24px;">
+				<span class="eyebrow">Admin</span>
+				<h1 class="h-1">Delete { target.Username }?</h1>
+				<p class="muted" style="margin: 0;"><a href="/admin">← Back to roster</a></p>
+			</div>
+
+			<section class="card" style="padding: 20px;">
+				if isSelf {
+					<p>You can't delete your own account from the admin panel. Ask another admin to do it.</p>
+					<div class="form-row">
+						<a class="btn ghost" href="/admin">Back to roster</a>
+					</div>
+				} else {
+					<p>Are you sure you want to delete <strong>{ target.Username }</strong>?</p>
+					<p class="muted" style="margin-top: 0;">
+						This will permanently remove their account
+						if nodeCount > 0 {
+							, the
+							<strong>{ strconv.FormatInt(nodeCount, 10) }</strong>
+							if nodeCount == 1 {
+								node
+							} else {
+								nodes
+							}
+							they authored, every edge attached to those nodes,
+						}
+						along with their comments, pins, follows, group memberships, and sign-in methods. This action cannot be undone.
+					</p>
+					<form method="post" action={ templ.SafeURL("/admin/users/" + target.ID.String() + "/delete") } class="form">
+						@CSRFField()
+						<div class="form-row">
+							<button type="submit" class="btn danger">Yes, delete { target.Username }</button>
+							<a class="btn ghost" href="/admin">Cancel</a>
+						</div>
+					</form>
+				}
 			</section>
 		</div>
 	}

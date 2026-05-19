@@ -41,6 +41,9 @@ type Querier interface {
 	CountGroupMembers(ctx context.Context, groupID uuid.UUID) (int64, error)
 	CountIdentitiesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountNodes(ctx context.Context) (int64, error)
+	// Used on the admin delete-user confirmation page so the admin can see
+	// the blast radius before clicking through.
+	CountNodesAuthoredBy(ctx context.Context, createdBy uuid.UUID) (int64, error)
 	// Pins on this node by users other than the node's author. The author's own
 	// pin is excluded — they obviously consent to losing it. Other users' pins
 	// are surfaced on the confirmation page so the author knows what cascades.
@@ -90,6 +93,11 @@ type Querier interface {
 	// Used by the "replace all tags" path on node update — the handler deletes
 	// the existing rows and re-inserts the new set.
 	DeleteTagsForNode(ctx context.Context, nodeID uuid.UUID) error
+	// Hard-delete the user row. FK cascades take care of follows, pins,
+	// comments, group memberships, auth identities, nodes, and edges; node
+	// revisions keep their content but lose the edited_by attribution
+	// (ON DELETE SET NULL).
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 	// Walk the parent chain to the topmost ancestor. Returns the id only when
 	// that ancestor is a topic; otherwise no row (callers reject the upload).
 	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —

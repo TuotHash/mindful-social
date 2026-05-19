@@ -264,6 +264,8 @@ func (s *Server) routes() {
 		r.Post("/admin/users/{id}/username", s.handleAdminUpdateUsername)
 		r.Post("/admin/users/{id}/email", s.handleAdminUpdateEmail)
 		r.Post("/admin/users/{id}/password", s.handleAdminResetPassword)
+		r.Get("/admin/users/{id}/delete", s.handleAdminUserDeleteConfirm)
+		r.Post("/admin/users/{id}/delete", s.handleAdminDeleteUser)
 	})
 
 	s.router = r

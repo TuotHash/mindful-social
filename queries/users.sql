@@ -62,3 +62,15 @@ WHERE id = $1;
 
 -- name: UpdateUserProfileImage :exec
 UPDATE users SET profile_image_path = $2 WHERE id = $1;
+
+-- name: DeleteUser :exec
+-- Hard-delete the user row. FK cascades take care of follows, pins,
+-- comments, group memberships, auth identities, nodes, and edges; node
+-- revisions keep their content but lose the edited_by attribution
+-- (ON DELETE SET NULL).
+DELETE FROM users WHERE id = $1;
+
+-- name: CountNodesAuthoredBy :one
+-- Used on the admin delete-user confirmation page so the admin can see
+-- the blast radius before clicking through.
+SELECT count(*)::bigint FROM nodes WHERE created_by = $1;

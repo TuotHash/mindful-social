@@ -26,6 +26,19 @@ func (q *Queries) CountAdmins(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const countNodesAuthoredBy = `-- name: CountNodesAuthoredBy :one
+SELECT count(*)::bigint FROM nodes WHERE created_by = $1
+`
+
+// Used on the admin delete-user confirmation page so the admin can see
+// the blast radius before clicking through.
+func (q *Queries) CountNodesAuthoredBy(ctx context.Context, createdBy uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countNodesAuthoredBy, createdBy)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)
@@ -51,6 +64,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.ProfileImagePath,
 	)
 	return i, err
+}
+
+const deleteUser = `-- name: DeleteUser :exec
+DELETE FROM users WHERE id = $1
+`
+
+// Hard-delete the user row. FK cascades take care of follows, pins,
+// comments, group memberships, auth identities, nodes, and edges; node
+// revisions keep their content but lose the edited_by attribution
+// (ON DELETE SET NULL).
+func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
 }
 
 const getUser = `-- name: GetUser :one

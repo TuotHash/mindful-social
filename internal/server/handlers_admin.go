@@ -109,6 +109,67 @@ func (s *Server) handleAdminSetRole(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
+// handleAdminUserDeleteConfirm renders the "are you sure?" page before a
+// destructive delete. We show a count of authored nodes so the admin
+// understands the blast radius — every node, edge, comment, pin, follow,
+// group membership, and auth identity owned by this user will cascade.
+func (s *Server) handleAdminUserDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	viewer := currentUser(r)
+	target, ok := s.lookupAdminTarget(w, r)
+	if !ok {
+		return
+	}
+	nodeCount, err := s.queries.CountNodesAuthoredBy(r.Context(), target.ID)
+	if err != nil {
+		s.logger.Error("admin delete confirm: count nodes", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.AdminUserDelete(viewerFor(viewer), target, nodeCount, target.ID == viewer.ID))
+}
+
+// handleAdminDeleteUser removes a user account and everything it owns.
+// Admins can't delete themselves (no recovery path through the UI), and
+// the last-admin guard from handleAdminSetRole applies here too: if this
+// would leave the instance with zero admins, refuse.
+func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	viewer := currentUser(r)
+	target, ok := s.lookupAdminTarget(w, r)
+	if !ok {
+		return
+	}
+	if target.ID == viewer.ID {
+		s.flashAdmin(r, "You can't delete your own account from the admin panel.")
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+	if target.Role == db.UserRoleAdmin {
+		count, err := s.queries.CountAdmins(r.Context())
+		if err != nil {
+			s.logger.Error("admin delete: count admins", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if count <= 1 {
+			s.flashAdmin(r, "Can't delete the last admin. Promote another user first.")
+			http.Redirect(w, r, "/admin", http.StatusSeeOther)
+			return
+		}
+	}
+	if err := auth.RevokeUserSessions(r.Context(), s.sessions, target.ID, false); err != nil {
+		s.logger.Error("admin delete: revoke sessions", "err", err, "target", target.ID)
+	}
+	if err := s.queries.DeleteUser(r.Context(), target.ID); err != nil {
+		s.logger.Error("admin delete user", "err", err, "target", target.ID)
+		s.flashAdmin(r, "Could not delete user. Please try again.")
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+	s.logger.Info("admin deleted user", "target", target.ID, "username", target.Username, "by", viewer.ID)
+	s.successAdmin(r, "Deleted "+target.Username+" and all of their content.")
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
 // handleAdminUserEdit renders the per-user edit page. We look up the target
 // user (404 on a bad/missing id) and pass through any flash/success messages
 // from a previous POST.

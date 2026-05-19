@@ -815,6 +815,17 @@ section.page {
   padding: 12px 18px;
   font-size: var(--fs-md);
 }
+/* Square icon-only button: same height as .btn.sm but no horizontal
+   padding, so the SVG sits in a tidy square. Used for the admin roster
+   edit/delete actions. */
+.btn.icon-only {
+  padding: 5px;
+  width: 28px;
+  height: 28px;
+}
+.btn.icon-only svg {
+  display: block;
+}
 
 .link,
 button.link {
@@ -3564,6 +3575,69 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
 }
 .modal-dialog .form {
   max-width: none;
+}
+
+/* =========================================================================
+   Admin roster
+   ========================================================================= */
+
+/* A flatter list-rows variant: no surrounding card, lighter dividers
+   between rows. The roster sits directly on the page background so the
+   inline controls (role dropdown + icon buttons) carry the visual
+   weight. */
+.admin-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.admin-roster-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-roster-main {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.admin-roster-main:hover {
+  text-decoration: none;
+}
+.admin-roster-main:hover span:first-of-type {
+  text-decoration: underline;
+}
+.admin-roster-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+/* Compact, auto-width select for the inline role picker. Overrides the
+   global select rule that stretches to 100%. */
+.role-select {
+  width: auto;
+  padding: 4px 26px 4px 8px;
+  font-size: var(--fs-xs);
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+.role-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* =========================================================================
