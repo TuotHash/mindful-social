@@ -12,56 +12,132 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createComment = `-- name: CreateComment :one
-WITH target AS (
-  SELECT n.id
-  FROM nodes n
-  WHERE n.id = $4::uuid
-    AND n.type = 'view'
-    AND node_visible_to(n.*, $2::uuid)
+const createCommentNode = `-- name: CreateCommentNode :one
+
+WITH target_node AS (
+    SELECT n.id, n.visibility, n.visibility_group_id, n.group_id
+    FROM nodes n
+    WHERE n.id = $1::uuid
+      AND n.deleted_at IS NULL
+      AND n.type <> 'comment'
+      AND node_visible_to(n.*, $2::uuid)
 ),
-parent AS (
-  SELECT c.id
-  FROM comments c
-  WHERE c.id = $1::uuid
-    AND c.node_id = $4::uuid
-    AND c.parent_id IS NULL
+parent_comment AS (
+    SELECT p.id
+    FROM nodes p
+    JOIN edges pe ON pe.from_node = p.id
+                 AND pe.kind = 'comments_on'
+                 AND pe.to_node = $1::uuid
+    WHERE p.id = $3::uuid
+      AND p.type = 'comment'
+      AND p.deleted_at IS NULL
+),
+attach_to AS (
+    SELECT id FROM parent_comment
+    WHERE $3::uuid IS NOT NULL
+    UNION ALL
+    SELECT id FROM target_node
+    WHERE $3::uuid IS NULL
+),
+new_comment AS (
+    INSERT INTO nodes (
+        id, type, title, body, slug,
+        created_by, visibility, visibility_group_id, group_id
+    )
+    SELECT
+        $4::uuid,
+        'comment',
+        '',
+        $5::text,
+        $6::text,
+        $2::uuid,
+        target_node.visibility,
+        target_node.visibility_group_id,
+        target_node.group_id
+    FROM target_node
+    WHERE EXISTS (SELECT 1 FROM attach_to)
+    RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
+),
+new_edge AS (
+    INSERT INTO edges (from_node, to_node, kind, created_by)
+    SELECT new_comment.id, attach_to.id, 'comments_on', $2::uuid
+    FROM new_comment, attach_to
+    RETURNING from_node
 )
-INSERT INTO comments (node_id, parent_id, author_id, body)
-SELECT
-  target.id,
-  $1::uuid,
-  $2::uuid,
-  $3::text
-FROM target
-WHERE $1::uuid IS NULL
-   OR EXISTS (SELECT 1 FROM parent)
-RETURNING id, node_id, parent_id, author_id, body, created_at, edited_at, deleted_at
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM new_comment
 `
 
-type CreateCommentParams struct {
-	ParentID *uuid.UUID `json:"parent_id"`
-	AuthorID uuid.UUID  `json:"author_id"`
-	Body     string     `json:"body"`
-	NodeID   uuid.UUID  `json:"node_id"`
+type CreateCommentNodeParams struct {
+	NodeID      uuid.UUID  `json:"node_id"`
+	AuthorID    uuid.UUID  `json:"author_id"`
+	ParentID    *uuid.UUID `json:"parent_id"`
+	CommentID   uuid.UUID  `json:"comment_id"`
+	Body        string     `json:"body"`
+	CommentSlug string     `json:"comment_slug"`
 }
 
-func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error) {
-	row := q.db.QueryRow(ctx, createComment,
-		arg.ParentID,
-		arg.AuthorID,
-		arg.Body,
+type CreateCommentNodeRow struct {
+	ID                uuid.UUID          `json:"id"`
+	Type              NodeType           `json:"type"`
+	Title             string             `json:"title"`
+	Body              string             `json:"body"`
+	SourceUrl         *string            `json:"source_url"`
+	CreatedBy         uuid.UUID          `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	SearchTsv         interface{}        `json:"search_tsv"`
+	Slug              string             `json:"slug"`
+	Visibility        VisibilityKind     `json:"visibility"`
+	EditPolicy        NodeActionPolicy   `json:"edit_policy"`
+	ParentNodeID      *uuid.UUID         `json:"parent_node_id"`
+	GroupID           *uuid.UUID         `json:"group_id"`
+	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Comments are stored as nodes (type='comment') attached to their target
+// via a 'comments_on' edge. Top-level comments point at the discussed
+// node (view, topic, finding, ...); replies point at the parent comment.
+// The single reply level is enforced at write time so the thread UI's
+// two-level layout stays valid.
+// Creates a comment node and the comments_on edge linking it to its target
+// in one statement. Branches on parent_id:
+//
+//	parent_id IS NULL → top-level comment on node_id (any non-comment node)
+//	parent_id IS NOT  → reply, where parent_id must already be a top-level
+//	                    comment of node_id (its comments_on points at node_id)
+//
+// Visibility, group_id, and visibility_group_id are inherited from node_id
+// so private/group conversations shield their replies too. The caller
+// supplies comment_id and comment_slug — slug is the synthetic 'c-<uuid>'
+// pattern; it satisfies the NOT NULL UNIQUE constraint without being
+// URL-exposed (redirects use the parent node's slug).
+func (q *Queries) CreateCommentNode(ctx context.Context, arg CreateCommentNodeParams) (CreateCommentNodeRow, error) {
+	row := q.db.QueryRow(ctx, createCommentNode,
 		arg.NodeID,
+		arg.AuthorID,
+		arg.ParentID,
+		arg.CommentID,
+		arg.Body,
+		arg.CommentSlug,
 	)
-	var i Comment
+	var i CreateCommentNodeRow
 	err := row.Scan(
 		&i.ID,
-		&i.NodeID,
-		&i.ParentID,
-		&i.AuthorID,
+		&i.Type,
+		&i.Title,
 		&i.Body,
+		&i.SourceUrl,
+		&i.CreatedBy,
 		&i.CreatedAt,
-		&i.EditedAt,
+		&i.UpdatedAt,
+		&i.SearchTsv,
+		&i.Slug,
+		&i.Visibility,
+		&i.EditPolicy,
+		&i.ParentNodeID,
+		&i.GroupID,
+		&i.VisibilityGroupID,
 		&i.DeletedAt,
 	)
 	return i, err
@@ -69,13 +145,30 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 
 const getCommentForNode = `-- name: GetCommentForNode :one
 SELECT
-  c.id, c.node_id, c.parent_id, c.author_id, c.body, c.created_at, c.edited_at, c.deleted_at,
-  u.username AS author_username,
-  u.profile_image_path AS author_profile_image_path
-FROM comments c
-JOIN users u ON u.id = c.author_id
+    c.id,
+    c.body,
+    c.created_at,
+    c.updated_at,
+    c.deleted_at,
+    c.created_by AS author_id,
+    u.username AS author_username,
+    u.profile_image_path AS author_profile_image_path
+FROM nodes c
+JOIN edges e ON e.from_node = c.id AND e.kind = 'comments_on'
+JOIN users u ON u.id = c.created_by
 WHERE c.id = $1::uuid
-  AND c.node_id = $2::uuid
+  AND c.type = 'comment'
+  AND (
+      e.to_node = $2::uuid
+      OR e.to_node IN (
+          SELECT root.id
+          FROM nodes root
+          JOIN edges re ON re.from_node = root.id
+                       AND re.kind = 'comments_on'
+                       AND re.to_node = $2::uuid
+          WHERE root.type = 'comment'
+      )
+  )
 `
 
 type GetCommentForNodeParams struct {
@@ -85,29 +178,28 @@ type GetCommentForNodeParams struct {
 
 type GetCommentForNodeRow struct {
 	ID                     uuid.UUID          `json:"id"`
-	NodeID                 uuid.UUID          `json:"node_id"`
-	ParentID               *uuid.UUID         `json:"parent_id"`
-	AuthorID               uuid.UUID          `json:"author_id"`
 	Body                   string             `json:"body"`
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
-	EditedAt               pgtype.Timestamptz `json:"edited_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt              pgtype.Timestamptz `json:"deleted_at"`
+	AuthorID               uuid.UUID          `json:"author_id"`
 	AuthorUsername         string             `json:"author_username"`
 	AuthorProfileImagePath string             `json:"author_profile_image_path"`
 }
 
+// Loads a single comment attached (one or two hops) to the named node.
+// Used by the edit/update/delete handlers so a comment from one view
+// can't be touched via another view's URL.
 func (q *Queries) GetCommentForNode(ctx context.Context, arg GetCommentForNodeParams) (GetCommentForNodeRow, error) {
 	row := q.db.QueryRow(ctx, getCommentForNode, arg.ID, arg.NodeID)
 	var i GetCommentForNodeRow
 	err := row.Scan(
 		&i.ID,
-		&i.NodeID,
-		&i.ParentID,
-		&i.AuthorID,
 		&i.Body,
 		&i.CreatedAt,
-		&i.EditedAt,
+		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.AuthorID,
 		&i.AuthorUsername,
 		&i.AuthorProfileImagePath,
 	)
@@ -115,18 +207,26 @@ func (q *Queries) GetCommentForNode(ctx context.Context, arg GetCommentForNodePa
 }
 
 const hardDeleteComment = `-- name: HardDeleteComment :execrows
-DELETE FROM comments
-WHERE id = $1::uuid
-  AND node_id = $2::uuid
+DELETE FROM nodes
+WHERE type = 'comment'
+  AND (
+      id = $1::uuid
+      OR id IN (
+          SELECT c.id
+          FROM nodes c
+          JOIN edges e ON e.from_node = c.id
+                      AND e.kind = 'comments_on'
+                      AND e.to_node = $1::uuid
+          WHERE c.type = 'comment'
+      )
+  )
 `
 
-type HardDeleteCommentParams struct {
-	ID     uuid.UUID `json:"id"`
-	NodeID uuid.UUID `json:"node_id"`
-}
-
-func (q *Queries) HardDeleteComment(ctx context.Context, arg HardDeleteCommentParams) (int64, error) {
-	result, err := q.db.Exec(ctx, hardDeleteComment, arg.ID, arg.NodeID)
+// Permanent delete used by staff. Removes the comment plus its direct
+// replies (comment nodes whose comments_on edge points at this comment).
+// The matching edges are removed by their own ON DELETE CASCADE.
+func (q *Queries) HardDeleteComment(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, hardDeleteComment, id)
 	if err != nil {
 		return 0, err
 	}
@@ -134,33 +234,53 @@ func (q *Queries) HardDeleteComment(ctx context.Context, arg HardDeleteCommentPa
 }
 
 const listCommentsForNode = `-- name: ListCommentsForNode :many
+WITH top_level AS (
+    SELECT c.id, c.created_at
+    FROM nodes c
+    JOIN edges e ON e.from_node = c.id
+                AND e.kind = 'comments_on'
+                AND e.to_node = $1::uuid
+    WHERE c.type = 'comment'
+)
 SELECT
-  c.id, c.node_id, c.parent_id, c.author_id, c.body, c.created_at, c.edited_at, c.deleted_at,
-  u.username AS author_username,
-  u.profile_image_path AS author_profile_image_path
-FROM comments c
-JOIN users u ON u.id = c.author_id
-LEFT JOIN comments parent ON parent.id = c.parent_id
-WHERE c.node_id = $1::uuid
+    c.id,
+    tl_parent.id AS parent_id,
+    c.body,
+    c.created_at,
+    c.updated_at,
+    c.deleted_at,
+    c.created_by AS author_id,
+    u.username AS author_username,
+    u.profile_image_path AS author_profile_image_path
+FROM nodes c
+JOIN edges e ON e.from_node = c.id AND e.kind = 'comments_on'
+JOIN users u ON u.id = c.created_by
+LEFT JOIN top_level tl_self   ON tl_self.id = c.id
+LEFT JOIN top_level tl_parent ON tl_parent.id = e.to_node
+WHERE c.type = 'comment'
+  AND (tl_self.id IS NOT NULL OR tl_parent.id IS NOT NULL)
 ORDER BY
-  COALESCE(parent.created_at, c.created_at) ASC,
-  CASE WHEN c.parent_id IS NULL THEN 0 ELSE 1 END ASC,
-  c.created_at ASC
+    COALESCE(tl_parent.created_at, c.created_at) ASC,
+    CASE WHEN tl_parent.id IS NULL THEN 0 ELSE 1 END ASC,
+    c.created_at ASC
 `
 
 type ListCommentsForNodeRow struct {
 	ID                     uuid.UUID          `json:"id"`
-	NodeID                 uuid.UUID          `json:"node_id"`
 	ParentID               *uuid.UUID         `json:"parent_id"`
-	AuthorID               uuid.UUID          `json:"author_id"`
 	Body                   string             `json:"body"`
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
-	EditedAt               pgtype.Timestamptz `json:"edited_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt              pgtype.Timestamptz `json:"deleted_at"`
+	AuthorID               uuid.UUID          `json:"author_id"`
 	AuthorUsername         string             `json:"author_username"`
 	AuthorProfileImagePath string             `json:"author_profile_image_path"`
 }
 
+// Returns top-level comments attached to node_id, plus their direct
+// replies. parent_id is NULL on top-level rows and set to the parent
+// comment's id on reply rows. Soft-deleted comments stay in the result
+// so the "comment removed" placeholder keeps the thread structure.
 func (q *Queries) ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]ListCommentsForNodeRow, error) {
 	rows, err := q.db.Query(ctx, listCommentsForNode, nodeID)
 	if err != nil {
@@ -172,13 +292,12 @@ func (q *Queries) ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]
 		var i ListCommentsForNodeRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.NodeID,
 			&i.ParentID,
-			&i.AuthorID,
 			&i.Body,
 			&i.CreatedAt,
-			&i.EditedAt,
+			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.AuthorID,
 			&i.AuthorUsername,
 			&i.AuthorProfileImagePath,
 		); err != nil {
@@ -193,22 +312,23 @@ func (q *Queries) ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]
 }
 
 const softDeleteComment = `-- name: SoftDeleteComment :execrows
-UPDATE comments
+UPDATE nodes
 SET deleted_at = now()
 WHERE id = $1::uuid
-  AND node_id = $2::uuid
-  AND author_id = $3::uuid
+  AND type = 'comment'
+  AND created_by = $2::uuid
   AND deleted_at IS NULL
 `
 
 type SoftDeleteCommentParams struct {
 	ID       uuid.UUID `json:"id"`
-	NodeID   uuid.UUID `json:"node_id"`
 	AuthorID uuid.UUID `json:"author_id"`
 }
 
+// Marks a comment removed without deleting it. The thread keeps its shape;
+// the renderer shows "comment removed" in place of the body.
 func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentParams) (int64, error) {
-	result, err := q.db.Exec(ctx, softDeleteComment, arg.ID, arg.NodeID, arg.AuthorID)
+	result, err := q.db.Exec(ctx, softDeleteComment, arg.ID, arg.AuthorID)
 	if err != nil {
 		return 0, err
 	}
@@ -216,39 +336,44 @@ func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentPa
 }
 
 const updateComment = `-- name: UpdateComment :one
-UPDATE comments
+UPDATE nodes
 SET body = $1::text,
-    edited_at = now()
+    updated_at = now()
 WHERE id = $2::uuid
-  AND node_id = $3::uuid
-  AND author_id = $4::uuid
+  AND type = 'comment'
+  AND created_by = $3::uuid
   AND deleted_at IS NULL
-RETURNING id, node_id, parent_id, author_id, body, created_at, edited_at, deleted_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
 `
 
 type UpdateCommentParams struct {
 	Body     string    `json:"body"`
 	ID       uuid.UUID `json:"id"`
-	NodeID   uuid.UUID `json:"node_id"`
 	AuthorID uuid.UUID `json:"author_id"`
 }
 
-func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error) {
-	row := q.db.QueryRow(ctx, updateComment,
-		arg.Body,
-		arg.ID,
-		arg.NodeID,
-		arg.AuthorID,
-	)
-	var i Comment
+// Edits a comment's body. Only the author can edit, and only while not
+// soft-deleted. updated_at bumps; the UI treats updated_at > created_at
+// as "edited".
+func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (Node, error) {
+	row := q.db.QueryRow(ctx, updateComment, arg.Body, arg.ID, arg.AuthorID)
+	var i Node
 	err := row.Scan(
 		&i.ID,
-		&i.NodeID,
-		&i.ParentID,
-		&i.AuthorID,
+		&i.Type,
+		&i.Title,
 		&i.Body,
+		&i.SourceUrl,
+		&i.CreatedBy,
 		&i.CreatedAt,
-		&i.EditedAt,
+		&i.UpdatedAt,
+		&i.SearchTsv,
+		&i.Slug,
+		&i.Visibility,
+		&i.EditPolicy,
+		&i.ParentNodeID,
+		&i.GroupID,
+		&i.VisibilityGroupID,
 		&i.DeletedAt,
 	)
 	return i, err

@@ -1,15 +1,19 @@
 -- name: ListArgumentGraphNodesForViewer :many
 -- Recent visible nodes for the graph canvas. The graph viewer is intentionally
 -- bounded so a public instance cannot ship an unbounded graph into the page.
+-- Comment nodes are included here so threads show up alongside their target
+-- in the graph; deleted (soft-removed) nodes are excluded.
 SELECT
     n.id::text AS id,
     n.slug,
     n.type::text AS node_type,
     n.title,
+    n.body,
     u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+WHERE n.deleted_at IS NULL
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
 
@@ -20,7 +24,8 @@ LIMIT sqlc.arg(result_limit);
 WITH visible_nodes AS (
     SELECT n.id
     FROM nodes n
-    WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+    WHERE n.deleted_at IS NULL
+      AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
     ORDER BY n.created_at DESC
     LIMIT sqlc.arg(node_limit)
 )
@@ -45,6 +50,7 @@ WITH RECURSIVE reached AS (
     SELECT n.id, 0 AS hop
     FROM nodes n
     WHERE n.id = ANY(sqlc.arg(seed_ids)::uuid[])
+      AND n.deleted_at IS NULL
       AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
     UNION
     SELECT n2.id, r.hop + 1
@@ -52,6 +58,7 @@ WITH RECURSIVE reached AS (
     JOIN edges e ON r.id IN (e.from_node, e.to_node)
     JOIN nodes n2 ON n2.id IN (e.from_node, e.to_node) AND n2.id <> r.id
     WHERE r.hop < sqlc.arg(max_hops)::int
+      AND n2.deleted_at IS NULL
       AND node_visible_to(n2.*, sqlc.narg(viewer_id)::uuid)
 )
 SELECT
@@ -59,6 +66,7 @@ SELECT
     n.slug,
     n.type::text AS node_type,
     n.title,
+    n.body,
     u.username AS author_username
 FROM (SELECT DISTINCT id FROM reached) r
 JOIN nodes n ON n.id = r.id
@@ -81,7 +89,8 @@ SELECT n.id
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 LEFT JOIN groups g ON g.id = n.group_id
-WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+WHERE n.deleted_at IS NULL
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
   AND (sqlc.narg(author_username)::text IS NULL
        OR u.username = sqlc.narg(author_username)::text)
   AND (sqlc.narg(group_slug)::text IS NULL
@@ -121,6 +130,8 @@ JOIN nodes src ON src.id = e.from_node
 JOIN nodes dst ON dst.id = e.to_node
 WHERE e.from_node = ANY(sqlc.arg(node_ids)::uuid[])
   AND e.to_node = ANY(sqlc.arg(node_ids)::uuid[])
+  AND src.deleted_at IS NULL
+  AND dst.deleted_at IS NULL
   AND node_visible_to(src.*, sqlc.narg(viewer_id)::uuid)
   AND node_visible_to(dst.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY e.created_at DESC

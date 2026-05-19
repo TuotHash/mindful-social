@@ -329,6 +329,7 @@ func argumentGraphNodesFromRows(rows []db.ListArgumentGraphNodesForViewerRow) []
 			Slug:           row.Slug,
 			Type:           row.NodeType,
 			Title:          row.Title,
+			Body:           row.Body,
 			AuthorUsername: row.AuthorUsername,
 		})
 	}
@@ -344,6 +345,7 @@ func argumentGraphNodesFromNeighborhoodRows(rows []db.ListArgumentGraphNeighborh
 			Slug:           row.Slug,
 			Type:           row.NodeType,
 			Title:          row.Title,
+			Body:           row.Body,
 			AuthorUsername: row.AuthorUsername,
 			Match:          isMatch,
 		})

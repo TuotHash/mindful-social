@@ -46,7 +46,22 @@ type Querier interface {
 	// are surfaced on the confirmation page so the author knows what cascades.
 	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
-	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
+	// Comments are stored as nodes (type='comment') attached to their target
+	// via a 'comments_on' edge. Top-level comments point at the discussed
+	// node (view, topic, finding, ...); replies point at the parent comment.
+	// The single reply level is enforced at write time so the thread UI's
+	// two-level layout stays valid.
+	// Creates a comment node and the comments_on edge linking it to its target
+	// in one statement. Branches on parent_id:
+	//   parent_id IS NULL → top-level comment on node_id (any non-comment node)
+	//   parent_id IS NOT  → reply, where parent_id must already be a top-level
+	//                       comment of node_id (its comments_on points at node_id)
+	// Visibility, group_id, and visibility_group_id are inherited from node_id
+	// so private/group conversations shield their replies too. The caller
+	// supplies comment_id and comment_slug — slug is the synthetic 'c-<uuid>'
+	// pattern; it satisfies the NOT NULL UNIQUE constraint without being
+	// URL-exposed (redirects use the parent node's slug).
+	CreateCommentNode(ctx context.Context, arg CreateCommentNodeParams) (CreateCommentNodeRow, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) (Edge, error)
 	// Idempotent: re-following is a no-op rather than an error so the button
 	// handler doesn't need to disambiguate states.
@@ -80,6 +95,9 @@ type Querier interface {
 	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —
 	// a malformed cycle would otherwise loop forever.
 	FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// Loads a single comment attached (one or two hops) to the named node.
+	// Used by the edit/update/delete handlers so a comment from one view
+	// can't be touched via another view's URL.
 	GetCommentForNode(ctx context.Context, arg GetCommentForNodeParams) (GetCommentForNodeRow, error)
 	// One round-trip lookup the profile page uses to render the button: does
 	// the viewer follow this profile, and does the profile follow the viewer
@@ -111,7 +129,10 @@ type Querier interface {
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	HardDeleteComment(ctx context.Context, arg HardDeleteCommentParams) (int64, error)
+	// Permanent delete used by staff. Removes the comment plus its direct
+	// replies (comment nodes whose comments_on edge points at this comment).
+	// The matching edges are removed by their own ON DELETE CASCADE.
+	HardDeleteComment(ctx context.Context, id uuid.UUID) (int64, error)
 	// Promote an edge into the highlights section from the perspective of
 	// `pov_node`, which must be one of the edge's endpoints. The rank is the
 	// next-highest across the existing highlights on that side, so the new
@@ -141,6 +162,8 @@ type Querier interface {
 	ListArgumentGraphNeighborhood(ctx context.Context, arg ListArgumentGraphNeighborhoodParams) ([]ListArgumentGraphNeighborhoodRow, error)
 	// Recent visible nodes for the graph canvas. The graph viewer is intentionally
 	// bounded so a public instance cannot ship an unbounded graph into the page.
+	// Comment nodes are included here so threads show up alongside their target
+	// in the graph; deleted (soft-removed) nodes are excluded.
 	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)
 	// Visible node IDs matching the active graph-viewer filters. All filter
 	// parameters are nullable / sentinel-blank: pass NULL (or an empty array
@@ -153,6 +176,10 @@ type Querier interface {
 	// SearchNodes (which uses tsvector + trigram) and is intersected at the
 	// Go layer when both are active. The cap matches the canvas budget.
 	ListArgumentGraphSeeds(ctx context.Context, arg ListArgumentGraphSeedsParams) ([]uuid.UUID, error)
+	// Returns top-level comments attached to node_id, plus their direct
+	// replies. parent_id is NULL on top-level rows and set to the parent
+	// comment's id on reply rows. Soft-deleted comments stay in the result
+	// so the "comment removed" placeholder keeps the thread structure.
 	ListCommentsForNode(ctx context.Context, nodeID uuid.UUID) ([]ListCommentsForNodeRow, error)
 	// People the user has a mutual follow with — drives the "friends bubble"
 	// graph view. Alphabetical for stable rendering.
@@ -191,7 +218,8 @@ type Querier interface {
 	ListNodeVideosForRoot(ctx context.Context, rootTopicID uuid.UUID) ([]ListNodeVideosForRootRow, error)
 	// Nodes a user has authored, most recent first — for the "Authored" section
 	// on a profile page. Filtered through node_visible_to() so a visitor only
-	// sees nodes they're entitled to.
+	// sees nodes they're entitled to. Comments are excluded; a future profile
+	// section can surface them separately.
 	ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
 	ListNodesForGroupForViewer(ctx context.Context, arg ListNodesForGroupForViewerParams) ([]Node, error)
@@ -205,6 +233,8 @@ type Querier interface {
 	ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error)
 	// Home page feed. node_visible_to() handles the per-row visibility check;
 	// viewer_id is NULL for logged-out users (only public nodes match).
+	// Comments are excluded from the feed — they show up inline under their
+	// target node and in the argument graph, not as standalone entries.
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Roster for the admin /users page. Recent signups first; staff bubble to
@@ -213,6 +243,11 @@ type Querier interface {
 	// Topic pages render their child views as a thread feed. parent_node_id is
 	// the canonical hierarchy link; node_visible_to() keeps group/list/private
 	// child views hidden from viewers outside their audience.
+	//
+	// comment_count walks 'comments_on' edges up to two hops deep (top-level
+	// comments attached to the view, plus their replies). Soft-deleted
+	// comments are excluded so the badge matches what the viewer actually
+	// sees. The depth limit mirrors the application's one-level-reply rule.
 	ListViewsForTopic(ctx context.Context, arg ListViewsForTopicParams) ([]ListViewsForTopicRow, error)
 	// Three visibility branches:
 	//   public       — visible to everyone (the public/anon visitor included)
@@ -276,11 +311,16 @@ type Querier interface {
 	// update so the profile shows the most recent stance change first. Returns
 	// the pin's id so callers can attach findings to it.
 	SetPin(ctx context.Context, arg SetPinParams) (uuid.UUID, error)
+	// Marks a comment removed without deleting it. The thread keeps its shape;
+	// the renderer shows "comment removed" in place of the body.
 	SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentParams) (int64, error)
 	// Reverse of HighlightEdge: clears the rank on whichever side matches
 	// pov_node. No-op if pov_node isn't one of the edge's endpoints.
 	UnhighlightEdge(ctx context.Context, arg UnhighlightEdgeParams) (int64, error)
-	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
+	// Edits a comment's body. Only the author can edit, and only while not
+	// soft-deleted. updated_at bumps; the UI treats updated_at > created_at
+	// as "edited".
+	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Node, error)
 	UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error
 	// Owner-only — the handler enforces that. Stored as the same enum the
 	// create form populates: 'public' | 'connections' | 'private'.

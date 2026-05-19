@@ -25,10 +25,6 @@ func (s *Server) handleCommentCreate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if node.Type != db.NodeTypeView {
-		http.Error(w, "comments can only be posted on views", http.StatusBadRequest)
-		return
-	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -43,11 +39,14 @@ func (s *Server) handleCommentCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comment, err := s.queries.CreateComment(r.Context(), db.CreateCommentParams{
-		NodeID:   node.ID,
-		ParentID: parentID,
-		AuthorID: user.ID,
-		Body:     body,
+	commentID := uuid.New()
+	comment, err := s.queries.CreateCommentNode(r.Context(), db.CreateCommentNodeParams{
+		NodeID:      node.ID,
+		AuthorID:    user.ID,
+		ParentID:    parentID,
+		CommentID:   commentID,
+		Body:        body,
+		CommentSlug: commentSlug(commentID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -103,7 +102,6 @@ func (s *Server) handleCommentUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := s.queries.UpdateComment(r.Context(), db.UpdateCommentParams{
 		ID:       comment.ID,
-		NodeID:   node.ID,
 		AuthorID: user.ID,
 		Body:     body,
 	})
@@ -139,14 +137,10 @@ func (s *Server) handleCommentDelete(w http.ResponseWriter, r *http.Request) {
 		err  error
 	)
 	if isStaff(user) {
-		rows, err = s.queries.HardDeleteComment(r.Context(), db.HardDeleteCommentParams{
-			ID:     comment.ID,
-			NodeID: node.ID,
-		})
+		rows, err = s.queries.HardDeleteComment(r.Context(), comment.ID)
 	} else {
 		rows, err = s.queries.SoftDeleteComment(r.Context(), db.SoftDeleteCommentParams{
 			ID:       comment.ID,
-			NodeID:   node.ID,
 			AuthorID: user.ID,
 		})
 	}
@@ -225,6 +219,27 @@ func canDeleteComment(authorID uuid.UUID, deletedAt pgtype.Timestamptz, user *db
 	return user.ID == authorID && !deletedAt.Valid
 }
 
+// commentSlug builds the synthetic slug stored on a comment node. The slug
+// is required by the NOT NULL UNIQUE constraint on nodes.slug but is never
+// URL-exposed — comment redirects go through the parent node's slug.
+func commentSlug(id uuid.UUID) string {
+	return "c-" + id.String()
+}
+
+// commentEditedAt derives the "edited at" timestamp from the node's
+// updated_at vs. created_at. UpdateComment bumps updated_at; on first
+// creation both timestamps share the same now() snapshot, so any later
+// strictly-greater updated_at marks an edit.
+func commentEditedAt(createdAt, updatedAt pgtype.Timestamptz) pgtype.Timestamptz {
+	if !updatedAt.Valid || !createdAt.Valid {
+		return pgtype.Timestamptz{}
+	}
+	if !updatedAt.Time.After(createdAt.Time) {
+		return pgtype.Timestamptz{}
+	}
+	return updatedAt
+}
+
 func commentThreadFromRows(rows []db.ListCommentsForNodeRow, user *db.User) ([]views.Comment, int64) {
 	byID := make(map[uuid.UUID]views.Comment, len(rows))
 	var rootOrder []uuid.UUID
@@ -242,7 +257,7 @@ func commentThreadFromRows(rows []db.ListCommentsForNodeRow, user *db.User) ([]v
 			AuthorProfileImagePath: row.AuthorProfileImagePath,
 			Body:                   row.Body,
 			CreatedAt:              row.CreatedAt,
-			EditedAt:               row.EditedAt,
+			EditedAt:               commentEditedAt(row.CreatedAt, row.UpdatedAt),
 			DeletedAt:              row.DeletedAt,
 			CanEdit:                canEditComment(row.AuthorID, row.DeletedAt, user),
 			CanDelete:              canDeleteComment(row.AuthorID, row.DeletedAt, user),
@@ -278,7 +293,7 @@ func commentForEdit(row db.GetCommentForNodeRow) views.Comment {
 		AuthorProfileImagePath: row.AuthorProfileImagePath,
 		Body:                   row.Body,
 		CreatedAt:              row.CreatedAt,
-		EditedAt:               row.EditedAt,
+		EditedAt:               commentEditedAt(row.CreatedAt, row.UpdatedAt),
 		DeletedAt:              row.DeletedAt,
 	}
 }

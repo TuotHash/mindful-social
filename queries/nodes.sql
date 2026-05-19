@@ -28,16 +28,21 @@ WHERE n.id = $1;
 -- name: ListRecentNodesForViewer :many
 -- Home page feed. node_visible_to() handles the per-row visibility check;
 -- viewer_id is NULL for logged-out users (only public nodes match).
+-- Comments are excluded from the feed — they show up inline under their
+-- target node and in the argument graph, not as standalone entries.
 SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
+WHERE n.type <> 'comment'
+  AND n.deleted_at IS NULL
+  AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY n.created_at DESC
 LIMIT $1;
 
 -- name: ListNodesByType :many
 SELECT * FROM nodes
 WHERE type = $1
+  AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $2;
 
@@ -81,9 +86,12 @@ SELECT count(*) FROM user_node_pins WHERE node_id = $1 AND user_id <> $2;
 -- name: ListNodesAuthoredByForViewer :many
 -- Nodes a user has authored, most recent first — for the "Authored" section
 -- on a profile page. Filtered through node_visible_to() so a visitor only
--- sees nodes they're entitled to.
+-- sees nodes they're entitled to. Comments are excluded; a future profile
+-- section can surface them separately.
 SELECT * FROM nodes n
 WHERE n.created_by = sqlc.arg(author_id)
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);
@@ -99,6 +107,8 @@ LIMIT sqlc.arg(result_limit);
 SELECT id, type, title
 FROM nodes
 WHERE (sqlc.arg(type_filter)::text = '' OR type::text = sqlc.arg(type_filter)::text)
+  AND type <> 'comment'
+  AND deleted_at IS NULL
   AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
   AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
 ORDER BY
@@ -118,6 +128,8 @@ LIMIT 20;
 SELECT n.id, n.type, n.title
 FROM nodes n
 WHERE n.id != sqlc.arg(source_id)
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND n.title %> sqlc.arg(query)::text
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY word_similarity(sqlc.arg(query)::text, n.title) DESC, n.title ASC
@@ -152,6 +164,8 @@ FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE (n.search_tsv @@ websearch_to_tsquery('english', sqlc.arg(query)::text)
        OR n.title %> sqlc.arg(query)::text)
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
 ORDER BY rank DESC, n.created_at DESC
 LIMIT sqlc.arg(result_limit);
@@ -160,6 +174,11 @@ LIMIT sqlc.arg(result_limit);
 -- Topic pages render their child views as a thread feed. parent_node_id is
 -- the canonical hierarchy link; node_visible_to() keeps group/list/private
 -- child views hidden from viewers outside their audience.
+--
+-- comment_count walks 'comments_on' edges up to two hops deep (top-level
+-- comments attached to the view, plus their replies). Soft-deleted
+-- comments are excluded so the badge matches what the viewer actually
+-- sees. The depth limit mirrors the application's one-level-reply rule.
 SELECT
     n.id,
     n.slug,
@@ -168,13 +187,30 @@ SELECT
     n.created_at,
     u.username AS author_username,
     u.profile_image_path AS author_profile_image_path,
-    count(c.id) FILTER (WHERE c.deleted_at IS NULL)::bigint AS comment_count
+    (
+        SELECT count(*)::bigint
+        FROM nodes c
+        WHERE c.type = 'comment'
+          AND c.deleted_at IS NULL
+          AND EXISTS (
+              SELECT 1 FROM edges e1
+              WHERE e1.from_node = c.id AND e1.kind = 'comments_on'
+                AND (
+                    e1.to_node = n.id
+                    OR EXISTS (
+                        SELECT 1 FROM edges e2
+                        WHERE e2.from_node = e1.to_node
+                          AND e2.kind = 'comments_on'
+                          AND e2.to_node = n.id
+                    )
+                )
+          )
+    ) AS comment_count
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-LEFT JOIN comments c ON c.node_id = n.id
 WHERE n.type = 'view'
   AND n.parent_node_id = sqlc.arg(topic_id)::uuid
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, sqlc.narg(viewer_id)::uuid)
-GROUP BY n.id, n.slug, n.title, n.body, n.created_at, u.username, u.profile_image_path
 ORDER BY n.created_at DESC
 LIMIT sqlc.arg(result_limit);

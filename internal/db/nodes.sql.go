@@ -107,7 +107,7 @@ INSERT INTO nodes (
     parent_node_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
 `
 
 type CreateNodeParams struct {
@@ -153,6 +153,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -167,7 +168,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -189,12 +190,13 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getNodeBySlug = `-- name: GetNodeBySlug :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes WHERE slug = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes WHERE slug = $1
 `
 
 func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
@@ -216,13 +218,16 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listNodesAuthoredByForViewer = `-- name: ListNodesAuthoredByForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes n
 WHERE n.created_by = $1
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
 LIMIT $3
@@ -236,7 +241,8 @@ type ListNodesAuthoredByForViewerParams struct {
 
 // Nodes a user has authored, most recent first — for the "Authored" section
 // on a profile page. Filtered through node_visible_to() so a visitor only
-// sees nodes they're entitled to.
+// sees nodes they're entitled to. Comments are excluded; a future profile
+// section can surface them separately.
 func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error) {
 	rows, err := q.db.Query(ctx, listNodesAuthoredByForViewer, arg.AuthorID, arg.ViewerID, arg.ResultLimit)
 	if err != nil {
@@ -262,6 +268,7 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 			&i.ParentNodeID,
 			&i.GroupID,
 			&i.VisibilityGroupID,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -274,8 +281,9 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes
 WHERE type = $1
+  AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $2
 `
@@ -310,6 +318,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.ParentNodeID,
 			&i.GroupID,
 			&i.VisibilityGroupID,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -325,7 +334,9 @@ const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
 SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE node_visible_to(n.*, $2::uuid)
+WHERE n.type <> 'comment'
+  AND n.deleted_at IS NULL
+  AND node_visible_to(n.*, $2::uuid)
 ORDER BY n.created_at DESC
 LIMIT $1
 `
@@ -346,6 +357,8 @@ type ListRecentNodesForViewerRow struct {
 
 // Home page feed. node_visible_to() handles the per-row visibility check;
 // viewer_id is NULL for logged-out users (only public nodes match).
+// Comments are excluded from the feed — they show up inline under their
+// target node and in the argument graph, not as standalone entries.
 func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listRecentNodesForViewer, arg.Limit, arg.ViewerID)
 	if err != nil {
@@ -382,14 +395,31 @@ SELECT
     n.created_at,
     u.username AS author_username,
     u.profile_image_path AS author_profile_image_path,
-    count(c.id) FILTER (WHERE c.deleted_at IS NULL)::bigint AS comment_count
+    (
+        SELECT count(*)::bigint
+        FROM nodes c
+        WHERE c.type = 'comment'
+          AND c.deleted_at IS NULL
+          AND EXISTS (
+              SELECT 1 FROM edges e1
+              WHERE e1.from_node = c.id AND e1.kind = 'comments_on'
+                AND (
+                    e1.to_node = n.id
+                    OR EXISTS (
+                        SELECT 1 FROM edges e2
+                        WHERE e2.from_node = e1.to_node
+                          AND e2.kind = 'comments_on'
+                          AND e2.to_node = n.id
+                    )
+                )
+          )
+    ) AS comment_count
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-LEFT JOIN comments c ON c.node_id = n.id
 WHERE n.type = 'view'
   AND n.parent_node_id = $1::uuid
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, $2::uuid)
-GROUP BY n.id, n.slug, n.title, n.body, n.created_at, u.username, u.profile_image_path
 ORDER BY n.created_at DESC
 LIMIT $3
 `
@@ -414,6 +444,11 @@ type ListViewsForTopicRow struct {
 // Topic pages render their child views as a thread feed. parent_node_id is
 // the canonical hierarchy link; node_visible_to() keeps group/list/private
 // child views hidden from viewers outside their audience.
+//
+// comment_count walks 'comments_on' edges up to two hops deep (top-level
+// comments attached to the view, plus their replies). Soft-deleted
+// comments are excluded so the badge matches what the viewer actually
+// sees. The depth limit mirrors the application's one-level-reply rule.
 func (q *Queries) ListViewsForTopic(ctx context.Context, arg ListViewsForTopicParams) ([]ListViewsForTopicRow, error) {
 	rows, err := q.db.Query(ctx, listViewsForTopic, arg.TopicID, arg.ViewerID, arg.ResultLimit)
 	if err != nil {
@@ -447,6 +482,8 @@ const pickerSearchNodes = `-- name: PickerSearchNodes :many
 SELECT n.id, n.type, n.title
 FROM nodes n
 WHERE n.id != $1
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND n.title %> $2::text
   AND node_visible_to(n.*, $3::uuid)
 ORDER BY word_similarity($2::text, n.title) DESC, n.title ASC
@@ -507,6 +544,8 @@ FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE (n.search_tsv @@ websearch_to_tsquery('english', $1::text)
        OR n.title %> $1::text)
+  AND n.type <> 'comment'
+  AND n.deleted_at IS NULL
   AND node_visible_to(n.*, $2::uuid)
 ORDER BY rank DESC, n.created_at DESC
 LIMIT $3
@@ -584,6 +623,8 @@ const searchPostParents = `-- name: SearchPostParents :many
 SELECT id, type, title
 FROM nodes
 WHERE ($1::text = '' OR type::text = $1::text)
+  AND type <> 'comment'
+  AND deleted_at IS NULL
   AND node_visible_to(nodes.*, $2::uuid)
   AND ($3::text = '' OR title %> $3::text)
 ORDER BY
@@ -643,7 +684,7 @@ SET title = $2,
     edit_policy = $8,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
 `
 
 type UpdateNodeParams struct {
@@ -685,6 +726,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.ParentNodeID,
 		&i.GroupID,
 		&i.VisibilityGroupID,
+		&i.DeletedAt,
 	)
 	return i, err
 }

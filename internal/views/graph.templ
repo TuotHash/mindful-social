@@ -11,6 +11,10 @@ type ArgumentGraphNode struct {
 	Slug           string `json:"slug"`
 	Type           string `json:"type"`
 	Title          string `json:"title"`
+	// Body carries the comment text for comment nodes (their Title is
+	// always empty). Non-comment nodes ship it too so the client can
+	// preview them in the inspector without a follow-up fetch.
+	Body           string `json:"body"`
 	AuthorUsername string `json:"authorUsername"`
 	// Match is true for nodes that directly matched the active search
 	// query. Neighbourhood-expansion nodes leave it false. The client

@@ -483,7 +483,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 
 	var comments []views.Comment
 	var commentCount int64
-	if node.Type == db.NodeTypeView {
+	if node.Type != db.NodeTypeComment {
 		rows, err := s.queries.ListCommentsForNode(r.Context(), id)
 		if err != nil {
 			s.logger.Error("node detail: comments", "err", err)

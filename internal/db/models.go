@@ -15,9 +15,10 @@ import (
 type EdgeKind string
 
 const (
-	EdgeKindSupports EdgeKind = "supports"
-	EdgeKindOpposes  EdgeKind = "opposes"
-	EdgeKindRelated  EdgeKind = "related"
+	EdgeKindSupports   EdgeKind = "supports"
+	EdgeKindOpposes    EdgeKind = "opposes"
+	EdgeKindRelated    EdgeKind = "related"
+	EdgeKindCommentsOn EdgeKind = "comments_on"
 )
 
 func (e *EdgeKind) Scan(src interface{}) error {
@@ -59,7 +60,8 @@ func (e EdgeKind) Valid() bool {
 	switch e {
 	case EdgeKindSupports,
 		EdgeKindOpposes,
-		EdgeKindRelated:
+		EdgeKindRelated,
+		EdgeKindCommentsOn:
 		return true
 	}
 	return false
@@ -232,6 +234,7 @@ const (
 	NodeTypeTopic   NodeType = "topic"
 	NodeTypeView    NodeType = "view"
 	NodeTypeFinding NodeType = "finding"
+	NodeTypeComment NodeType = "comment"
 )
 
 func (e *NodeType) Scan(src interface{}) error {
@@ -273,7 +276,8 @@ func (e NodeType) Valid() bool {
 	switch e {
 	case NodeTypeTopic,
 		NodeTypeView,
-		NodeTypeFinding:
+		NodeTypeFinding,
+		NodeTypeComment:
 		return true
 	}
 	return false
@@ -449,17 +453,6 @@ type AuthIdentity struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-type Comment struct {
-	ID        uuid.UUID          `json:"id"`
-	NodeID    uuid.UUID          `json:"node_id"`
-	ParentID  *uuid.UUID         `json:"parent_id"`
-	AuthorID  uuid.UUID          `json:"author_id"`
-	Body      string             `json:"body"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	EditedAt  pgtype.Timestamptz `json:"edited_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-}
-
 type Edge struct {
 	ID         uuid.UUID          `json:"id"`
 	FromNode   uuid.UUID          `json:"from_node"`
@@ -520,6 +513,7 @@ type Node struct {
 	ParentNodeID      *uuid.UUID         `json:"parent_node_id"`
 	GroupID           *uuid.UUID         `json:"group_id"`
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type NodeImage struct {

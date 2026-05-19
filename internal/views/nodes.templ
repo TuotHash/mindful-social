@@ -538,7 +538,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 					}
 				}
 			</aside>
-			if node.Type == db.NodeTypeView {
+			if node.Type != db.NodeTypeComment {
 				@CommentSection(viewer, node, comments, commentCount)
 			}
 		</div>

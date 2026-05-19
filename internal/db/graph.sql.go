@@ -23,6 +23,8 @@ JOIN nodes src ON src.id = e.from_node
 JOIN nodes dst ON dst.id = e.to_node
 WHERE e.from_node = ANY($1::uuid[])
   AND e.to_node = ANY($1::uuid[])
+  AND src.deleted_at IS NULL
+  AND dst.deleted_at IS NULL
   AND node_visible_to(src.*, $2::uuid)
   AND node_visible_to(dst.*, $2::uuid)
 ORDER BY e.created_at DESC
@@ -73,7 +75,8 @@ const listArgumentGraphEdgesForViewer = `-- name: ListArgumentGraphEdgesForViewe
 WITH visible_nodes AS (
     SELECT n.id
     FROM nodes n
-    WHERE node_visible_to(n.*, $2::uuid)
+    WHERE n.deleted_at IS NULL
+      AND node_visible_to(n.*, $2::uuid)
     ORDER BY n.created_at DESC
     LIMIT $3
 )
@@ -135,6 +138,7 @@ WITH RECURSIVE reached AS (
     SELECT n.id, 0 AS hop
     FROM nodes n
     WHERE n.id = ANY($2::uuid[])
+      AND n.deleted_at IS NULL
       AND node_visible_to(n.*, $3::uuid)
     UNION
     SELECT n2.id, r.hop + 1
@@ -142,6 +146,7 @@ WITH RECURSIVE reached AS (
     JOIN edges e ON r.id IN (e.from_node, e.to_node)
     JOIN nodes n2 ON n2.id IN (e.from_node, e.to_node) AND n2.id <> r.id
     WHERE r.hop < $4::int
+      AND n2.deleted_at IS NULL
       AND node_visible_to(n2.*, $3::uuid)
 )
 SELECT
@@ -149,6 +154,7 @@ SELECT
     n.slug,
     n.type::text AS node_type,
     n.title,
+    n.body,
     u.username AS author_username
 FROM (SELECT DISTINCT id FROM reached) r
 JOIN nodes n ON n.id = r.id
@@ -169,6 +175,7 @@ type ListArgumentGraphNeighborhoodRow struct {
 	Slug           string `json:"slug"`
 	NodeType       string `json:"node_type"`
 	Title          string `json:"title"`
+	Body           string `json:"body"`
 	AuthorUsername string `json:"author_username"`
 }
 
@@ -196,6 +203,7 @@ func (q *Queries) ListArgumentGraphNeighborhood(ctx context.Context, arg ListArg
 			&i.Slug,
 			&i.NodeType,
 			&i.Title,
+			&i.Body,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
@@ -214,10 +222,12 @@ SELECT
     n.slug,
     n.type::text AS node_type,
     n.title,
+    n.body,
     u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
-WHERE node_visible_to(n.*, $1::uuid)
+WHERE n.deleted_at IS NULL
+  AND node_visible_to(n.*, $1::uuid)
 ORDER BY n.created_at DESC
 LIMIT $2
 `
@@ -232,11 +242,14 @@ type ListArgumentGraphNodesForViewerRow struct {
 	Slug           string `json:"slug"`
 	NodeType       string `json:"node_type"`
 	Title          string `json:"title"`
+	Body           string `json:"body"`
 	AuthorUsername string `json:"author_username"`
 }
 
 // Recent visible nodes for the graph canvas. The graph viewer is intentionally
 // bounded so a public instance cannot ship an unbounded graph into the page.
+// Comment nodes are included here so threads show up alongside their target
+// in the graph; deleted (soft-removed) nodes are excluded.
 func (q *Queries) ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listArgumentGraphNodesForViewer, arg.ViewerID, arg.ResultLimit)
 	if err != nil {
@@ -251,6 +264,7 @@ func (q *Queries) ListArgumentGraphNodesForViewer(ctx context.Context, arg ListA
 			&i.Slug,
 			&i.NodeType,
 			&i.Title,
+			&i.Body,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
@@ -268,7 +282,8 @@ SELECT n.id
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 LEFT JOIN groups g ON g.id = n.group_id
-WHERE node_visible_to(n.*, $1::uuid)
+WHERE n.deleted_at IS NULL
+  AND node_visible_to(n.*, $1::uuid)
   AND ($2::text IS NULL
        OR u.username = $2::text)
   AND ($3::text IS NULL

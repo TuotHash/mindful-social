@@ -1292,7 +1292,7 @@ func NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if node.Type == db.NodeTypeView {
+			if node.Type != db.NodeTypeComment {
 				templ_7745c5c3_Err = CommentSection(viewer, node, comments, commentCount).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
