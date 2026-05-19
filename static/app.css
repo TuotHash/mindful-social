@@ -47,6 +47,7 @@
   --topic-h: 250; /* blue */
   --view-h: 22; /* red */
   --finding-h: 332; /* rose        */
+  --comment-h: 145; /* teal-green  */
 
   /* edge-kind colors */
   --supports: oklch(72% 0.14 158);
@@ -116,6 +117,8 @@
   --view-ink: oklch(82% 0.13 var(--view-h));
   --finding-bg: oklch(72% 0.15 var(--finding-h) / 0.12);
   --finding-ink: oklch(82% 0.13 var(--finding-h));
+  --comment-bg: oklch(72% 0.1 var(--comment-h) / 0.11);
+  --comment-ink: oklch(80% 0.1 var(--comment-h));
 }
 
 /* ---- LIGHT -------------------------------------------------------------- */
@@ -162,6 +165,8 @@
   --view-ink: oklch(36% 0.12 var(--view-h));
   --finding-bg: oklch(93% 0.06 var(--finding-h));
   --finding-ink: oklch(36% 0.1 var(--finding-h));
+  --comment-bg: oklch(93% 0.04 var(--comment-h));
+  --comment-ink: oklch(34% 0.08 var(--comment-h));
 }
 
 /* =========================================================================
@@ -1223,6 +1228,12 @@ label.field {
   background: var(--finding-bg);
   border-color: color-mix(in oklab, var(--finding-ink) 25%, transparent);
 }
+.badge-comment,
+.chip.comment {
+  color: var(--comment-ink);
+  background: var(--comment-bg);
+  border-color: color-mix(in oklab, var(--comment-ink) 25%, transparent);
+}
 
 .badge.accent {
   color: var(--accent-strong);
@@ -2021,6 +2032,16 @@ label.field {
   fill: var(--relates);
 }
 
+.argument-graph-arrow.edge-comments_on path {
+  fill: var(--comment-ink);
+}
+
+.argument-graph-edge.edge-comments_on {
+  --edge: var(--comment-ink);
+  stroke-dasharray: 4 4;
+  opacity: 0.5;
+}
+
 .argument-graph-node {
   cursor: pointer;
   outline: none;
@@ -2050,6 +2071,11 @@ label.field {
 .argument-graph-node.node-finding {
   --node-bg: var(--finding-bg);
   --node-ink: var(--finding-ink);
+}
+
+.argument-graph-node.node-comment {
+  --node-bg: var(--comment-bg);
+  --node-ink: var(--comment-ink);
 }
 
 .argument-graph-node.is-selected circle,

@@ -683,6 +683,17 @@
         return value.slice(0, Math.max(0, max - 1)) + "…";
       }
 
+      // nodeLabel returns the text shown next to a graph node. Topics,
+      // views, and findings use their title. Comments carry their content
+      // in body (title is always empty for them), so we fall back to that.
+      function nodeLabel(node) {
+        if (!node) return "";
+        if (node.type === "comment") {
+          return (node.body || "").replace(/\s+/g, " ").trim();
+        }
+        return node.title || "";
+      }
+
       function activeTypes() {
         var active = {};
         typeInputs.forEach(function (input) {
@@ -730,6 +741,7 @@
         if (!query) return true;
         var haystack = [
           node.title || "",
+          node.body || "",
           node.authorUsername || "",
           node.type || "",
         ].join(" ").toLowerCase();
@@ -879,7 +891,7 @@
       }
 
       function appendMarkers(defs) {
-        ["supports", "opposes", "related"].forEach(function (kind) {
+        ["supports", "opposes", "related", "comments_on"].forEach(function (kind) {
           var marker = svgEl("marker", {
             id: markerID(kind),
             viewBox: "0 0 10 10",
@@ -910,13 +922,14 @@
       function nodeRadius(node) {
         if (node.type === "topic") return 29;
         if (node.type === "view") return 24;
+        if (node.type === "comment") return 14;
         return 20;
       }
 
       function renderInspector() {
         var node = nodesByID[selectedID];
         if (!titleEl || !metaEl || !openEl) return;
-        titleEl.textContent = node ? node.title : "Choose a node";
+        titleEl.textContent = node ? (nodeLabel(node) || "(empty)") : "Choose a node";
         metaEl.replaceChildren();
 
         if (!node) {
@@ -1062,15 +1075,16 @@
           if (node.id === selectedID) cls += " is-selected";
           if (selectedID && !related) cls += " is-dim";
 
+          var label = nodeLabel(node);
           var groupEl = svgEl("g", {
             class: cls,
             transform: "translate(" + node.x + " " + node.y + ")",
             tabindex: "0",
             role: "button",
-            "aria-label": node.title,
+            "aria-label": label,
           });
           var title = svgEl("title");
-          title.textContent = node.title + " by " + node.authorUsername;
+          title.textContent = label + " by " + node.authorUsername;
           groupEl.appendChild(title);
           groupEl.appendChild(svgEl("circle", { r: String(radius), cx: "0", cy: "0" }));
           groupEl.appendChild(svgEl("rect", {
@@ -1087,7 +1101,7 @@
             y: String(radius + 30),
             "text-anchor": "middle",
           });
-          text.textContent = truncate(node.title, 25);
+          text.textContent = truncate(label, 25);
           groupEl.appendChild(text);
           groupEl.addEventListener("click", function (event) {
             event.stopPropagation();

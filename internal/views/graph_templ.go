@@ -286,7 +286,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" autocomplete=\"off\" hx-get=\"/tags/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-tag-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-tag-suggest\" class=\"search-suggest\" hidden></div></div></label><fieldset class=\"argument-graph-types\"><legend>Types</legend> <label class=\"chip topic\"><input type=\"checkbox\" value=\"topic\" data-graph-type checked> <span class=\"dot\"></span> Topic</label> <label class=\"chip view\"><input type=\"checkbox\" value=\"view\" data-graph-type checked> <span class=\"dot\"></span> View</label> <label class=\"chip finding\"><input type=\"checkbox\" value=\"finding\" data-graph-type checked> <span class=\"dot\"></span> Finding</label></fieldset><fieldset class=\"argument-graph-types argument-graph-kinds\" aria-label=\"Filter by relationship kind\"><legend>Edge kinds</legend> <label class=\"chip kind-supports\" title=\"Show supporting edges\"><input type=\"checkbox\" value=\"supports\" data-graph-kind checked> <span class=\"dot\"></span> Supports</label> <label class=\"chip kind-opposes\" title=\"Show opposing edges\"><input type=\"checkbox\" value=\"opposes\" data-graph-kind checked> <span class=\"dot\"></span> Opposes</label> <label class=\"chip kind-related\" title=\"Show related edges\"><input type=\"checkbox\" value=\"related\" data-graph-kind checked> <span class=\"dot\"></span> Related</label></fieldset><div class=\"argument-graph-toggle-group\" role=\"group\" aria-label=\"Filter by recency\"><span class=\"argument-graph-toggle-label\">When</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" autocomplete=\"off\" hx-get=\"/tags/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-tag-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-tag-suggest\" class=\"search-suggest\" hidden></div></div></label><fieldset class=\"argument-graph-types\"><legend>Types</legend> <label class=\"chip topic\"><input type=\"checkbox\" value=\"topic\" data-graph-type checked> <span class=\"dot\"></span> Topic</label> <label class=\"chip view\"><input type=\"checkbox\" value=\"view\" data-graph-type checked> <span class=\"dot\"></span> View</label> <label class=\"chip finding\"><input type=\"checkbox\" value=\"finding\" data-graph-type checked> <span class=\"dot\"></span> Finding</label> <label class=\"chip comment\"><input type=\"checkbox\" value=\"comment\" data-graph-type checked> <span class=\"dot\"></span> Comment</label></fieldset><fieldset class=\"argument-graph-types argument-graph-kinds\" aria-label=\"Filter by relationship kind\"><legend>Edge kinds</legend> <label class=\"chip kind-supports\" title=\"Show supporting edges\"><input type=\"checkbox\" value=\"supports\" data-graph-kind checked> <span class=\"dot\"></span> Supports</label> <label class=\"chip kind-opposes\" title=\"Show opposing edges\"><input type=\"checkbox\" value=\"opposes\" data-graph-kind checked> <span class=\"dot\"></span> Opposes</label> <label class=\"chip kind-related\" title=\"Show related edges\"><input type=\"checkbox\" value=\"related\" data-graph-kind checked> <span class=\"dot\"></span> Related</label></fieldset><div class=\"argument-graph-toggle-group\" role=\"group\" aria-label=\"Filter by recency\"><span class=\"argument-graph-toggle-label\">When</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -602,7 +602,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var36 templ.SafeURL
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + n.Slug))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 334, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 339, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 					if templ_7745c5c3_Err != nil {
@@ -637,7 +637,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var39 string
 					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(n.Type)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 337, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 342, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
@@ -650,7 +650,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var40 string
 					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 339, Col: 40}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 344, Col: 40}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
