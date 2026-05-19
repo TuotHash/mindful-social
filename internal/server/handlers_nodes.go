@@ -295,7 +295,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if flash == "" && nt == db.NodeTypeFinding {
 		ek := db.EdgeKind(rawFindingEdgeKind)
-		if !ek.Valid() {
+		if !isUserPickableEdgeKind(ek) {
 			flash = "Pick how this finding relates to its parent."
 		} else {
 			findingEdgeKind = ek
@@ -1021,7 +1021,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ek := db.EdgeKind(rawKind)
-	if !ek.Valid() {
+	if !isUserPickableEdgeKind(ek) {
 		rerender("Pick a valid relationship kind.")
 		return
 	}
@@ -1117,6 +1117,8 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 // edgeOrder fixes the canonical kind sequence for the legend and pins active
 // vs. passive labels for each kind. 'related' is symmetric so its passive
 // form matches its active one and the two directions render in a single bucket.
+// 'comments_on' is intentionally absent — comment edges are created by the
+// comment flow, not the manual edge picker.
 var edgeOrder = []struct {
 	kind         db.EdgeKind
 	activeLabel  string
@@ -1125,6 +1127,18 @@ var edgeOrder = []struct {
 	{db.EdgeKindSupports, "Supports", "Supported by"},
 	{db.EdgeKindOpposes, "Opposes", "Opposed by"},
 	{db.EdgeKindRelated, "Related", "Related"},
+}
+
+// isUserPickableEdgeKind reports whether the form value names an edge kind
+// users may choose in the connection picker. comments_on is excluded
+// because it is owned by the comment-creation path; allowing it here
+// would let any user fabricate a comment edge without writing a comment.
+func isUserPickableEdgeKind(k db.EdgeKind) bool {
+	switch k {
+	case db.EdgeKindSupports, db.EdgeKindOpposes, db.EdgeKindRelated:
+		return true
+	}
+	return false
 }
 
 // displayGroups combines outgoing and incoming edges into one ordered list
