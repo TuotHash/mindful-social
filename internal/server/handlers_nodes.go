@@ -77,9 +77,23 @@ func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, b
 }
 
 // handleLanding serves the public landing page at /. Accessible to everyone
-// including logged-in users who want to browse the marketing page.
+// including logged-in users who want to browse the marketing page. Pulls a
+// handful of recent visible nodes for the example section; node_visible_to()
+// ensures anonymous visitors only see public content.
 func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
-	render(w, r, views.Landing(viewerFor(currentUser(r))))
+	rows, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
+		Limit:    6,
+		ViewerID: viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("landing: list recent", "err", err)
+		rows = nil
+	}
+	items := make([]views.FeedItem, len(rows))
+	for i, row := range rows {
+		items[i] = views.FeedItem{Slug: row.Slug, Type: row.Type, Title: row.Title, AuthorUsername: row.AuthorUsername}
+	}
+	render(w, r, views.Landing(viewerFor(currentUser(r)), items))
 }
 
 // handleHome serves the personal feed at /home for logged-in users.

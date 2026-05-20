@@ -8,9 +8,11 @@ import (
 
 // Landing renders the public marketing page at /. Shown to everyone regardless
 // of auth state — logged-in users can navigate here by clicking the brand logo.
-templ Landing(viewer *Viewer) {
+// recentNodes is a short list of visibility-filtered nodes for the example
+// section; the section is omitted when the list is empty.
+templ Landing(viewer *Viewer, recentNodes []FeedItem) {
 	@Layout("Home", viewer) {
-		@landingMarketing(viewer)
+		@landingMarketing(viewer, recentNodes)
 	}
 }
 
@@ -29,7 +31,7 @@ templ Feed(viewer *Viewer, items []FeedItem) {
 	}
 }
 
-templ landingMarketing(viewer *Viewer) {
+templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 	<section class="hero">
 		<div class="page" style="position: relative; z-index: 2;">
 			<div class="hero-grid">
@@ -139,6 +141,7 @@ templ landingMarketing(viewer *Viewer) {
 			</div>
 		</div>
 	</section>
+	@landingRecent(recentNodes)
 	<section class="page" style="padding-top: 100px; padding-bottom: 120px;">
 		<div class="card" style="padding: 64px 48px; text-align: center; position: relative; overflow: hidden; background: linear-gradient(135deg, var(--paper), var(--bg-2));">
 			@bloom(200, 105, "position: absolute; left: -50px; top: -40px; opacity: 0.6;")
@@ -160,6 +163,44 @@ templ landingMarketing(viewer *Viewer) {
 		</div>
 	</section>
 	@siteFooter(viewer)
+}
+
+// landingRecent shows a small teaser of recent visible nodes so first-time
+// visitors see real content instead of pure marketing copy. Hidden when there
+// are no visible nodes for the viewer (e.g. fresh install, anonymous + only
+// private content).
+templ landingRecent(items []FeedItem) {
+	if len(items) > 0 {
+		<section class="page" style="padding-top: 80px; padding-bottom: 0;">
+			<div class="row between wrap gap-16" style="margin-bottom: 28px;">
+				<div class="col gap-8" style="max-width: 560px;">
+					<span class="eyebrow">From the graph</span>
+					<h2 class="h-1" style="font-size: 36px;">A few recent additions.</h2>
+					<p class="muted" style="margin: 0; font-size: 15px;">
+						Real topics, opinions, and occurences contributed by the community. Click any to read.
+					</p>
+				</div>
+				<a class="btn" href="/graph">Open graph</a>
+			</div>
+			<ul class="node-list">
+				for _, n := range items {
+					<li>
+						<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
+							<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
+								<span class="dot"></span>
+								{ nodeTypeAliasLabel(n.Type) }
+							</span>
+							<span class="title">{ n.Title }</span>
+						</a>
+						<a href={ templ.SafeURL("/users/" + n.AuthorUsername) } class="node-author">
+							@Avatar(n.AuthorUsername, 18)
+							{ n.AuthorUsername }
+						</a>
+					</li>
+				}
+			</ul>
+		</section>
+	}
 }
 
 templ homeFeed(viewer *Viewer, items []FeedItem) {
