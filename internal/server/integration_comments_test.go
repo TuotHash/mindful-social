@@ -143,6 +143,45 @@ func TestCommentEditAndSoftDelete_AuthorOnly(t *testing.T) {
 	}
 }
 
+func TestCommentVisibilityFollowsParentEdit(t *testing.T) {
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+	viewID := createNode(t, c, "view", "Visibility cascade target", "")
+
+	resp := formPost(t, c, "/nodes/"+viewID.String()+"/comments", url.Values{
+		"body": {"Top-level"},
+	})
+	resp.Body.Close()
+	topID := onlyTopLevelComment(t, viewID)
+	resp = formPost(t, c, "/nodes/"+viewID.String()+"/comments", url.Values{
+		"parent_id": {topID.String()},
+		"body":      {"Reply"},
+	})
+	resp.Body.Close()
+	replyID := onlyReplyComment(t, viewID)
+
+	resp = formPost(t, c, "/nodes/"+viewID.String(), url.Values{
+		"title":      {"Visibility cascade target"},
+		"body":       {""},
+		"visibility": {"private"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update visibility: status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	for _, id := range []uuid.UUID{topID, replyID} {
+		row, err := testServer.queries.GetNode(t.Context(), id)
+		if err != nil {
+			t.Fatalf("load comment %s: %v", id, err)
+		}
+		if row.Visibility != "private" {
+			t.Fatalf("comment %s visibility = %q, want private", id, row.Visibility)
+		}
+	}
+}
+
 func TestTopicPageListsChildViewsWithCommentCounts(t *testing.T) {
 	integrationDB(t)
 	c := newClient(t)
