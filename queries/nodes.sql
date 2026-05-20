@@ -26,11 +26,14 @@ FROM nodes n
 WHERE n.id = $1;
 
 -- name: ListRecentNodesForViewer :many
--- Home page feed. node_visible_to() handles the per-row visibility check;
--- viewer_id is NULL for logged-out users (only public nodes match).
--- Comments are excluded from the feed — they show up inline under their
--- target node and in the argument graph, not as standalone entries.
-SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
+-- Home page feed and landing-page teaser. node_visible_to() handles the
+-- per-row visibility check; viewer_id is NULL for logged-out users (only
+-- public nodes match). Comments are excluded from the feed — they show up
+-- inline under their target node and in the argument graph, not as
+-- standalone entries. body is returned so callers that want a preview
+-- snippet (landing cards) can render an excerpt; the home feed simply
+-- ignores it.
+SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE n.type <> 'comment'

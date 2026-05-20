@@ -91,7 +91,7 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]views.FeedItem, len(rows))
 	for i, row := range rows {
-		items[i] = views.FeedItem{Slug: row.Slug, Type: row.Type, Title: row.Title, AuthorUsername: row.AuthorUsername}
+		items[i] = views.FeedItem{Slug: row.Slug, Type: row.Type, Title: row.Title, Body: row.Body, AuthorUsername: row.AuthorUsername}
 	}
 	render(w, r, views.Landing(viewerFor(currentUser(r)), items))
 }
@@ -110,7 +110,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]views.FeedItem, len(rows))
 	for i, r := range rows {
-		items[i] = views.FeedItem{Slug: r.Slug, Type: r.Type, Title: r.Title, AuthorUsername: r.AuthorUsername}
+		items[i] = views.FeedItem{Slug: r.Slug, Type: r.Type, Title: r.Title, Body: r.Body, AuthorUsername: r.AuthorUsername}
 	}
 	render(w, r, views.Feed(viewerFor(user), items))
 }

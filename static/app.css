@@ -3884,3 +3884,74 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
     grid-column: 1;
   }
 }
+
+/* =========================================================================
+   Landing — recent-nodes teaser grid
+   Used by the "From the graph" section on the public landing page.
+   Stretched ::after on the title turns the whole card into a click target
+   for the node detail page; the author byline gets its own stacking context
+   so the user-profile link still works independently.
+   ========================================================================= */
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  padding: 20px;
+}
+.recent-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.recent-card .chip {
+  align-self: flex-start;
+}
+.recent-card-title {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.recent-card-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.recent-card-body {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.recent-card-author {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-decoration: none;
+  margin-top: auto;
+}
+.recent-card-author:hover {
+  color: var(--ink);
+}

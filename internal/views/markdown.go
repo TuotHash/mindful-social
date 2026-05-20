@@ -30,6 +30,11 @@ var nodeMarkdown = goldmark.New(
 
 var nodeMarkdownPolicy = newNodeMarkdownPolicy()
 
+// strictTextPolicy strips every tag and attribute, keeping only the inner
+// text. Used by NodePlainExcerpt to turn a markdown body into a clean
+// teaser snippet.
+var strictTextPolicy = bluemonday.StrictPolicy()
+
 func newNodeMarkdownPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowURLSchemes("http", "https", "mailto")
@@ -96,4 +101,33 @@ func renderNodeMarkdown(source string) string {
 
 func NodeMarkdown(source string) templ.Component {
 	return templ.Raw(renderNodeMarkdown(source))
+}
+
+// NodePlainExcerpt renders the markdown body to HTML, strips every tag, and
+// collapses whitespace so callers get a plain-text snippet suitable for a
+// teaser line. The result is truncated to maxRunes (counted as runes, not
+// bytes) so a multi-byte UTF-8 body doesn't get cut mid-codepoint, and an
+// ellipsis is appended when truncation actually happens. Visual line-clamp
+// still happens in CSS — the server-side cap is only there to avoid sending
+// a megabyte of body across the wire for a small card.
+func NodePlainExcerpt(source string, maxRunes int) string {
+	if !nodeMarkdownHasText(source) {
+		return ""
+	}
+	var buf bytes.Buffer
+	rendered := source
+	if err := nodeMarkdown.Convert([]byte(source), &buf); err == nil {
+		rendered = buf.String()
+	}
+	text := strictTextPolicy.Sanitize(rendered)
+	text = html.UnescapeString(text)
+	text = strings.Join(strings.Fields(text), " ")
+	if maxRunes <= 0 {
+		return text
+	}
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return strings.TrimRight(string(runes[:maxRunes]), " ") + "…"
 }

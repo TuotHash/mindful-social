@@ -250,10 +250,13 @@ type Querier interface {
 	// a profile page. node_visible_to() hides pins whose underlying node the
 	// viewer isn't entitled to see.
 	ListPinsByUser(ctx context.Context, arg ListPinsByUserParams) ([]ListPinsByUserRow, error)
-	// Home page feed. node_visible_to() handles the per-row visibility check;
-	// viewer_id is NULL for logged-out users (only public nodes match).
-	// Comments are excluded from the feed — they show up inline under their
-	// target node and in the argument graph, not as standalone entries.
+	// Home page feed and landing-page teaser. node_visible_to() handles the
+	// per-row visibility check; viewer_id is NULL for logged-out users (only
+	// public nodes match). Comments are excluded from the feed — they show up
+	// inline under their target node and in the argument graph, not as
+	// standalone entries. body is returned so callers that want a preview
+	// snippet (landing cards) can render an excerpt; the home feed simply
+	// ignores it.
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Roster for the admin /users page. Recent signups first; staff bubble to

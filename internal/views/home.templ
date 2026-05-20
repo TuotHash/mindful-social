@@ -16,11 +16,14 @@ templ Landing(viewer *Viewer, recentNodes []FeedItem) {
 	}
 }
 
-// FeedItem is a slim node row for the home feed — just what the list needs.
+// FeedItem is a slim node row for the home feed and the landing-page teaser.
+// Body is the raw markdown source; renderers turn it into a short plain-text
+// excerpt where needed and ignore it otherwise.
 type FeedItem struct {
 	Slug           string
 	Type           db.NodeType
 	Title          string
+	Body           string
 	AuthorUsername string
 }
 
@@ -96,6 +99,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 			</div>
 		</div>
 	</section>
+	@landingRecent(recentNodes)
 	<section class="section-paper">
 		<div class="page" style="padding-top: 80px; padding-bottom: 80px;">
 			<div class="col gap-16" style="margin-bottom: 48px; max-width: 720px;">
@@ -141,7 +145,6 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 			</div>
 		</div>
 	</section>
-	@landingRecent(recentNodes)
 	<section class="page" style="padding-top: 100px; padding-bottom: 120px;">
 		<div class="card" style="padding: 64px 48px; text-align: center; position: relative; overflow: hidden; background: linear-gradient(135deg, var(--paper), var(--bg-2));">
 			@bloom(200, 105, "position: absolute; left: -50px; top: -40px; opacity: 0.6;")
@@ -168,39 +171,46 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 // landingRecent shows a small teaser of recent visible nodes so first-time
 // visitors see real content instead of pure marketing copy. Hidden when there
 // are no visible nodes for the viewer (e.g. fresh install, anonymous + only
-// private content).
+// private content). Sits right under the hero so visitors land on real
+// community content before reading the marketing primitives.
 templ landingRecent(items []FeedItem) {
 	if len(items) > 0 {
-		<section class="page" style="padding-top: 80px; padding-bottom: 0;">
-			<div class="row between wrap gap-16" style="margin-bottom: 28px;">
+		<section class="page" style="padding-top: 48px; padding-bottom: 16px;">
+			<div class="row between wrap gap-16" style="margin-bottom: 24px;">
 				<div class="col gap-8" style="max-width: 560px;">
 					<span class="eyebrow">From the graph</span>
-					<h2 class="h-1" style="font-size: 36px;">A few recent additions.</h2>
-					<p class="muted" style="margin: 0; font-size: 15px;">
-						Real topics, opinions, and occurences contributed by the community. Click any to read.
-					</p>
+					<h2 class="h-2" style="margin: 0;">A few recent additions.</h2>
 				</div>
 				<a class="btn" href="/graph">Open graph</a>
 			</div>
-			<ul class="node-list">
+			<div class="recent-grid">
 				for _, n := range items {
-					<li>
-						<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
-							<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
-								<span class="dot"></span>
-								{ nodeTypeAliasLabel(n.Type) }
-							</span>
-							<span class="title">{ n.Title }</span>
-						</a>
-						<a href={ templ.SafeURL("/users/" + n.AuthorUsername) } class="node-author">
-							@Avatar(n.AuthorUsername, 18)
-							{ n.AuthorUsername }
-						</a>
-					</li>
+					@recentNodeCard(n)
 				}
-			</ul>
+			</div>
 		</section>
 	}
+}
+
+// recentNodeCard is one tile of the landing teaser grid. The title link's
+// stretched ::after pseudo turns the whole card into a click target for the
+// node page; the author byline lives in its own stacking context so its
+// /users/{username} link still wins clicks over the stretched overlay.
+templ recentNodeCard(n FeedItem) {
+	<article class="card recent-card">
+		<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
+			<span class="dot"></span>
+			{ nodeTypeAliasLabel(n.Type) }
+		</span>
+		<a class="recent-card-title" href={ templ.SafeURL("/nodes/" + n.Slug) }>{ n.Title }</a>
+		if excerpt := NodePlainExcerpt(n.Body, 240); excerpt != "" {
+			<p class="recent-card-body">{ excerpt }</p>
+		}
+		<a class="recent-card-author" href={ templ.SafeURL("/users/" + n.AuthorUsername) }>
+			@Avatar(n.AuthorUsername, 18)
+			{ n.AuthorUsername }
+		</a>
+	</article>
 }
 
 templ homeFeed(viewer *Viewer, items []FeedItem) {

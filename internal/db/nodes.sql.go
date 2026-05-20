@@ -331,7 +331,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
-SELECT n.id, n.slug, n.type, n.title, n.created_at, u.username AS author_username
+SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE n.type <> 'comment'
@@ -351,14 +351,18 @@ type ListRecentNodesForViewerRow struct {
 	Slug           string             `json:"slug"`
 	Type           NodeType           `json:"type"`
 	Title          string             `json:"title"`
+	Body           string             `json:"body"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	AuthorUsername string             `json:"author_username"`
 }
 
-// Home page feed. node_visible_to() handles the per-row visibility check;
-// viewer_id is NULL for logged-out users (only public nodes match).
-// Comments are excluded from the feed — they show up inline under their
-// target node and in the argument graph, not as standalone entries.
+// Home page feed and landing-page teaser. node_visible_to() handles the
+// per-row visibility check; viewer_id is NULL for logged-out users (only
+// public nodes match). Comments are excluded from the feed — they show up
+// inline under their target node and in the argument graph, not as
+// standalone entries. body is returned so callers that want a preview
+// snippet (landing cards) can render an excerpt; the home feed simply
+// ignores it.
 func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listRecentNodesForViewer, arg.Limit, arg.ViewerID)
 	if err != nil {
@@ -373,6 +377,7 @@ func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNo
 			&i.Slug,
 			&i.Type,
 			&i.Title,
+			&i.Body,
 			&i.CreatedAt,
 			&i.AuthorUsername,
 		); err != nil {
