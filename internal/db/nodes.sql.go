@@ -337,7 +337,22 @@ JOIN users u ON u.id = n.created_by
 WHERE n.type <> 'comment'
   AND n.deleted_at IS NULL
   AND node_visible_to(n.*, $2::uuid)
-ORDER BY n.created_at DESC
+ORDER BY (
+    (1.0 + (SELECT count(*) FROM user_node_pins p WHERE p.node_id = n.id))::float8
+        / power(extract(epoch FROM (now() - n.created_at)) / 3600.0 + 2.0, 1.5)
+  + 0.3 * (
+        (SELECT count(*) FROM user_node_pins p
+           WHERE p.node_id = n.id
+             AND p.created_at > now() - interval '24 hours')
+      + (SELECT count(*) FROM edges e
+         JOIN nodes c ON c.id = e.from_node
+           WHERE e.to_node = n.id
+             AND e.kind = 'comments_on'
+             AND c.deleted_at IS NULL
+             AND c.created_at > now() - interval '24 hours')
+    )::float8
+  ) DESC,
+  n.created_at DESC
 LIMIT $1
 `
 
@@ -363,6 +378,23 @@ type ListRecentNodesForViewerRow struct {
 // standalone entries. body is returned so callers that want a preview
 // snippet (landing cards) can render an excerpt; the home feed simply
 // ignores it.
+//
+// Ordering combines two terms so the feed surfaces both new posts and old
+// posts that are "going off" right now:
+//
+//	base     = (1 + lifetime pins) / (age_hours + 2) ^ 1.5
+//	velocity = 0.3 * (pins in last 24h + 1-hop comments in last 24h)
+//	score    = base + velocity
+//
+// The base term is Hacker-News-style: it rewards lifetime engagement and
+// decays with the node's creation age (gravity 1.5 is gentler than HN's
+// 1.8, so multi-day-old posts still register). The velocity term ignores
+// creation age entirely, so a dormant week-old node with a recent burst of
+// attention can outrank brand-new lonely posts. Comment activity is
+// counted 1-hop only — replies-to-replies don't bubble through, which
+// keeps the signal a deliberate "engagement with this post" rather than
+// "drama anywhere downstream". n.created_at DESC is the tiebreaker so
+// identical scores resolve newest-first.
 func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error) {
 	rows, err := q.db.Query(ctx, listRecentNodesForViewer, arg.Limit, arg.ViewerID)
 	if err != nil {

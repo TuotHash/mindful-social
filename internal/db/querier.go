@@ -257,6 +257,21 @@ type Querier interface {
 	// standalone entries. body is returned so callers that want a preview
 	// snippet (landing cards) can render an excerpt; the home feed simply
 	// ignores it.
+	//
+	// Ordering combines two terms so the feed surfaces both new posts and old
+	// posts that are "going off" right now:
+	//   base     = (1 + lifetime pins) / (age_hours + 2) ^ 1.5
+	//   velocity = 0.3 * (pins in last 24h + 1-hop comments in last 24h)
+	//   score    = base + velocity
+	// The base term is Hacker-News-style: it rewards lifetime engagement and
+	// decays with the node's creation age (gravity 1.5 is gentler than HN's
+	// 1.8, so multi-day-old posts still register). The velocity term ignores
+	// creation age entirely, so a dormant week-old node with a recent burst of
+	// attention can outrank brand-new lonely posts. Comment activity is
+	// counted 1-hop only — replies-to-replies don't bubble through, which
+	// keeps the signal a deliberate "engagement with this post" rather than
+	// "drama anywhere downstream". n.created_at DESC is the tiebreaker so
+	// identical scores resolve newest-first.
 	ListRecentNodesForViewer(ctx context.Context, arg ListRecentNodesForViewerParams) ([]ListRecentNodesForViewerRow, error)
 	ListTagsForNode(ctx context.Context, nodeID uuid.UUID) ([]Tag, error)
 	// Roster for the admin /users page. Recent signups first; staff bubble to
