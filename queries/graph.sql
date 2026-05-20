@@ -3,13 +3,35 @@
 -- bounded so a public instance cannot ship an unbounded graph into the page.
 -- Comment nodes are included here so threads show up alongside their target
 -- in the graph; deleted (soft-removed) nodes are excluded.
+--
+-- parent_slug is the slug of the root non-comment ancestor for comment rows
+-- (NULL otherwise). The graph inspector uses it to route "Open node" to
+-- /nodes/<parent_slug>#comment-<id> so a comment selected in the graph opens
+-- the discussion page already anchored at the comment. One or two hops cover
+-- the application's max reply depth (top-level → reply); deeper chains would
+-- still resolve to the highest reachable non-comment via the second branch.
 SELECT
     n.id::text AS id,
     n.slug,
     n.type::text AS node_type,
     n.title,
     n.body,
-    u.username AS author_username
+    u.username AS author_username,
+    COALESCE(
+        (SELECT t.slug FROM edges e1
+            JOIN nodes t ON t.id = e1.to_node
+            WHERE e1.from_node = n.id
+              AND e1.kind = 'comments_on'
+              AND t.type <> 'comment'),
+        (SELECT t.slug FROM edges e1
+            JOIN edges e2 ON e2.from_node = e1.to_node
+                         AND e2.kind = 'comments_on'
+            JOIN nodes t ON t.id = e2.to_node
+            WHERE e1.from_node = n.id
+              AND e1.kind = 'comments_on'
+              AND t.type <> 'comment'),
+        ''
+    )::text AS parent_slug
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE n.deleted_at IS NULL
@@ -67,7 +89,22 @@ SELECT
     n.type::text AS node_type,
     n.title,
     n.body,
-    u.username AS author_username
+    u.username AS author_username,
+    COALESCE(
+        (SELECT t.slug FROM edges e1
+            JOIN nodes t ON t.id = e1.to_node
+            WHERE e1.from_node = n.id
+              AND e1.kind = 'comments_on'
+              AND t.type <> 'comment'),
+        (SELECT t.slug FROM edges e1
+            JOIN edges e2 ON e2.from_node = e1.to_node
+                         AND e2.kind = 'comments_on'
+            JOIN nodes t ON t.id = e2.to_node
+            WHERE e1.from_node = n.id
+              AND e1.kind = 'comments_on'
+              AND t.type <> 'comment'),
+        ''
+    )::text AS parent_slug
 FROM (SELECT DISTINCT id FROM reached) r
 JOIN nodes n ON n.id = r.id
 JOIN users u ON u.id = n.created_by

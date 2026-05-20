@@ -694,6 +694,20 @@
         return node.title || "";
       }
 
+      // nodeHref returns the destination for "Open node" / double-click on a
+      // graph node. Comments lack their own URL; we route through the parent
+      // page anchored at the comment so the browser scrolls straight to it.
+      // parentSlug is populated server-side via the comments_on chain; an
+      // empty value falls back to the comment's own slug so a broken chain
+      // still produces a deterministic (if imperfect) link.
+      function nodeHref(node) {
+        if (!node) return "#";
+        if (node.type === "comment" && node.parentSlug) {
+          return "/nodes/" + node.parentSlug + "#comment-" + node.id;
+        }
+        return "/nodes/" + node.slug;
+      }
+
       function activeTypes() {
         var active = {};
         typeInputs.forEach(function (input) {
@@ -970,7 +984,7 @@
         metaEl.appendChild(connections);
 
         openEl.hidden = false;
-        openEl.setAttribute("href", "/nodes/" + node.slug);
+        openEl.setAttribute("href", nodeHref(node));
       }
 
       function applyTransform() {
@@ -1109,7 +1123,7 @@
             render();
           });
           groupEl.addEventListener("dblclick", function () {
-            window.location.href = "/nodes/" + node.slug;
+            window.location.href = nodeHref(node);
           });
           groupEl.addEventListener("keydown", function (event) {
             if (event.key !== "Enter" && event.key !== " ") return;

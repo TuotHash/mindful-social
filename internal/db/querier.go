@@ -172,6 +172,13 @@ type Querier interface {
 	// bounded so a public instance cannot ship an unbounded graph into the page.
 	// Comment nodes are included here so threads show up alongside their target
 	// in the graph; deleted (soft-removed) nodes are excluded.
+	//
+	// parent_slug is the slug of the root non-comment ancestor for comment rows
+	// (NULL otherwise). The graph inspector uses it to route "Open node" to
+	// /nodes/<parent_slug>#comment-<id> so a comment selected in the graph opens
+	// the discussion page already anchored at the comment. One or two hops cover
+	// the application's max reply depth (top-level → reply); deeper chains would
+	// still resolve to the highest reachable non-comment via the second branch.
 	ListArgumentGraphNodesForViewer(ctx context.Context, arg ListArgumentGraphNodesForViewerParams) ([]ListArgumentGraphNodesForViewerRow, error)
 	// Visible node IDs matching the active graph-viewer filters. All filter
 	// parameters are nullable / sentinel-blank: pass NULL (or an empty array

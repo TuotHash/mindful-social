@@ -16,6 +16,11 @@ type ArgumentGraphNode struct {
 	// preview them in the inspector without a follow-up fetch.
 	Body           string `json:"body"`
 	AuthorUsername string `json:"authorUsername"`
+	// ParentSlug is the slug of the root non-comment ancestor for
+	// comment nodes; empty for everything else. The inspector uses it
+	// to route "Open node" through the parent page anchored at the
+	// comment (which lacks its own URL).
+	ParentSlug string `json:"parentSlug,omitempty"`
 	// Match is true for nodes that directly matched the active search
 	// query. Neighbourhood-expansion nodes leave it false. The client
 	// uses this to seed the depth-slider BFS — without it the browser
