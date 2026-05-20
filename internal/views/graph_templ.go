@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 type ArgumentGraphNode struct {
@@ -169,7 +171,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(filters.Author)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 126, Col: 131}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 128, Col: 131}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -194,7 +196,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(graphCount(len(data.Nodes), "node"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 135, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 137, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -207,7 +209,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(graphCount(len(data.Edges), "connection"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 136, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 138, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -220,7 +222,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(filters.Query)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 148, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 150, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -233,7 +235,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(filters.Author)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 166, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 168, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -246,7 +248,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(filters.Group)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 184, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 186, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -259,7 +261,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(graphCount(len(data.Nodes), "node"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 195, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 197, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -272,7 +274,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(graphTagsCSV(filters.Tags))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 205, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 207, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -285,13 +287,13 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tagPlaceholder(len(filters.Tags)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 206, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 208, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" autocomplete=\"off\" hx-get=\"/tags/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-tag-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-tag-suggest\" class=\"search-suggest\" hidden></div></div></label><fieldset class=\"argument-graph-types\"><legend>Types</legend> <label class=\"chip topic\"><input type=\"checkbox\" value=\"topic\" data-graph-type checked> <span class=\"dot\"></span> Topic</label> <label class=\"chip view\"><input type=\"checkbox\" value=\"view\" data-graph-type checked> <span class=\"dot\"></span> View</label> <label class=\"chip finding\"><input type=\"checkbox\" value=\"finding\" data-graph-type checked> <span class=\"dot\"></span> Finding</label> <label class=\"chip comment\"><input type=\"checkbox\" value=\"comment\" data-graph-type checked> <span class=\"dot\"></span> Comment</label></fieldset><fieldset class=\"argument-graph-types argument-graph-kinds\" aria-label=\"Filter by relationship kind\"><legend>Edge kinds</legend> <label class=\"chip kind-supports\" title=\"Show supporting edges\"><input type=\"checkbox\" value=\"supports\" data-graph-kind checked> <span class=\"dot\"></span> Supports</label> <label class=\"chip kind-opposes\" title=\"Show opposing edges\"><input type=\"checkbox\" value=\"opposes\" data-graph-kind checked> <span class=\"dot\"></span> Opposes</label> <label class=\"chip kind-related\" title=\"Show related edges\"><input type=\"checkbox\" value=\"related\" data-graph-kind checked> <span class=\"dot\"></span> Related</label></fieldset><div class=\"argument-graph-toggle-group\" role=\"group\" aria-label=\"Filter by recency\"><span class=\"argument-graph-toggle-label\">When</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" autocomplete=\"off\" hx-get=\"/tags/suggest\" hx-trigger=\"input changed delay:200ms\" hx-target=\"#graph-tag-suggest\" hx-swap=\"innerHTML\"><div id=\"graph-tag-suggest\" class=\"search-suggest\" hidden></div></div></label><fieldset class=\"argument-graph-types\"><legend>Types</legend> <label class=\"chip topic\"><input type=\"checkbox\" value=\"topic\" data-graph-type checked> <span class=\"dot\"></span> Topic</label> <label class=\"chip view\" title=\"View\"><input type=\"checkbox\" value=\"view\" data-graph-type checked> <span class=\"dot\"></span> Opinion</label> <label class=\"chip finding\" title=\"Finding\"><input type=\"checkbox\" value=\"finding\" data-graph-type checked> <span class=\"dot\"></span> Occurence</label> <label class=\"chip comment\"><input type=\"checkbox\" value=\"comment\" data-graph-type checked> <span class=\"dot\"></span> Comment</label></fieldset><fieldset class=\"argument-graph-types argument-graph-kinds\" aria-label=\"Filter by relationship kind\"><legend>Edge kinds</legend> <label class=\"chip kind-supports\" title=\"Show supporting edges\"><input type=\"checkbox\" value=\"supports\" data-graph-kind checked> <span class=\"dot\"></span> Supports</label> <label class=\"chip kind-opposes\" title=\"Show opposing edges\"><input type=\"checkbox\" value=\"opposes\" data-graph-kind checked> <span class=\"dot\"></span> Opposes</label> <label class=\"chip kind-related\" title=\"Show related edges\"><input type=\"checkbox\" value=\"related\" data-graph-kind checked> <span class=\"dot\"></span> Related</label></fieldset><div class=\"argument-graph-toggle-group\" role=\"group\" aria-label=\"Filter by recency\"><span class=\"argument-graph-toggle-label\">When</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -607,7 +609,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var36 templ.SafeURL
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + n.Slug))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 344, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 346, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 					if templ_7745c5c3_Err != nil {
@@ -635,43 +637,56 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\"><span class=\"dot\"></span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\" title=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var39 string
-					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(n.Type)
+					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(nodeTypeOriginalLabel(db.NodeType(n.Type)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 347, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 347, Col: 92}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</span> <span class=\"title\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\"><span class=\"dot\"></span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var40 string
-					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
+					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(nodeTypeAliasLabel(db.NodeType(n.Type)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 349, Col: 40}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 349, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</span></a></li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</span> <span class=\"title\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var41 string
+					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 351, Col: 40}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</span></a></li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</div></noscript></section></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div></noscript></section></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -9,6 +9,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **UI terminology aliases** — node types `view` and `finding` now
+  render in the UI as "Opinion" and "Occurence" respectively, with the
+  original term shown as a tooltip on hover. The Post form preselects
+  Occurence as the default type. Database enums, query parameters,
+  CSS classes, and form values are unchanged; this is a pure copy
+  swap on the user-facing surface.
+
 - **Relevant parent ordering for new findings** — when creating a
   finding, the parent picker now surfaces views and sub-topics ahead
   of root topics and other findings, so the most specific anchors come

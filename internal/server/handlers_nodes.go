@@ -110,7 +110,7 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
-		TypeFilter: string(db.NodeTypeTopic), // default form type is view, which parents to a topic
+		TypeFilter: "", // default form type is finding, which can attach to any node
 		Query:      "",
 		ViewerID:   viewerID(r),
 	})
@@ -124,10 +124,10 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		defaultVisibility = string(db.VisibilityKindPublic)
 	}
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "view", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
+		render(w, r, views.NodeNewModal("", "finding", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
 		return
 	}
-	render(w, r, views.NodeNew(viewerFor(user), "", "view", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
+	render(w, r, views.NodeNew(viewerFor(user), "", "finding", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
 }
 
 // handleParentPicker serves the post form's parent-node picker fragment.
@@ -238,7 +238,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	var findingEdgeKind db.EdgeKind
 	switch {
 	case nt != db.NodeTypeTopic && nt != db.NodeTypeView && nt != db.NodeTypeFinding:
-		flash = "Pick a type: View, Topic, or Finding."
+		flash = "Pick a type: Opinion, Topic, or Occurence."
 	case title == "":
 		flash = "Title is required."
 	case len(title) > 200:
@@ -250,13 +250,13 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	// node is fine.
 	needsParent := nt == db.NodeTypeView || nt == db.NodeTypeFinding || (nt == db.NodeTypeTopic && rawTopicParentMode == "sub")
 	if flash == "" && needsParent {
-		missingMsg := "A view must be connected to a parent topic. Search and select one above."
+		missingMsg := "An opinion must be connected to a parent topic. Search and select one above."
 		mustBeTopic := true
 		switch nt {
 		case db.NodeTypeTopic:
 			missingMsg = "A sub-topic must be connected to a parent topic. Search and select one above."
 		case db.NodeTypeFinding:
-			missingMsg = "A finding must attach to an existing node. Search and select one above."
+			missingMsg = "An occurence must attach to an existing node. Search and select one above."
 			mustBeTopic = false
 		}
 		if rawParentNodeID == "" {
@@ -296,7 +296,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	if flash == "" && nt == db.NodeTypeFinding {
 		ek := db.EdgeKind(rawFindingEdgeKind)
 		if !isUserPickableEdgeKind(ek) {
-			flash = "Pick how this finding relates to its parent."
+			flash = "Pick how this occurence relates to its parent."
 		} else {
 			findingEdgeKind = ek
 		}
@@ -1033,11 +1033,11 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	var toID uuid.UUID
 	if rawToMode == "new" {
 		if rawNewFindingTitle == "" {
-			rerender("Type a title for the new finding.")
+			rerender("Type a title for the new occurence.")
 			return
 		}
 		if len(rawNewFindingTitle) > 200 {
-			rerender("Finding title is too long (max 200 characters).")
+			rerender("Occurence title is too long (max 200 characters).")
 			return
 		}
 		newNode, createErr := s.createNodeWithUniqueSlug(r.Context(), slugify(rawNewFindingTitle), func(slug string) db.CreateNodeParams {
@@ -1056,7 +1056,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		})
 		if createErr != nil {
 			s.logger.Error("edge create: new finding", "err", createErr)
-			rerender("Could not create the finding. Please try again.")
+			rerender("Could not create the occurence. Please try again.")
 			return
 		}
 		s.logger.Info("node created", "node_id", newNode.ID, "slug", newNode.Slug, "type", newNode.Type, "user_id", user.ID, "via", "edge_inline", "parent_node_id", fromID)

@@ -20,7 +20,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			<div class="col gap-12" style="margin-bottom: 24px;">
 				<span class="eyebrow">Post</span>
 				<h1 class="h-1">New post</h1>
-				<p class="muted" style="margin: 0;">A view is a stance — that's the standard post. A topic groups views together. A finding attaches an observation to an existing node and says how it relates.</p>
+				<p class="muted" style="margin: 0;">An opinion is a stance. A topic groups opinions together. An occurence attaches an observation to an existing node and says how it relates.</p>
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
@@ -49,7 +49,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			</div>
 			<h2 id="post-modal-title" style="margin: 0 0 6px; font-size: 22px;">New post</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
-				Share a view, start a topic, or attach a finding to an existing node.
+				Share an opinion, start a topic, or attach an occurence to an existing node.
 			</p>
 			@Flash(flash)
 			<form
@@ -80,23 +80,23 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 	<fieldset class="toggle-group">
 		<legend>Type</legend>
 		<div class="toggle-btns">
-			<label class="toggle-btn" data-type="view">
-				<input type="radio" name="type" value="view" required checked?={ formType == "view" || formType == "" }/>
+			<label class="toggle-btn" data-type="view" title="View">
+				<input type="radio" name="type" value="view" checked?={ formType == "view" }/>
 				<span class="material-symbols-outlined">campaign</span>
-				View
+				Opinion
 			</label>
-			<label class="toggle-btn" data-type="topic">
+			<label class="toggle-btn" data-type="topic" title="Topic">
 				<input type="radio" name="type" value="topic" checked?={ formType == "topic" }/>
 				<span class="material-symbols-outlined">workspaces</span>
 				Topic
 			</label>
-			<label class="toggle-btn" data-type="finding">
-				<input type="radio" name="type" value="finding" checked?={ formType == "finding" }/>
+			<label class="toggle-btn" data-type="finding" title="Finding">
+				<input type="radio" name="type" value="finding" required checked?={ formType == "finding" || formType == "" }/>
 				<span class="material-symbols-outlined">fact_check</span>
-				Finding
+				Occurence
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">A view takes a stance. A topic groups views. A finding attaches an observation to any existing node.</small>
+		<small class="muted" style="font-size: 12px;">An opinion takes a stance. A topic groups opinions. An occurence attaches an observation to any existing node.</small>
 	</fieldset>
 	<fieldset class="toggle-group if-topic">
 		<legend>Position</legend>
@@ -133,7 +133,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 				Related
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">How this finding relates to its parent — supports backs it, opposes argues against, related is for citations or loose links.</small>
+		<small class="muted" style="font-size: 12px;">How this occurence relates to its parent — supports backs it, opposes argues against, related is for citations or loose links.</small>
 	</fieldset>
 	<label>
 		Title
@@ -203,7 +203,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			/>
 			<small class="if-view">Pick the topic this anchors under.</small>
 			<small class="if-topic">Pick the topic this anchors under.</small>
-			<small class="if-finding">Pick the node this finding attaches to — any topic, view, or finding.</small>
+			<small class="if-finding">Pick the node this occurence attaches to — any topic, opinion, or occurence.</small>
 		</label>
 		@TopicCandidatePicker(findParent, formParentNodeID, parentCandidates)
 	</div>
@@ -382,12 +382,45 @@ func topicViewExcerpt(body string) string {
 	return string(r[:180]) + "..."
 }
 
-// nodeTypeChip renders a chip with the node-type pastel.
+// nodeTypeChip renders a chip with the node-type pastel. The displayed
+// label uses the user-facing alias (view → opinion, finding → occurence);
+// the title attribute carries the original term so a hover/long-press
+// reveals it. The CSS class stays on the original type name so the
+// per-type colours don't move.
 templ nodeTypeChip(t db.NodeType) {
-	<span class={ "chip", string(t) }>
+	<span class={ "chip", string(t) } title={ nodeTypeOriginalLabel(t) }>
 		<span class="dot"></span>
-		{ string(t) }
+		{ nodeTypeAliasLabel(t) }
 	</span>
+}
+
+// nodeTypeAliasLabel returns the user-facing label for a node type. View
+// renders as "opinion" and finding as "occurence"; the chip's CSS uppercases
+// the result. Topic and comment stay as they are.
+func nodeTypeAliasLabel(t db.NodeType) string {
+	switch t {
+	case db.NodeTypeView:
+		return "opinion"
+	case db.NodeTypeFinding:
+		return "occurence"
+	}
+	return string(t)
+}
+
+// nodeTypeOriginalLabel returns the original (pre-alias) capitalised name
+// for the title tooltip on chips and buttons.
+func nodeTypeOriginalLabel(t db.NodeType) string {
+	switch t {
+	case db.NodeTypeView:
+		return "View"
+	case db.NodeTypeFinding:
+		return "Finding"
+	case db.NodeTypeTopic:
+		return "Topic"
+	case db.NodeTypeComment:
+		return "Comment"
+	}
+	return string(t)
 }
 
 templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, tags []db.Tag, canEdit, canDelete bool) {
@@ -471,7 +504,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 
 			if len(featured) > 0 {
 				<section class="featured">
-					<h2>Key findings</h2>
+					<h2 title="Key findings">Key occurences</h2>
 					for _, f := range featured {
 						<article class={ "featured-card", "edge-" + string(f.Kind) }>
 							<header class="featured-head">
@@ -549,12 +582,12 @@ templ TopicViewFeed(viewer *Viewer, items []TopicView) {
 	<section class="topic-feed">
 		<div class="section-head">
 			<div>
-				<h2>Views</h2>
+				<h2 title="Views">Opinions</h2>
 				<p class="muted">Posts anchored to this topic.</p>
 			</div>
 		</div>
 		if len(items) == 0 {
-			<div class="card muted topic-empty">No views in this topic yet.</div>
+			<div class="card muted topic-empty">No opinions in this topic yet.</div>
 		} else {
 			<div class="topic-view-list">
 				for _, item := range items {
@@ -849,7 +882,7 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — support or oppose — or just feature it. Evidence and reasoning live in the graph; use Connect to add a finding.
+					Take a stance — support or oppose — or just feature it. Evidence and reasoning live in the graph; use Connect to add an occurence.
 				} else {
 					Feature this on your profile.
 				}
@@ -1075,13 +1108,13 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 				<span class="material-symbols-outlined">search</span>
 				Existing node
 			</label>
-			<label class="toggle-btn" data-to-mode="new">
+			<label class="toggle-btn" data-to-mode="new" title="New finding">
 				<input type="radio" name="to_mode" value="new" checked?={ formToMode == "new" }/>
 				<span class="material-symbols-outlined">add_circle</span>
-				New finding
+				New occurence
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new finding attached to this one. The new finding inherits visibility from this node.</small>
+		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new occurence attached to this one. The new occurence inherits visibility from this node.</small>
 	</fieldset>
 	<div class="edge-target-existing">
 		<label>
@@ -1101,7 +1134,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 		@CandidatePicker(find, candidates)
 	</div>
 	<label class="edge-target-new">
-		New finding title
+		New occurence title
 		<input
 			type="text"
 			name="new_finding_title"
@@ -1109,7 +1142,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 			maxlength="200"
 			placeholder="e.g. The 2023 IPCC synthesis report"
 		/>
-		<small>The finding is created with this title and attached by the chosen relationship kind.</small>
+		<small>The occurence is created with this title and attached by the chosen relationship kind.</small>
 	</label>
 }
 

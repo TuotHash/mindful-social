@@ -181,7 +181,7 @@ func TestEdgeCreate_InlineFindingRequiresTitle(t *testing.T) {
 		"new_finding_title": {""},
 	})
 	body := readBody(t, resp)
-	if !strings.Contains(body, "Type a title for the new finding.") {
+	if !strings.Contains(body, "Type a title for the new occurence.") {
 		t.Fatalf("expected missing-title flash; got: %s", snippet(body))
 	}
 }

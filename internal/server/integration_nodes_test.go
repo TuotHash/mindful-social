@@ -109,7 +109,7 @@ func TestNodeCreate_FindingRequiresParent(t *testing.T) {
 		"title": {"Should not create"},
 	})
 	body := readBody(t, resp)
-	if !strings.Contains(body, "finding must attach") {
+	if !strings.Contains(body, "occurence must attach") {
 		t.Fatalf("expected flash about parent requirement, got: %s", snippet(body))
 	}
 	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {

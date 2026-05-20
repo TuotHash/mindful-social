@@ -3,6 +3,20 @@
     return '<span class="material-symbols-outlined">' + name + '</span>';
   }
 
+  function nodeTypeAliasLabel(t) {
+    if (t === "view") return "opinion";
+    if (t === "finding") return "occurence";
+    return t || "";
+  }
+
+  function nodeTypeOriginalLabel(t) {
+    if (t === "view") return "View";
+    if (t === "finding") return "Finding";
+    if (t === "topic") return "Topic";
+    if (t === "comment") return "Comment";
+    return t || "";
+  }
+
   function sanitizePreview(html) {
     var doc = new DOMParser().parseFromString(html, "text/html");
     doc.querySelectorAll("script, style, iframe, object, embed, form, input, button").forEach(function (node) {
@@ -190,11 +204,11 @@
       var topicMode = selectedValue(form, "topic_parent_mode") || "root";
       var needsParent = type === "view" || type === "finding" || (type === "topic" && topicMode === "sub");
       if (needsParent && !selectedValue(form, "parent_node_id")) {
-        var message = "A view must be connected to a parent topic. Search and select one above.";
+        var message = "An opinion must be connected to a parent topic. Search and select one above.";
         if (type === "topic") {
           message = "A sub-topic must be connected to a parent topic. Search and select one above.";
         } else if (type === "finding") {
-          message = "A finding must attach to an existing node. Search and select one above.";
+          message = "An occurence must attach to an existing node. Search and select one above.";
         }
         return {
           field: form.querySelector('input[name="find_parent"]') || form.querySelector('input[name="parent_node_id"]'),
@@ -207,7 +221,7 @@
     if (toMode === "new") {
       var title = form.querySelector('input[name="new_finding_title"]');
       if (title && title.value.trim() === "") {
-        return { field: title, message: "Type a title for the new finding." };
+        return { field: title, message: "Type a title for the new occurence." };
       }
     } else if (toMode === "existing" && !selectedValue(form, "to_id")) {
       return {
@@ -965,10 +979,11 @@
 
         var chip = document.createElement("span");
         chip.className = "chip " + node.type;
+        chip.title = nodeTypeOriginalLabel(node.type);
         var dot = document.createElement("span");
         dot.className = "dot";
         chip.appendChild(dot);
-        chip.appendChild(document.createTextNode(node.type));
+        chip.appendChild(document.createTextNode(nodeTypeAliasLabel(node.type)));
 
         var author = document.createElement("span");
         author.textContent = "by " + node.authorUsername;
