@@ -268,6 +268,7 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 		r.Get("/nodes/{id}/pin", s.handlePinForm)
 		r.Post("/nodes/{id}/pin", s.handlePinSet)
 		r.Post("/nodes/{id}/unpin", s.handlePinDelete)
+		r.Post("/nodes/{id}/stance", s.handleStanceSet)
 		r.Post("/nodes/{id}/comments", s.handleCommentCreate)
 		r.Get("/nodes/{id}/comments/{commentID}/edit", s.handleCommentEdit)
 		r.Post("/nodes/{id}/comments/{commentID}", s.handleCommentUpdate)

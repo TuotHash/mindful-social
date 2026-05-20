@@ -58,10 +58,14 @@ func TestPin_UpsertSwapsKindInPlace(t *testing.T) {
 		t.Fatalf("expected opposes, got %s", row.Kind)
 	}
 
-	// Detail page banner reflects the current kind.
+	// Detail page reflects the current kind: the Oppose button is pressed
+	// and the meter shows a 100% oppose share (alice is the only voter).
 	body := readBody(t, get(t, c, "/nodes/"+view.String()))
-	if !strings.Contains(body, "You oppose this") {
-		t.Fatalf("detail page should say 'You oppose this'; excerpt: %s", snippet(body))
+	if !strings.Contains(body, "stance-opposes pressed") {
+		t.Fatalf("detail page should mark Oppose as pressed; excerpt: %s", snippet(body))
+	}
+	if !strings.Contains(body, "100% oppose") {
+		t.Fatalf("detail page should show 100%% oppose in meter; excerpt: %s", snippet(body))
 	}
 }
 

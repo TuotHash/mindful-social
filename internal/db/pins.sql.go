@@ -32,6 +32,31 @@ func (q *Queries) DeletePin(ctx context.Context, arg DeletePinParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const getPinCountsForNode = `-- name: GetPinCountsForNode :one
+SELECT
+    COUNT(*) FILTER (WHERE kind = 'supports')::bigint AS supports_count,
+    COUNT(*) FILTER (WHERE kind = 'opposes')::bigint  AS opposes_count,
+    COUNT(*) FILTER (WHERE kind = 'featured')::bigint AS resonates_count
+FROM user_node_pins
+WHERE node_id = $1
+`
+
+type GetPinCountsForNodeRow struct {
+	SupportsCount  int64 `json:"supports_count"`
+	OpposesCount   int64 `json:"opposes_count"`
+	ResonatesCount int64 `json:"resonates_count"`
+}
+
+// Aggregate pin counts for a node — drives the on-post stance meter and
+// the (later) trending-relevance counter. supports + opposes feed the
+// 0..100% meter; the total (all three kinds) is the relevance signal.
+func (q *Queries) GetPinCountsForNode(ctx context.Context, nodeID uuid.UUID) (GetPinCountsForNodeRow, error) {
+	row := q.db.QueryRow(ctx, getPinCountsForNode, nodeID)
+	var i GetPinCountsForNodeRow
+	err := row.Scan(&i.SupportsCount, &i.OpposesCount, &i.ResonatesCount)
+	return i, err
+}
+
 const getPinForUserAndNode = `-- name: GetPinForUserAndNode :one
 SELECT
     p.id,

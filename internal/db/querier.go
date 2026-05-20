@@ -129,6 +129,10 @@ type Querier interface {
 	// bcrypt hash of their password identity in one round-trip.
 	GetPasswordIdentityForLogin(ctx context.Context, email string) (GetPasswordIdentityForLoginRow, error)
 	GetPasswordIdentityForUser(ctx context.Context, userID uuid.UUID) (AuthIdentity, error)
+	// Aggregate pin counts for a node — drives the on-post stance meter and
+	// the (later) trending-relevance counter. supports + opposes feed the
+	// 0..100% meter; the total (all three kinds) is the relevance signal.
+	GetPinCountsForNode(ctx context.Context, nodeID uuid.UUID) (GetPinCountsForNodeRow, error)
 	// Whether and how the viewer has pinned a given node. Pins now carry
 	// only the stance — findings live as first-class graph nodes attached
 	// through edges, not bolted onto the pin record.

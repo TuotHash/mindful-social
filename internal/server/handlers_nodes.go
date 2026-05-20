@@ -446,6 +446,18 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	counts, err := s.queries.GetPinCountsForNode(r.Context(), id)
+	if err != nil {
+		s.logger.Error("node detail: stance counts", "err", err)
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
+	stance := views.StanceCounts{
+		Supports:  counts.SupportsCount,
+		Opposes:   counts.OpposesCount,
+		Resonates: counts.ResonatesCount,
+	}
+
 	author, err := s.queries.GetUser(r.Context(), node.CreatedBy)
 	if err != nil {
 		s.logger.Error("node detail: author", "err", err)
@@ -503,6 +515,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		comments,
 		commentCount,
 		pin,
+		stance,
 		tags,
 		canEdit,
 		canDelete,

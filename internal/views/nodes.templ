@@ -165,8 +165,8 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			</label>
 			<label class="toggle-btn" data-kind="featured">
 				<input type="radio" name="pin" value="featured" checked?={ formPin == "featured" }/>
-				<span class="material-symbols-outlined">keep</span>
-				Feature
+				<span class="material-symbols-outlined">graphic_eq</span>
+				Resonate
 			</label>
 			<label class="toggle-btn if-view" data-kind="supports">
 				<input type="radio" name="pin" value="supports" checked?={ formPin == "supports" }/>
@@ -251,6 +251,40 @@ type PinInfo struct {
 	Kind db.PinKind
 }
 
+// StanceCounts is the on-post stance snapshot. Supports + Opposes drive
+// the 0..100% meter (rendered only when their sum > 0). The Resonates
+// kind is stance-neutral and feeds the (later) trending-relevance
+// counter — all three contribute to Relevance.
+type StanceCounts struct {
+	Supports  int64
+	Opposes   int64
+	Resonates int64
+}
+
+func (c StanceCounts) StanceTotal() int64 { return c.Supports + c.Opposes }
+
+func (c StanceCounts) Relevance() int64 { return c.Supports + c.Opposes + c.Resonates }
+
+// SupportPercent returns the support share of the support+oppose total,
+// rounded to an integer in [0, 100]. Caller should check StanceTotal()>0
+// before showing the meter.
+func (c StanceCounts) SupportPercent() int {
+	total := c.StanceTotal()
+	if total <= 0 {
+		return 0
+	}
+	p := (c.Supports*100 + total/2) / total
+	if p < 0 {
+		return 0
+	}
+	if p > 100 {
+		return 100
+	}
+	return int(p)
+}
+
+func (c StanceCounts) OpposePercent() int { return 100 - c.SupportPercent() }
+
 // TopicView is one child view in a topic's thread feed.
 type TopicView struct {
 	ID                     uuid.UUID
@@ -288,7 +322,7 @@ func pinKindLabel(k db.PinKind) string {
 	case db.PinKindOpposes:
 		return "You oppose this"
 	case db.PinKindFeatured:
-		return "On your profile"
+		return "Resonates with you"
 	}
 	return string(k)
 }
@@ -297,6 +331,46 @@ func pinKindLabel(k db.PinKind) string {
 // (green for supports, red for opposes, neutral for featured).
 func pinBannerClass(k db.PinKind) string {
 	return "pin-banner pin-" + string(k)
+}
+
+// stanceBtnClass styles a button as pressed when the viewer's current
+// pin matches this button's kind. The .pressed modifier shifts the
+// button into the kind colour via CSS, the same hue used by the meter.
+func stanceBtnClass(kind db.PinKind, current *PinInfo) string {
+	base := "stance-btn stance-" + string(kind)
+	if current != nil && current.Kind == kind {
+		return base + " pressed"
+	}
+	return base
+}
+
+// stanceBarStyle is the inline width on the supports fill of the meter.
+// Returning a string keeps templ's CSS sanitizer happy.
+func stanceBarStyle(pct int) string {
+	return fmt.Sprintf("width: %d%%", pct)
+}
+
+func stanceVoiceLabel(n int64) string {
+	if n == 1 {
+		return "1 voice"
+	}
+	return fmt.Sprintf("%d voices", n)
+}
+
+func stancePercentLabel(pct int) string {
+	return fmt.Sprintf("%d%%", pct)
+}
+
+func stanceMeterAria(stance StanceCounts) string {
+	return fmt.Sprintf("%d%% support, %d%% oppose across %s",
+		stance.SupportPercent(), stance.OpposePercent(), stanceVoiceLabel(stance.StanceTotal()))
+}
+
+func ariaPressed(pin *PinInfo, kind db.PinKind) string {
+	if pin != nil && pin.Kind == kind {
+		return "true"
+	}
+	return "false"
 }
 
 // cascadeEdgeLabel renders the edge-count line on the deletion confirmation
@@ -423,7 +497,69 @@ func nodeTypeOriginalLabel(t db.NodeType) string {
 	return string(t)
 }
 
-templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, tags []db.Tag, canEdit, canDelete bool) {
+// StanceRow renders the on-post stance controls + meter. For views the
+// row carries three one-click toggles (Support / Oppose / Resonate); for
+// other node types only Resonate applies (support and oppose are stance
+// statements that don't make sense on topics, occurences, or comments).
+// The meter renders only when at least one viewer has taken a stance.
+// Logged-out viewers see read-only counts and a sign-in nudge — keeps
+// the percentage visible to anyone browsing.
+templ StanceRow(viewer *Viewer, node db.Node, pin *PinInfo, stance StanceCounts) {
+	<section class="stance-row" style="margin-top: 22px;">
+		if viewer != nil {
+			<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/stance") } class="stance-buttons">
+				@CSRFField()
+				if node.Type == db.NodeTypeView {
+					<button type="submit" name="kind" value="supports" class={ stanceBtnClass(db.PinKindSupports, pin) } aria-pressed={ ariaPressed(pin, db.PinKindSupports) }>
+						<span class="material-symbols-outlined">heart_plus</span>
+						Support
+					</button>
+					<button type="submit" name="kind" value="opposes" class={ stanceBtnClass(db.PinKindOpposes, pin) } aria-pressed={ ariaPressed(pin, db.PinKindOpposes) }>
+						<span class="material-symbols-outlined">heart_minus</span>
+						Oppose
+					</button>
+				}
+				<button type="submit" name="kind" value="featured" class={ stanceBtnClass(db.PinKindFeatured, pin) } aria-pressed={ ariaPressed(pin, db.PinKindFeatured) }>
+					<span class="material-symbols-outlined">graphic_eq</span>
+					Resonate
+				</button>
+			</form>
+		} else {
+			<p class="muted stance-signed-out"><a href="/login">Sign in</a> to support, oppose, or resonate.</p>
+		}
+		if node.Type == db.NodeTypeView {
+			@StanceMeter(stance)
+		} else if stance.Resonates > 0 {
+			<div class="stance-relevance">
+				<span class="material-symbols-outlined">graphic_eq</span>
+				{ stanceVoiceLabel(stance.Resonates) }
+			</div>
+		}
+	</section>
+}
+
+// StanceMeter draws the 0..100% horizontal bar. The fill spans support
+// share of (supports + opposes); the unfilled remainder reads as oppose.
+// When no one has weighed in yet the meter is replaced with a neutral
+// "no stances yet" line so the layout never collapses.
+templ StanceMeter(stance StanceCounts) {
+	if stance.StanceTotal() <= 0 {
+		<p class="muted stance-empty">No stances yet — be the first to support or oppose.</p>
+	} else {
+		<div class="stance-meter" role="img" aria-label={ stanceMeterAria(stance) }>
+			<div class="stance-bar">
+				<span class="stance-fill" style={ stanceBarStyle(stance.SupportPercent()) }></span>
+			</div>
+			<div class="stance-meter-labels">
+				<span class="stance-label supports">{ stancePercentLabel(stance.SupportPercent()) } support</span>
+				<span class="stance-label voices">{ stanceVoiceLabel(stance.StanceTotal()) }</span>
+				<span class="stance-label opposes">{ stancePercentLabel(stance.OpposePercent()) } oppose</span>
+			</div>
+		</div>
+	}
+}
+
+templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured []FeaturedRow, groups []EdgeGroup, topicViews []TopicView, comments []Comment, commentCount int64, pin *PinInfo, stance StanceCounts, tags []db.Tag, canEdit, canDelete bool) {
 	@Layout(node.Title, viewer) {
 		<div class="page medium">
 			<article class="node card" style="padding: 36px;">
@@ -452,8 +588,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 						}
 					</section>
 				}
+				@StanceRow(viewer, node, pin, stance)
 				if viewer != nil {
-					<div class="node-actions" style="margin-top: 22px;">
+					<div class="node-actions" style="margin-top: 18px;">
 						if canEdit {
 							<a
 								href={ templ.SafeURL("/nodes/" + node.Slug + "/edges/new") }
@@ -465,35 +602,9 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/edit") } class="btn ghost"><span class="material-symbols-outlined">edit</span>Edit</a>
 						}
 						<a href={ templ.SafeURL("/nodes/" + node.Slug + "/history") } class="btn ghost"><span class="material-symbols-outlined">history</span>History</a>
-						if pin == nil {
-							<a
-								href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }
-								class="btn accent"
-								hx-get={ "/nodes/" + node.Slug + "/pin" }
-								hx-target="#modal"
-								hx-swap="innerHTML"
-							><span class="material-symbols-outlined">graphic_eq</span>Resonate</a>
-						}
 						if canDelete {
 							<a href={ templ.SafeURL("/nodes/" + node.Slug + "/delete") } class="btn danger"><span class="material-symbols-outlined">delete</span>Delete</a>
 						}
-					</div>
-				}
-				if viewer != nil && pin != nil {
-					<div class={ pinBannerClass(pin.Kind) } style="margin-top: 18px;">
-						<strong>{ pinKindLabel(pin.Kind) }.</strong>
-						<a
-							href={ templ.SafeURL("/nodes/" + node.Slug + "/pin") }
-							class="muted"
-							style="margin-left: auto; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;"
-							hx-get={ "/nodes/" + node.Slug + "/pin" }
-							hx-target="#modal"
-							hx-swap="innerHTML"
-						><span class="material-symbols-outlined" style="font-size: 14px;">edit</span>Change</a>
-						<form method="post" action={ templ.SafeURL("/nodes/" + node.Slug + "/unpin") } class="inline">
-							@CSRFField()
-							<button type="submit" class="link" style="display: inline-flex; align-items: center; gap: 4px;"><span class="material-symbols-outlined" style="font-size: 14px;">keep_off</span>Remove</button>
-						</form>
 					</div>
 				}
 			</article>
@@ -882,9 +993,9 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — support or oppose — or just feature it. Evidence and reasoning live in the graph; use Connect to add an occurence.
+					Take a stance — support or oppose — or simply resonate. Evidence and reasoning live in the graph; use Connect to add an occurence.
 				} else {
-					Feature this on your profile.
+					Resonate with this on your profile.
 				}
 			</p>
 			@Flash(flash)
@@ -917,9 +1028,9 @@ templ PinModal(node db.Node, flash, formKind string) {
 			<h2 id="pin-modal-title" style="margin: 0 0 6px; font-size: 22px;">{ node.Title }</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — or just feature it.
+					Take a stance — or simply resonate.
 				} else {
-					Feature this on your profile.
+					Resonate with this on your profile.
 				}
 			</p>
 			@Flash(flash)
@@ -963,8 +1074,8 @@ templ pinFormFields(node db.Node, formKind string) {
 			}
 			<label class="toggle-btn" data-kind="featured">
 				<input type="radio" name="kind" value="featured" checked?={ formKind == "featured" || (node.Type != db.NodeTypeView && formKind == "") }/>
-				<span class="material-symbols-outlined">keep</span>
-				Just feature
+				<span class="material-symbols-outlined">graphic_eq</span>
+				Resonate
 			</label>
 		</div>
 	</fieldset>

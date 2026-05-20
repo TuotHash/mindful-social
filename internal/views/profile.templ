@@ -46,7 +46,7 @@ func (r FollowRelation) IsConnection() bool {
 }
 
 // pinKindShort is the inline label rendered next to each pin row on a
-// profile, e.g. "Supports", "Opposes", "Featured".
+// profile, e.g. "Supports", "Opposes", "Resonates".
 func pinKindShort(k db.PinKind) string {
 	switch k {
 	case db.PinKindSupports:
@@ -54,7 +54,7 @@ func pinKindShort(k db.PinKind) string {
 	case db.PinKindOpposes:
 		return "Opposes"
 	case db.PinKindFeatured:
-		return "Featured"
+		return "Resonates"
 	}
 	return string(k)
 }

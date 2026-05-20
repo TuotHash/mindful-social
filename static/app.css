@@ -2317,6 +2317,117 @@ header.node-header > .chip {
   border-color: var(--border-strong);
 }
 
+/* stance row — on-post Support / Oppose / Resonate buttons + 0-100% meter */
+.stance-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.stance-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.stance-buttons .stance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev-1);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.stance-buttons .stance-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+.stance-buttons .stance-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elev-2);
+}
+.stance-buttons .stance-btn:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+.stance-buttons .stance-supports.pressed {
+  background: color-mix(in oklab, var(--supports) 18%, var(--bg-elev-1));
+  border-color: var(--supports);
+  color: var(--supports);
+}
+.stance-buttons .stance-opposes.pressed {
+  background: color-mix(in oklab, var(--opposes) 18%, var(--bg-elev-1));
+  border-color: var(--opposes);
+  color: var(--opposes);
+}
+.stance-buttons .stance-featured.pressed {
+  background: var(--bg-elev-2);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+.stance-signed-out {
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
+.stance-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--s-1);
+}
+.stance-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--opposes);
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+.stance-bar .stance-fill {
+  display: block;
+  height: 100%;
+  background: var(--supports);
+  transition: width 200ms ease;
+}
+.stance-meter-labels {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 12px;
+  color: var(--muted, var(--fg));
+}
+.stance-meter-labels .stance-label.supports {
+  color: var(--supports);
+  font-weight: 600;
+}
+.stance-meter-labels .stance-label.opposes {
+  color: var(--opposes);
+  font-weight: 600;
+  margin-left: auto;
+}
+.stance-meter-labels .stance-label.voices {
+  font-variant-numeric: tabular-nums;
+}
+.stance-empty {
+  font-size: 12px;
+  margin: 0;
+}
+.stance-relevance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, var(--fg));
+}
+.stance-relevance .material-symbols-outlined {
+  font-size: 16px;
+}
+
 /* featured / key findings */
 .featured {
   margin-bottom: var(--s-8);

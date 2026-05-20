@@ -13,7 +13,7 @@ import (
 )
 
 // handlePinForm renders the "Pin to profile" page for a node. A pin is
-// now a pure stance toggle (Support / Oppose / Feature); attaching
+// now a pure stance toggle (Support / Oppose / Resonate); attaching
 // evidence happens through the typed-edge graph via the Connect form,
 // not here.
 func (s *Server) handlePinForm(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +74,56 @@ func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }
 
+// handleStanceSet powers the three one-click buttons on a node page
+// (Support / Oppose / Resonate). Clicking the button that matches the
+// viewer's current pin removes it; clicking a different button replaces
+// the existing pin (or creates one when there is none). All three kinds
+// are mutually exclusive — there is at most one pin per (user, node).
+func (s *Server) handleStanceSet(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	node, ok := s.resolveNode(w, r)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest)
+		return
+	}
+
+	kind, kindErr := parsePinKind(strings.TrimSpace(r.PostFormValue("kind")), node.Type)
+	if kindErr != "" {
+		s.renderError(w, r, http.StatusBadRequest)
+		return
+	}
+
+	current, ok := s.lookupPin(w, r, user.ID, node.ID)
+	if !ok {
+		return
+	}
+
+	if current != nil && current.Kind == kind {
+		if _, err := s.queries.DeletePin(r.Context(), db.DeletePinParams{
+			UserID: user.ID,
+			NodeID: node.ID,
+		}); err != nil {
+			s.logger.Error("stance toggle off", "err", err)
+			s.renderError(w, r, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		if _, err := s.queries.SetPin(r.Context(), db.SetPinParams{
+			UserID: user.ID,
+			NodeID: node.ID,
+			Kind:   kind,
+		}); err != nil {
+			s.logger.Error("stance set", "err", err)
+			s.renderError(w, r, http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
+}
+
 func (s *Server) handlePinDelete(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	node, ok := s.resolveNode(w, r)
@@ -104,7 +154,7 @@ func parsePinKind(raw string, nodeType db.NodeType) (db.PinKind, string) {
 		return "", "Pick a valid stance."
 	}
 	if (pk == db.PinKindSupports || pk == db.PinKindOpposes) && nodeType != db.NodeTypeView {
-		return "", "Support and oppose only apply to views. Use 'feature' for other node types."
+		return "", "Support and oppose only apply to views. Use 'resonate' for other node types."
 	}
 	return pk, ""
 }

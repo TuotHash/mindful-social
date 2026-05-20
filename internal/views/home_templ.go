@@ -243,7 +243,7 @@ func landingMarketing(viewer *Viewer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = stepCard("03", "Share your own occurences", "Pin your stance — Support, Oppose, or Feature — then link the occurences that shaped it.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = stepCard("03", "Share your own occurences", "Take a stance — Support, Oppose, or Resonate — then link the occurences that shaped it.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

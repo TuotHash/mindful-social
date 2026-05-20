@@ -27,6 +27,17 @@ SELECT
 FROM user_node_pins p
 WHERE p.user_id = $1 AND p.node_id = $2;
 
+-- name: GetPinCountsForNode :one
+-- Aggregate pin counts for a node — drives the on-post stance meter and
+-- the (later) trending-relevance counter. supports + opposes feed the
+-- 0..100% meter; the total (all three kinds) is the relevance signal.
+SELECT
+    COUNT(*) FILTER (WHERE kind = 'supports')::bigint AS supports_count,
+    COUNT(*) FILTER (WHERE kind = 'opposes')::bigint  AS opposes_count,
+    COUNT(*) FILTER (WHERE kind = 'featured')::bigint AS resonates_count
+FROM user_node_pins
+WHERE node_id = $1;
+
 -- name: ListPinsByUser :many
 -- A user's pins with the joined node — for the "On my profile" section on
 -- a profile page. node_visible_to() hides pins whose underlying node the
