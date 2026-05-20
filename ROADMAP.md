@@ -30,6 +30,8 @@ This document outlines upcoming features beyond the MVP. For the current feature
 
 - **Trending graph view** — most-engaged nodes and edges over a recent window.
 
+- **2D force-directed layout** — replace the static three-column placeholder in `static/app.js` with a physics simulation: a charge force (every node repels every other node, so things don't pile up), a link force (connected nodes attract along a target distance, so related stuff clusters), and a gentle centering force. Optional per-edge-kind tweaks: `supports` pulls harder than `relates_to`; `opposes` could repel a bit, though that gets visually noisy. Likely uses `d3-force` (~30KB, no rendering dep) vendored alongside `htmx.min.js`; a hand-rolled Verlet sim is the fallback. Same data shape carries over to the 3D entry below, so the tuning learned here informs that work.
+
 - **3D argument graph** — add an optional `/graph/3d` explorer powered by `3d-force-graph` for spatial graph exploration while keeping the readable 2D graph as the default view.
 
 - **Graph search** — full-text search inside the graph view; matches highlight in place so the user sees them in context.
