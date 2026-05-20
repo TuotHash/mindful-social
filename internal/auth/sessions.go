@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,7 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-const sessionUserKey = "user_id"
+const (
+	sessionUserKey          = "user_id"
+	sessionOIDCProviderKey  = "oidc_provider"
+	sessionOIDCSubjectKey   = "oidc_subject"
+	sessionOIDCSessionIDKey = "oidc_sid"
+)
 
 // NewSessionManager wires scs to the Postgres-backed session store. We pass
 // in a *sql.DB rather than the pgx pool because scs/postgresstore is built
@@ -60,6 +66,50 @@ func CurrentUserID(ctx context.Context, sm *scs.SessionManager) (uuid.UUID, bool
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// RecordOIDCLogin tags the current session with the IdP coordinates that
+// produced it. We persist (provider, sub, sid) so a later backchannel
+// logout from the IdP can find this exact device session and destroy it.
+// sid may be empty when the IdP doesn't issue one — in that case backchannel
+// logout falls back to revoking every session for (provider, sub).
+func RecordOIDCLogin(ctx context.Context, sm *scs.SessionManager, provider, subject, sid string) {
+	sm.Put(ctx, sessionOIDCProviderKey, provider)
+	sm.Put(ctx, sessionOIDCSubjectKey, subject)
+	if sid != "" {
+		sm.Put(ctx, sessionOIDCSessionIDKey, sid)
+	}
+}
+
+// RevokeOIDCSessions destroys every session whose stored (provider, subject)
+// matches. When sid is non-empty, only sessions also carrying that sid are
+// destroyed — letting the IdP log a user out of one browser without
+// disturbing their other devices. Returns the number of sessions destroyed.
+func RevokeOIDCSessions(ctx context.Context, sm *scs.SessionManager, provider, subject, sid string) (int, error) {
+	if provider == "" || subject == "" {
+		return 0, errors.New("auth: revoke oidc: missing provider or subject")
+	}
+	var revoked int
+	// Iterate runs against a fresh background context internally; pass one
+	// rather than the request ctx so a short request deadline can't kill
+	// the loop midway.
+	err := sm.Iterate(context.Background(), func(c context.Context) error {
+		if sm.GetString(c, sessionOIDCProviderKey) != provider {
+			return nil
+		}
+		if sm.GetString(c, sessionOIDCSubjectKey) != subject {
+			return nil
+		}
+		if sid != "" && sm.GetString(c, sessionOIDCSessionIDKey) != sid {
+			return nil
+		}
+		if err := sm.Destroy(c); err != nil {
+			return err
+		}
+		revoked++
+		return nil
+	})
+	return revoked, err
 }
 
 // RevokeUserSessions destroys every active session belonging to userID.

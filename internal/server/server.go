@@ -146,23 +146,43 @@ func (s *Server) Close() error {
 
 func (s *Server) routes() {
 	r := chi.NewRouter()
+	// Outer middleware that runs on every route, including the
+	// IdP-to-server OIDC backchannel logout endpoint.
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(s.recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
-	// scs LoadAndSave wraps the request in a session-aware response writer
-	// and persists changes on the way out.
-	r.Use(s.sessions.LoadAndSave)
-	r.Use(s.loadUser)
-	r.Use(s.requestLogger)
-	// gorilla/csrf double-submit cookie + token check on unsafe methods.
-	// The bridge inside csrfMiddleware copies the per-request token onto
-	// our ctx so templates can render the hidden input via views.CSRFField.
-	r.Use(s.csrf)
-	// Defense-in-depth headers. Sits after CSRF so the CSRF error page
-	// also carries CSP/X-Frame-Options/etc.
+	// Defense-in-depth headers. Sits at the outer layer so even early
+	// error responses (CSRF rejects, backchannel JSON errors) carry them.
 	r.Use(securityHeaders)
 
+	// OIDC backchannel logout: server-to-server callback from the IdP. The
+	// request carries no cookies and no CSRF token; trust comes from the
+	// JWT signature, issuer, and audience checks inside the handler. Sits
+	// outside the session/CSRF middleware on purpose.
+	r.Post("/auth/backchannel-logout/{provider}", s.handleBackchannelLogout)
+
+	// User-facing routes get session loading, user resolution, request
+	// logging (with user_id), and CSRF on unsafe methods.
+	r.Group(func(r chi.Router) {
+		// scs LoadAndSave wraps the request in a session-aware response
+		// writer and persists changes on the way out.
+		r.Use(s.sessions.LoadAndSave)
+		r.Use(s.loadUser)
+		r.Use(s.requestLogger)
+		// gorilla/csrf double-submit cookie + token check on unsafe
+		// methods. The bridge inside csrfMiddleware copies the per-request
+		// token onto our ctx so templates can render the hidden input via
+		// views.CSRFField.
+		r.Use(s.csrf)
+
+		s.userFacingRoutes(r)
+	})
+
+	s.router = r
+}
+
+func (s *Server) userFacingRoutes(r chi.Router) {
 	r.Get("/healthz", s.handleHealth)
 
 	// Static assets are served from the embedded FS so the binary is
@@ -267,6 +287,4 @@ func (s *Server) routes() {
 		r.Get("/admin/users/{id}/delete", s.handleAdminUserDeleteConfirm)
 		r.Post("/admin/users/{id}/delete", s.handleAdminDeleteUser)
 	})
-
-	s.router = r
 }

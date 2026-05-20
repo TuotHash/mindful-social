@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -182,8 +183,81 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Tag the session with the IdP identifiers so a later OIDC backchannel
+	// logout can target it. Skipped when the provider didn't return a
+	// subject (shouldn't happen — FindOrCreateOAuthUser already rejects
+	// that case — but cheap belt-and-braces).
+	if ident.Subject != "" {
+		auth.RecordOIDCLogin(r.Context(), s.sessions, key, ident.Subject, ident.SessionID)
+	}
 	s.logger.Info("login", "user_id", user.ID, "username", user.Username, "method", "oauth", "provider", key)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// handleBackchannelLogout accepts an OIDC backchannel logout_token from the
+// IdP server. The request carries no cookies and no CSRF token; trust comes
+// from the JWT signature, issuer, and audience checks. On success we destroy
+// every local session matching (provider, sub[, sid]). Response shape and
+// status codes follow OpenID Connect Back-Channel Logout 1.0 §2.7-§2.8.
+func (s *Server) handleBackchannelLogout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+
+	key := chiURLParam(r, "provider")
+	prov, ok := s.oauth.Get(key)
+	if !ok {
+		writeBackchannelLogoutError(w, http.StatusNotFound, "invalid_request", "unknown provider")
+		return
+	}
+	verifier, ok := prov.(auth.BackchannelLogoutSupporter)
+	if !ok {
+		// Non-OIDC providers (GitHub) reach here; the spec doesn't apply.
+		writeBackchannelLogoutError(w, http.StatusBadRequest, "invalid_request", "provider does not support backchannel logout")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		writeBackchannelLogoutError(w, http.StatusBadRequest, "invalid_request", "malformed form body")
+		return
+	}
+	rawToken := r.PostFormValue("logout_token")
+	if rawToken == "" {
+		writeBackchannelLogoutError(w, http.StatusBadRequest, "invalid_request", "logout_token parameter is required")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), oauthExchangeTimeout)
+	defer cancel()
+	claims, err := verifier.VerifyLogoutToken(ctx, rawToken)
+	if err != nil {
+		s.logger.Warn("backchannel logout: token rejected", "provider", key, "err", err)
+		writeBackchannelLogoutError(w, http.StatusBadRequest, "invalid_request", "logout_token failed validation")
+		return
+	}
+
+	revoked, err := auth.RevokeOIDCSessions(r.Context(), s.sessions, key, claims.Subject, claims.SessionID)
+	if err != nil {
+		s.logger.Error("backchannel logout: revoke sessions", "provider", key, "err", err)
+		writeBackchannelLogoutError(w, http.StatusInternalServerError, "server_error", "could not revoke sessions")
+		return
+	}
+	s.logger.Info("backchannel logout",
+		"provider", key,
+		"sub", claims.Subject,
+		"sid", claims.SessionID,
+		"revoked", revoked,
+	)
+	w.WriteHeader(http.StatusOK)
+}
+
+// writeBackchannelLogoutError emits the JSON error shape the spec recommends
+// (RFC 6749 §5.2 style: error + error_description) with no-store caching.
+func writeBackchannelLogoutError(w http.ResponseWriter, status int, code, description string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"error":             code,
+		"error_description": description,
+	})
 }
 
 // humanizeAuthErr maps known auth errors to user-facing copy. Anything we

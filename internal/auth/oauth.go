@@ -38,7 +38,33 @@ type Identity struct {
 	Email         string // may be empty
 	EmailVerified bool   // true only when the provider explicitly attests it
 	DisplayName   string // may be empty
+	// SessionID is the OIDC `sid` claim, identifying this specific browser
+	// session at the IdP. Empty for IdPs that don't issue it (and for
+	// non-OIDC providers like GitHub). When present, we persist it on our
+	// own session so a later backchannel logout can target just this
+	// device instead of every device the user signed in from.
+	SessionID string
 }
+
+// LogoutClaims is the subset of an OIDC backchannel logout_token we act on.
+// Either Subject or SessionID is non-empty — when SessionID is empty the
+// IdP is asking us to log every session belonging to (provider, Subject)
+// out at once.
+type LogoutClaims struct {
+	Subject   string // OIDC `sub` claim, may be empty if `sid` is present
+	SessionID string // OIDC `sid` claim, may be empty if `sub` is present
+}
+
+// BackchannelLogoutSupporter is implemented by providers that can verify
+// an OIDC backchannel logout_token. Non-OIDC providers (GitHub) intentionally
+// don't implement it so the route handler can answer 400 cleanly.
+type BackchannelLogoutSupporter interface {
+	VerifyLogoutToken(ctx context.Context, rawToken string) (LogoutClaims, error)
+}
+
+// backchannelLogoutEvent is the JSON pointer the OIDC spec mandates inside
+// the logout_token's `events` claim. Its value is an empty JSON object.
+const backchannelLogoutEvent = "http://schemas.openid.net/event/backchannel-logout"
 
 // ----- OIDC (generic, also Google) -----
 
@@ -79,6 +105,7 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"`
 		Name          string `json:"name"`
+		SID           string `json:"sid"`
 	}
 	if err := idTok.Claims(&claims); err != nil {
 		return Identity{}, fmt.Errorf("oidc: parse claims: %w", err)
@@ -99,7 +126,39 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 		Email:         claims.Email,
 		EmailVerified: claims.EmailVerified,
 		DisplayName:   display,
+		SessionID:     claims.SID,
 	}, nil
+}
+
+// VerifyLogoutToken validates a logout_token per OpenID Connect Back-Channel
+// Logout 1.0 §2.6. It reuses the ID-token verifier for signature, issuer,
+// audience and expiry checks, then enforces the logout-specific claims:
+// the `events` claim must contain the backchannel-logout member, at least
+// one of `sub`/`sid` must be present, and `nonce` must NOT be present.
+func (p *oidcProvider) VerifyLogoutToken(ctx context.Context, raw string) (LogoutClaims, error) {
+	tok, err := p.verifier.Verify(ctx, raw)
+	if err != nil {
+		return LogoutClaims{}, fmt.Errorf("oidc: verify logout_token: %w", err)
+	}
+	var claims struct {
+		Subject string                     `json:"sub"`
+		SID     string                     `json:"sid"`
+		Nonce   string                     `json:"nonce"`
+		Events  map[string]json.RawMessage `json:"events"`
+	}
+	if err := tok.Claims(&claims); err != nil {
+		return LogoutClaims{}, fmt.Errorf("oidc: parse logout_token: %w", err)
+	}
+	if claims.Subject == "" && claims.SID == "" {
+		return LogoutClaims{}, errors.New("oidc: logout_token missing both sub and sid")
+	}
+	if claims.Nonce != "" {
+		return LogoutClaims{}, errors.New("oidc: logout_token must not contain a nonce claim")
+	}
+	if _, ok := claims.Events[backchannelLogoutEvent]; !ok {
+		return LogoutClaims{}, errors.New("oidc: logout_token events claim missing backchannel-logout member")
+	}
+	return LogoutClaims{Subject: claims.Subject, SessionID: claims.SID}, nil
 }
 
 func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSecret, redirectURL, usernameClaim string, scopes []string) (Provider, error) {
