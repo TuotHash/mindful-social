@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -102,13 +103,47 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		id := u.ID
 		userID = &id
 	}
+	// Read OIDC tags before destroying — Destroy clears these from the
+	// session-loaded context too.
+	providerKey, idToken := auth.OIDCSessionLogout(r.Context(), s.sessions)
 	if err := auth.LogoutUser(r.Context(), s.sessions); err != nil {
 		s.logger.Warn("logout", "err", err)
 	}
 	if userID != nil {
 		s.logger.Info("logout", "user_id", *userID)
 	}
+	if dest := s.idpLogoutRedirect(providerKey, idToken); dest != "" {
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// idpLogoutRedirect returns the IdP's RP-initiated logout URL for the
+// just-ended session, or "" when we should fall back to a local-only
+// logout. Returns "" when:
+//   - the session was not established via OAuth (providerKey empty),
+//   - the provider is unknown (config changed since login),
+//   - the provider doesn't implement RP-initiated logout (e.g. GitHub),
+//   - the IdP didn't advertise an end_session_endpoint at discovery.
+//
+// post_logout_redirect_uri is the public origin's root — operators must
+// register that URL with the IdP, otherwise the IdP shows its own
+// logged-out page instead of bouncing the user back.
+func (s *Server) idpLogoutRedirect(providerKey, idToken string) string {
+	if providerKey == "" {
+		return ""
+	}
+	prov, ok := s.oauth.Get(providerKey)
+	if !ok {
+		return ""
+	}
+	rp, ok := prov.(auth.RPInitiatedLogoutSupporter)
+	if !ok {
+		return ""
+	}
+	postLogout := strings.TrimRight(s.cfg.PublicBaseURL, "/") + "/"
+	return rp.LogoutURL(idToken, postLogout)
 }
 
 // handleOAuthStart kicks off the redirect-to-IdP dance. We stash a CSRF state
@@ -184,11 +219,12 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Tag the session with the IdP identifiers so a later OIDC backchannel
-	// logout can target it. Skipped when the provider didn't return a
-	// subject (shouldn't happen — FindOrCreateOAuthUser already rejects
+	// logout can target it, and stash the raw id_token so /logout can pass
+	// it back as `id_token_hint`. Skipped when the provider didn't return
+	// a subject (shouldn't happen — FindOrCreateOAuthUser already rejects
 	// that case — but cheap belt-and-braces).
 	if ident.Subject != "" {
-		auth.RecordOIDCLogin(r.Context(), s.sessions, key, ident.Subject, ident.SessionID)
+		auth.RecordOIDCLogin(r.Context(), s.sessions, key, ident.Subject, ident.SessionID, ident.RawIDToken)
 	}
 	s.logger.Info("login", "user_id", user.ID, "username", user.Username, "method", "oauth", "provider", key)
 	http.Redirect(w, r, "/", http.StatusSeeOther)

@@ -17,6 +17,7 @@ const (
 	sessionOIDCProviderKey  = "oidc_provider"
 	sessionOIDCSubjectKey   = "oidc_subject"
 	sessionOIDCSessionIDKey = "oidc_sid"
+	sessionOIDCIDTokenKey   = "oidc_id_token"
 )
 
 // NewSessionManager wires scs to the Postgres-backed session store. We pass
@@ -73,12 +74,28 @@ func CurrentUserID(ctx context.Context, sm *scs.SessionManager) (uuid.UUID, bool
 // logout from the IdP can find this exact device session and destroy it.
 // sid may be empty when the IdP doesn't issue one — in that case backchannel
 // logout falls back to revoking every session for (provider, sub).
-func RecordOIDCLogin(ctx context.Context, sm *scs.SessionManager, provider, subject, sid string) {
+// idToken is the raw signed id_token; we hold onto it so the user-initiated
+// /logout flow can pass it back as `id_token_hint` to the IdP. May be empty
+// for providers that never issued one (GitHub via plain OAuth2).
+func RecordOIDCLogin(ctx context.Context, sm *scs.SessionManager, provider, subject, sid, idToken string) {
 	sm.Put(ctx, sessionOIDCProviderKey, provider)
 	sm.Put(ctx, sessionOIDCSubjectKey, subject)
 	if sid != "" {
 		sm.Put(ctx, sessionOIDCSessionIDKey, sid)
 	}
+	if idToken != "" {
+		sm.Put(ctx, sessionOIDCIDTokenKey, idToken)
+	}
+}
+
+// OIDCSessionLogout returns the IdP coordinates needed to start an
+// RP-initiated logout. provider is the registry key (empty when the
+// session wasn't established via OIDC); idToken is the raw id_token last
+// issued for this session (empty when the provider never gave us one).
+// Read before LogoutUser destroys the session — afterwards the values
+// are gone from the session store.
+func OIDCSessionLogout(ctx context.Context, sm *scs.SessionManager) (provider, idToken string) {
+	return sm.GetString(ctx, sessionOIDCProviderKey), sm.GetString(ctx, sessionOIDCIDTokenKey)
 }
 
 // RevokeOIDCSessions destroys every session whose stored (provider, subject)

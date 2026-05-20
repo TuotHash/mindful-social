@@ -261,7 +261,7 @@ func makeSession(t *testing.T, sm *scs.SessionManager, userID, provider, subject
 	if userID != "" {
 		sm.Put(ctx, sessionUserKey, userID)
 	}
-	RecordOIDCLogin(ctx, sm, provider, subject, sid)
+	RecordOIDCLogin(ctx, sm, provider, subject, sid, "")
 	tok, _, err := sm.Commit(ctx)
 	if err != nil {
 		t.Fatalf("sm.Commit: %v", err)

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -44,6 +45,10 @@ type Identity struct {
 	// own session so a later backchannel logout can target just this
 	// device instead of every device the user signed in from.
 	SessionID string
+	// RawIDToken is the verified, raw-JWS id_token string. We stash it on
+	// the session so a later RP-initiated logout can pass it back to the
+	// IdP as `id_token_hint`. Empty for non-OIDC providers (GitHub).
+	RawIDToken string
 }
 
 // LogoutClaims is the subset of an OIDC backchannel logout_token we act on.
@@ -62,6 +67,25 @@ type BackchannelLogoutSupporter interface {
 	VerifyLogoutToken(ctx context.Context, rawToken string) (LogoutClaims, error)
 }
 
+// RPInitiatedLogoutSupporter is implemented by providers that know an
+// `end_session_endpoint` for the IdP — i.e. providers wired up for OpenID
+// Connect RP-Initiated Logout 1.0. The handler type-asserts to this on
+// /logout so the user is bounced through the IdP's logout page in addition
+// to having their local session destroyed.
+//
+// A provider may *implement* the interface yet still return "" when the
+// IdP didn't advertise an end-session endpoint at discovery time. The
+// caller treats empty the same as "interface not implemented": fall back
+// to a local-only logout.
+type RPInitiatedLogoutSupporter interface {
+	// LogoutURL builds the redirect URL that ends the user's IdP session.
+	// idTokenHint is the raw id_token previously issued for this session;
+	// most IdPs require it to identify which session to terminate. The
+	// post_logout_redirect_uri MUST be pre-registered with the IdP — it
+	// won't be honoured otherwise.
+	LogoutURL(idTokenHint, postLogoutRedirectURI string) string
+}
+
 // backchannelLogoutEvent is the JSON pointer the OIDC spec mandates inside
 // the logout_token's `events` claim. Its value is an empty JSON object.
 const backchannelLogoutEvent = "http://schemas.openid.net/event/backchannel-logout"
@@ -78,6 +102,11 @@ type oidcProvider struct {
 	// be set to "name", "nickname", "email", "sub", or any custom
 	// string claim the IdP issues.
 	usernameClaim string
+	// endSessionURL is the IdP's RP-initiated logout endpoint, read out
+	// of the discovery document at construction time. Empty when the IdP
+	// (e.g. Google) doesn't advertise one — LogoutURL then returns ""
+	// and the caller falls back to a local-only logout.
+	endSessionURL string
 }
 
 func (p *oidcProvider) Key() string   { return p.key }
@@ -127,7 +156,33 @@ func (p *oidcProvider) Identify(ctx context.Context, code string) (Identity, err
 		EmailVerified: claims.EmailVerified,
 		DisplayName:   display,
 		SessionID:     claims.SID,
+		RawIDToken:    rawID,
 	}, nil
+}
+
+// LogoutURL builds the RP-initiated logout URL per OpenID Connect
+// RP-Initiated Logout 1.0 §3. Returns "" when the IdP didn't advertise
+// an end_session_endpoint, when both id_token_hint and post_logout_redirect_uri
+// are empty (the spec requires at least one to identify the session), or
+// when the discovered URL is malformed (a sanity check; we already
+// validated it at construction time).
+func (p *oidcProvider) LogoutURL(idTokenHint, postLogoutRedirectURI string) string {
+	if p.endSessionURL == "" {
+		return ""
+	}
+	u, err := url.Parse(p.endSessionURL)
+	if err != nil {
+		return ""
+	}
+	q := u.Query()
+	if idTokenHint != "" {
+		q.Set("id_token_hint", idTokenHint)
+	}
+	if postLogoutRedirectURI != "" {
+		q.Set("post_logout_redirect_uri", postLogoutRedirectURI)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // VerifyLogoutToken validates a logout_token per OpenID Connect Back-Channel
@@ -172,6 +227,18 @@ func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSe
 	if usernameClaim == "" {
 		usernameClaim = "preferred_username"
 	}
+	// end_session_endpoint isn't in go-oidc's typed struct, so dip into
+	// the raw discovery JSON. A missing or malformed entry is fine: we
+	// just disable RP-initiated logout for this provider.
+	var extra struct {
+		EndSessionEndpoint string `json:"end_session_endpoint"`
+	}
+	_ = prov.Claims(&extra)
+	if extra.EndSessionEndpoint != "" {
+		if _, err := url.Parse(extra.EndSessionEndpoint); err != nil {
+			extra.EndSessionEndpoint = ""
+		}
+	}
 	return &oidcProvider{
 		key:      key,
 		label:    label,
@@ -184,6 +251,7 @@ func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSe
 			Scopes:       scopes,
 		},
 		usernameClaim: usernameClaim,
+		endSessionURL: extra.EndSessionEndpoint,
 	}, nil
 }
 
