@@ -104,6 +104,13 @@ LIMIT sqlc.arg(result_limit);
 -- is given; falls back to recency order when empty so the picker is
 -- pre-populated. Respects node_visible_to() so viewers only see candidates
 -- they can post under.
+--
+-- When type_filter is empty (finding flow), candidates are bucketed by how
+-- specific a parent they make: views and sub-topics first (a finding most
+-- naturally attaches to a concrete stance or a narrow topic), then root
+-- topics and other findings. Inside each bucket, the usual recency / fuzzy-
+-- match order applies. Single-type queries skip the bucket so the original
+-- order is preserved.
 SELECT id, type, title
 FROM nodes
 WHERE (sqlc.arg(type_filter)::text = '' OR type::text = sqlc.arg(type_filter)::text)
@@ -112,6 +119,12 @@ WHERE (sqlc.arg(type_filter)::text = '' OR type::text = sqlc.arg(type_filter)::t
   AND node_visible_to(nodes.*, sqlc.narg(viewer_id)::uuid)
   AND (sqlc.arg(query)::text = '' OR title %> sqlc.arg(query)::text)
 ORDER BY
+    CASE
+        WHEN sqlc.arg(type_filter)::text <> '' THEN 0
+        WHEN type = 'view' THEN 0
+        WHEN type = 'topic' AND parent_node_id IS NOT NULL THEN 0
+        ELSE 1
+    END ASC,
     CASE WHEN sqlc.arg(query)::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
     word_similarity(sqlc.arg(query)::text, title) DESC,
     title ASC

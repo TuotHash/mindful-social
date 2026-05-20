@@ -9,6 +9,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Relevant parent ordering for new findings** — when creating a
+  finding, the parent picker now surfaces views and sub-topics ahead
+  of root topics and other findings, so the most specific anchors come
+  first. Single-type pickers (view / sub-topic flows) are unaffected.
+
 - **Node types simplified** — `reasoning` and `evidence` merged into a
   single `finding` type. The split forced contributors to pick a label
   before the content was written and rarely mattered for downstream

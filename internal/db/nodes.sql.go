@@ -628,6 +628,12 @@ WHERE ($1::text = '' OR type::text = $1::text)
   AND node_visible_to(nodes.*, $2::uuid)
   AND ($3::text = '' OR title %> $3::text)
 ORDER BY
+    CASE
+        WHEN $1::text <> '' THEN 0
+        WHEN type = 'view' THEN 0
+        WHEN type = 'topic' AND parent_node_id IS NOT NULL THEN 0
+        ELSE 1
+    END ASC,
     CASE WHEN $3::text = '' THEN created_at ELSE NULL END DESC NULLS LAST,
     word_similarity($3::text, title) DESC,
     title ASC
@@ -653,6 +659,13 @@ type SearchPostParentsRow struct {
 // is given; falls back to recency order when empty so the picker is
 // pre-populated. Respects node_visible_to() so viewers only see candidates
 // they can post under.
+//
+// When type_filter is empty (finding flow), candidates are bucketed by how
+// specific a parent they make: views and sub-topics first (a finding most
+// naturally attaches to a concrete stance or a narrow topic), then root
+// topics and other findings. Inside each bucket, the usual recency / fuzzy-
+// match order applies. Single-type queries skip the bucket so the original
+// order is preserved.
 func (q *Queries) SearchPostParents(ctx context.Context, arg SearchPostParentsParams) ([]SearchPostParentsRow, error) {
 	rows, err := q.db.Query(ctx, searchPostParents, arg.TypeFilter, arg.ViewerID, arg.Query)
 	if err != nil {

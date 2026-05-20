@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
@@ -112,6 +114,91 @@ func TestNodeCreate_FindingRequiresParent(t *testing.T) {
 	}
 	if strings.HasPrefix(resp.Request.URL.Path, "/nodes/") && resp.Request.URL.Path != "/nodes" {
 		t.Fatalf("unexpected redirect to %s", resp.Request.URL.Path)
+	}
+}
+
+func TestParentPicker_FindingFlowOrdersSpecificParentsFirst(t *testing.T) {
+	// In the finding flow, the parent picker should surface views and
+	// sub-topics before root topics and other findings — a finding most
+	// naturally attaches to a concrete stance or a narrow topic. Single-
+	// type queries (the view / sub-topic flows) keep the recency order
+	// and are not affected.
+	integrationDB(t)
+	c := newClient(t)
+	signup(t, c, "alice", "alice@example.com", "correct horse battery staple")
+
+	// Created in this order so recency alone would put the root topic and
+	// finding ahead of the sub-topic and view. The bucket should reverse
+	// that ordering for the finding flow.
+	rootTopicID := createNode(t, c, "topic", "Root topic", "")
+	findingID := createNodeDirect(t, c, "finding", "A finding", "")
+	subTopicVals := url.Values{
+		"type":              {"topic"},
+		"title":             {"Sub topic"},
+		"topic_parent_mode": {"sub"},
+		"parent_node_id":    {rootTopicID.String()},
+	}
+	resp := formPost(t, c, "/nodes", subTopicVals)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("create sub-topic: status %d", resp.StatusCode)
+	}
+	viewID := createNode(t, c, "view", "An opinion", "")
+
+	rows, err := testServer.queries.SearchPostParents(t.Context(), db.SearchPostParentsParams{
+		TypeFilter: "",
+		Query:      "",
+		ViewerID:   nil, // public visibility, public viewer is fine
+	})
+	if err != nil {
+		t.Fatalf("SearchPostParents finding flow: %v", err)
+	}
+
+	// Map id → position so the assertions stay readable when more nodes
+	// from earlier tests are interleaved.
+	pos := map[string]int{}
+	for i, r := range rows {
+		pos[r.ID.String()] = i
+	}
+	for _, id := range []uuid.UUID{viewID, findingID, rootTopicID} {
+		if _, ok := pos[id.String()]; !ok {
+			t.Fatalf("expected node %s in results, got %d rows", id, len(rows))
+		}
+	}
+	if pos[viewID.String()] >= pos[rootTopicID.String()] {
+		t.Fatalf("view should appear before root topic (view=%d, root=%d)", pos[viewID.String()], pos[rootTopicID.String()])
+	}
+	if pos[viewID.String()] >= pos[findingID.String()] {
+		t.Fatalf("view should appear before finding (view=%d, finding=%d)", pos[viewID.String()], pos[findingID.String()])
+	}
+	// Single-type queries skip the bucket — the topic flow keeps its old
+	// recency ordering, so the sub-topic (created after the root) should
+	// come first.
+	topicRows, err := testServer.queries.SearchPostParents(t.Context(), db.SearchPostParentsParams{
+		TypeFilter: string(db.NodeTypeTopic),
+		Query:      "",
+		ViewerID:   nil,
+	})
+	if err != nil {
+		t.Fatalf("SearchPostParents topic flow: %v", err)
+	}
+	topicPos := map[string]int{}
+	for i, r := range topicRows {
+		topicPos[r.ID.String()] = i
+	}
+	// Sub-topic was created after the root topic, so recency puts it first.
+	subTopicPos := -1
+	for i, r := range topicRows {
+		if r.Title == "Sub topic" {
+			subTopicPos = i
+			break
+		}
+	}
+	if subTopicPos < 0 {
+		t.Fatalf("sub-topic not present in topic flow results")
+	}
+	if subTopicPos >= topicPos[rootTopicID.String()] {
+		t.Fatalf("sub-topic should come before root topic by recency in topic flow (sub=%d, root=%d)", subTopicPos, topicPos[rootTopicID.String()])
 	}
 }
 

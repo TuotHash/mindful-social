@@ -308,6 +308,13 @@ type Querier interface {
 	// is given; falls back to recency order when empty so the picker is
 	// pre-populated. Respects node_visible_to() so viewers only see candidates
 	// they can post under.
+	//
+	// When type_filter is empty (finding flow), candidates are bucketed by how
+	// specific a parent they make: views and sub-topics first (a finding most
+	// naturally attaches to a concrete stance or a narrow topic), then root
+	// topics and other findings. Inside each bucket, the usual recency / fuzzy-
+	// match order applies. Single-type queries skip the bucket so the original
+	// order is preserved.
 	SearchPostParents(ctx context.Context, arg SearchPostParentsParams) ([]SearchPostParentsRow, error)
 	// Live-suggest fuzzy match against tag names, gated by visible-node count so
 	// a tag that only sits on private nodes doesn't leak via the suggestion. Used
