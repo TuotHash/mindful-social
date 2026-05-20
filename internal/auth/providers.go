@@ -19,13 +19,28 @@ import (
 //
 // Recognized env vars:
 //
-//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-//   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
-//   OIDC_PROVIDERS = "work,community"      (comma-separated keys)
-//   OIDC_<KEY>_ISSUER, OIDC_<KEY>_CLIENT_ID, OIDC_<KEY>_CLIENT_SECRET,
-//     OIDC_<KEY>_LABEL (optional, defaults to the key, title-cased),
-//     OIDC_<KEY>_USERNAME_CLAIM (optional, defaults to "preferred_username";
-//       the ID-token claim used to seed the username on first sign-in)
+//	GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+//	GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+//
+//	OIDC_PROVIDERS = "work,community"          comma-separated keys
+//
+//	# Always required, per OIDC provider:
+//	OIDC_<KEY>_ISSUER                          the IdP's issuer URL
+//	OIDC_<KEY>_CLIENT_ID
+//	OIDC_<KEY>_CLIENT_SECRET
+//
+//	# Optional, per OIDC provider:
+//	OIDC_<KEY>_LABEL                           display name (default: title-cased key)
+//	OIDC_<KEY>_USERNAME_CLAIM                  ID-token claim used to seed the
+//	                                           username (default: preferred_username)
+//	OIDC_<KEY>_DISCOVERY_URL                   override the .well-known fetch URL
+//	                                           (useful for IdPs at non-spec paths)
+//	OIDC_<KEY>_AUTHORIZATION_ENDPOINT          override discovered values; setting
+//	OIDC_<KEY>_TOKEN_ENDPOINT                  all three of authorization/token/
+//	OIDC_<KEY>_JWKS_URI                        jwks skips discovery entirely.
+//	OIDC_<KEY>_USERINFO_ENDPOINT
+//	OIDC_<KEY>_END_SESSION_ENDPOINT            for RP-initiated logout when the
+//	                                           IdP doesn't advertise it in discovery
 func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*Registry, error) {
 	if baseURL == "" {
 		return &Registry{providers: map[string]Provider{}}, nil
@@ -37,11 +52,12 @@ func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*R
 
 	// Google (OIDC)
 	if id, secret := os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"); id != "" && secret != "" {
-		p, err := newOIDCProvider(ctx, "google", "Google",
-			"https://accounts.google.com",
-			id, secret,
-			callbackURL(baseURL, "google"),
-			"", nil)
+		p, err := newOIDCProvider(ctx, "google", "Google", oidcSettings{
+			Issuer:       "https://accounts.google.com",
+			ClientID:     id,
+			ClientSecret: secret,
+			RedirectURL:  callbackURL(baseURL, "google"),
+		})
 		if err != nil {
 			logger.Warn("oauth: google init failed", "err", err)
 		} else {
@@ -61,20 +77,30 @@ func LoadProviders(ctx context.Context, logger *slog.Logger, baseURL string) (*R
 			continue
 		}
 		envKey := strings.ToUpper(key)
-		issuer := os.Getenv("OIDC_" + envKey + "_ISSUER")
-		id := os.Getenv("OIDC_" + envKey + "_CLIENT_ID")
-		secret := os.Getenv("OIDC_" + envKey + "_CLIENT_SECRET")
-		label := os.Getenv("OIDC_" + envKey + "_LABEL")
-		usernameClaim := os.Getenv("OIDC_" + envKey + "_USERNAME_CLAIM")
+		get := func(name string) string { return os.Getenv("OIDC_" + envKey + "_" + name) }
+
+		label := get("LABEL")
 		if label == "" {
 			label = strings.Title(key) //nolint:staticcheck
 		}
-		if issuer == "" || id == "" || secret == "" {
+		settings := oidcSettings{
+			Issuer:             get("ISSUER"),
+			DiscoveryURL:       get("DISCOVERY_URL"),
+			ClientID:           get("CLIENT_ID"),
+			ClientSecret:       get("CLIENT_SECRET"),
+			RedirectURL:        callbackURL(baseURL, "oidc:"+key),
+			UsernameClaim:      get("USERNAME_CLAIM"),
+			AuthEndpoint:       get("AUTHORIZATION_ENDPOINT"),
+			TokenEndpoint:      get("TOKEN_ENDPOINT"),
+			JWKSURI:            get("JWKS_URI"),
+			UserInfoEndpoint:   get("USERINFO_ENDPOINT"),
+			EndSessionEndpoint: get("END_SESSION_ENDPOINT"),
+		}
+		if settings.Issuer == "" || settings.ClientID == "" || settings.ClientSecret == "" {
 			logger.Warn("oauth: skipping incomplete OIDC provider", "key", key)
 			continue
 		}
-		p, err := newOIDCProvider(ctx, "oidc:"+key, label, issuer, id, secret,
-			callbackURL(baseURL, "oidc:"+key), usernameClaim, nil)
+		p, err := newOIDCProvider(ctx, "oidc:"+key, label, settings)
 		if err != nil {
 			logger.Warn("oauth: OIDC init failed", "key", key, "err", err)
 			continue

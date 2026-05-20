@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -216,42 +217,183 @@ func (p *oidcProvider) VerifyLogoutToken(ctx context.Context, raw string) (Logou
 	return LogoutClaims{Subject: claims.Subject, SessionID: claims.SID}, nil
 }
 
-func newOIDCProvider(ctx context.Context, key, label, issuer, clientID, clientSecret, redirectURL, usernameClaim string, scopes []string) (Provider, error) {
-	prov, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: discover %s: %w", issuer, err)
+// oidcSettings is the union of everything an OIDC provider can be
+// configured with. The only always-required fields are Issuer, ClientID,
+// ClientSecret, and RedirectURL — every endpoint URL can either come
+// from the discovery document or be set explicitly to override (or
+// replace) discovery.
+//
+// Modes the same struct supports:
+//
+//   - Discovery (default): set Issuer; we GET <Issuer>/.well-known/openid-configuration.
+//   - Custom discovery URL: set Issuer AND DiscoveryURL; we GET the URL
+//     and validate the doc's `issuer` claim matches Issuer.
+//   - Full manual: set Issuer plus AuthEndpoint + TokenEndpoint + JWKSURI;
+//     discovery is skipped entirely. UserInfoEndpoint and EndSessionEndpoint
+//     remain optional.
+//
+// Any individual endpoint set on the struct wins over a discovered value,
+// so operators can override one piece without going full-manual.
+type oidcSettings struct {
+	Issuer        string
+	DiscoveryURL  string
+	ClientID      string
+	ClientSecret  string
+	RedirectURL   string
+	UsernameClaim string
+	Scopes        []string
+
+	// Endpoint overrides; any field set here replaces the discovered value.
+	// Setting all three of AuthEndpoint, TokenEndpoint, and JWKSURI skips
+	// discovery entirely.
+	AuthEndpoint       string
+	TokenEndpoint      string
+	JWKSURI            string
+	UserInfoEndpoint   string
+	EndSessionEndpoint string
+}
+
+// oidcDiscoveryDoc mirrors the fields of the OIDC discovery document we
+// care about. Unknown fields are ignored — we deliberately don't shadow
+// every field go-oidc tracks, only the ones this codebase uses.
+type oidcDiscoveryDoc struct {
+	Issuer             string   `json:"issuer"`
+	AuthEndpoint       string   `json:"authorization_endpoint"`
+	TokenEndpoint      string   `json:"token_endpoint"`
+	JWKSURI            string   `json:"jwks_uri"`
+	UserInfoEndpoint   string   `json:"userinfo_endpoint"`
+	EndSessionEndpoint string   `json:"end_session_endpoint"`
+	SigningAlgs        []string `json:"id_token_signing_alg_values_supported"`
+}
+
+// fetchOIDCDiscovery GETs the discovery document from `discoveryURL` if
+// non-empty, otherwise from `<expectedIssuer>/.well-known/openid-configuration`.
+// When expectedIssuer is non-empty, the doc's `issuer` claim must match —
+// without that anchor, a bogus DISCOVERY_URL could route us to an
+// attacker-controlled IdP.
+func fetchOIDCDiscovery(ctx context.Context, expectedIssuer, discoveryURL string) (oidcDiscoveryDoc, error) {
+	var doc oidcDiscoveryDoc
+
+	fetchURL := discoveryURL
+	if fetchURL == "" {
+		if expectedIssuer == "" {
+			return doc, errors.New("oidc: discovery requires either issuer or discovery URL")
+		}
+		fetchURL = strings.TrimRight(expectedIssuer, "/") + "/.well-known/openid-configuration"
 	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
+	if err != nil {
+		return doc, fmt.Errorf("oidc: discovery request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return doc, fmt.Errorf("oidc: fetch discovery from %s: %w", fetchURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return doc, fmt.Errorf("oidc: discovery from %s: status %d", fetchURL, resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+		return doc, fmt.Errorf("oidc: decode discovery: %w", err)
+	}
+	if expectedIssuer != "" && doc.Issuer != expectedIssuer {
+		return doc, fmt.Errorf("oidc: discovery doc issuer %q does not match configured issuer %q", doc.Issuer, expectedIssuer)
+	}
+	return doc, nil
+}
+
+func newOIDCProvider(ctx context.Context, key, label string, s oidcSettings) (Provider, error) {
+	if s.ClientID == "" || s.ClientSecret == "" {
+		return nil, fmt.Errorf("oidc[%s]: missing client_id or client_secret", key)
+	}
+	if s.Issuer == "" {
+		// We always need an issuer string for ID-token validation, even
+		// in full-manual mode — the `iss` claim of any token we accept
+		// must match this value.
+		return nil, fmt.Errorf("oidc[%s]: missing issuer", key)
+	}
+
+	authEndpoint := s.AuthEndpoint
+	tokenEndpoint := s.TokenEndpoint
+	jwksURI := s.JWKSURI
+	userInfoEndpoint := s.UserInfoEndpoint
+	endSessionEndpoint := s.EndSessionEndpoint
+	var algorithms []string
+
+	// Discovery is needed only when at least one of the three critical
+	// endpoints (auth, token, jwks) is missing. The other two (userinfo,
+	// end_session) we'll backfill from discovery too if we end up doing
+	// it, but their absence alone doesn't trigger a fetch.
+	if authEndpoint == "" || tokenEndpoint == "" || jwksURI == "" || s.DiscoveryURL != "" {
+		doc, err := fetchOIDCDiscovery(ctx, s.Issuer, s.DiscoveryURL)
+		if err != nil {
+			return nil, err
+		}
+		if authEndpoint == "" {
+			authEndpoint = doc.AuthEndpoint
+		}
+		if tokenEndpoint == "" {
+			tokenEndpoint = doc.TokenEndpoint
+		}
+		if jwksURI == "" {
+			jwksURI = doc.JWKSURI
+		}
+		if userInfoEndpoint == "" {
+			userInfoEndpoint = doc.UserInfoEndpoint
+		}
+		if endSessionEndpoint == "" {
+			endSessionEndpoint = doc.EndSessionEndpoint
+		}
+		algorithms = doc.SigningAlgs
+	}
+
+	if authEndpoint == "" || tokenEndpoint == "" || jwksURI == "" {
+		return nil, fmt.Errorf("oidc[%s]: missing required endpoint after discovery+overrides (need auth, token, jwks)", key)
+	}
+	if endSessionEndpoint != "" {
+		if _, err := url.Parse(endSessionEndpoint); err != nil {
+			// A bad end_session_endpoint disables RP-initiated logout
+			// for this provider but mustn't take down sign-in.
+			endSessionEndpoint = ""
+		}
+	}
+
+	scopes := s.Scopes
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, "email", "profile"}
 	}
+	usernameClaim := s.UsernameClaim
 	if usernameClaim == "" {
 		usernameClaim = "preferred_username"
 	}
-	// end_session_endpoint isn't in go-oidc's typed struct, so dip into
-	// the raw discovery JSON. A missing or malformed entry is fine: we
-	// just disable RP-initiated logout for this provider.
-	var extra struct {
-		EndSessionEndpoint string `json:"end_session_endpoint"`
+
+	// One provider construction path for every mode: go-oidc's
+	// ProviderConfig.NewProvider accepts the endpoints + algs verbatim,
+	// and the resulting verifier handles JWKS + issuer validation
+	// identically to one built via discovery.
+	provCfg := &oidc.ProviderConfig{
+		IssuerURL:   s.Issuer,
+		AuthURL:     authEndpoint,
+		TokenURL:    tokenEndpoint,
+		JWKSURL:     jwksURI,
+		UserInfoURL: userInfoEndpoint,
+		Algorithms:  algorithms,
 	}
-	_ = prov.Claims(&extra)
-	if extra.EndSessionEndpoint != "" {
-		if _, err := url.Parse(extra.EndSessionEndpoint); err != nil {
-			extra.EndSessionEndpoint = ""
-		}
-	}
+	prov := provCfg.NewProvider(ctx)
 	return &oidcProvider{
 		key:      key,
 		label:    label,
-		verifier: prov.Verifier(&oidc.Config{ClientID: clientID}),
+		verifier: prov.Verifier(&oidc.Config{ClientID: s.ClientID}),
 		oauth: &oauth2.Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			Endpoint:     prov.Endpoint(),
-			RedirectURL:  redirectURL,
+			ClientID:     s.ClientID,
+			ClientSecret: s.ClientSecret,
+			Endpoint:     oauth2.Endpoint{AuthURL: authEndpoint, TokenURL: tokenEndpoint},
+			RedirectURL:  s.RedirectURL,
 			Scopes:       scopes,
 		},
 		usernameClaim: usernameClaim,
-		endSessionURL: extra.EndSessionEndpoint,
+		endSessionURL: endSessionEndpoint,
 	}, nil
 }
 
