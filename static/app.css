@@ -3664,6 +3664,12 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   gap: var(--s-4);
   text-align: left;
 }
+/* Eyebrow sits over the green bloom, where the muted grey from the default
+   .eyebrow rule loses contrast. Force a near-black so the label stays
+   legible against the light center of the bloom. */
+.error-page .eyebrow {
+  color: #000;
+}
 .error-status {
   font-family: var(--font-serif);
   font-weight: 400;
