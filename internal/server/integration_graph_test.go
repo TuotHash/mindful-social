@@ -477,3 +477,106 @@ func TestArgumentGraph_RespectsVisibility(t *testing.T) {
 		t.Fatalf("author graph missing own private node; excerpt: %s", snippet(authorBody))
 	}
 }
+
+// TestArgumentGraphData_HidesCommentsOnHiddenParent pins the rule that a
+// comment's visibility in the graph is intersected with its parent
+// node's visibility. The cascade trigger copies the parent's visibility
+// kind onto the comment row, but node_local_visible_to evaluates the
+// "connections" branch against the comment row's own created_by — i.e.
+// the commenter, not the parent author. Without node_visible_to also
+// walking the comments_on edge, a viewer mutual-followers with the
+// commenter (but not with the parent author) used to see the comment
+// hanging in the graph without its target.
+func TestArgumentGraphData_HidesCommentsOnHiddenParent(t *testing.T) {
+	integrationDB(t)
+
+	authorClient := newClient(t)
+	author := signupAndGetUser(t, authorClient, "graphvisauthor", "graphvisauthor@example.com", "correct horse battery staple")
+
+	commenterClient := newClient(t)
+	commenter := signupAndGetUser(t, commenterClient, "graphviscommenter", "graphviscommenter@example.com", "correct horse battery staple")
+
+	viewerClient := newClient(t)
+	viewer := signupAndGetUser(t, viewerClient, "graphvisviewer", "graphvisviewer@example.com", "correct horse battery staple")
+
+	// author <-> commenter mutual follow (so commenter can see the
+	// connections-only post and comment on it).
+	for _, pair := range [][2]uuid.UUID{
+		{author.ID, commenter.ID},
+		{commenter.ID, author.ID},
+		// viewer <-> commenter mutual follow (the loophole the bug
+		// relied on: viewer is "connected to the commenter" but NOT to
+		// the parent author).
+		{viewer.ID, commenter.ID},
+		{commenter.ID, viewer.ID},
+	} {
+		if err := testServer.queries.CreateFollow(t.Context(), db.CreateFollowParams{
+			FollowerID: pair[0],
+			FollowedID: pair[1],
+		}); err != nil {
+			t.Fatalf("follow %s -> %s: %v", pair[0], pair[1], err)
+		}
+	}
+
+	parentTitle := "Hidden parent " + uuid.NewString()
+	parent, err := testServer.queries.CreateNode(t.Context(), db.CreateNodeParams{
+		Type:       db.NodeTypeTopic,
+		Title:      parentTitle,
+		Body:       "",
+		CreatedBy:  author.ID,
+		Slug:       "hidden-parent-" + uuid.NewString()[:8],
+		Visibility: db.VisibilityKindConnections,
+	})
+	if err != nil {
+		t.Fatalf("create connections node: %v", err)
+	}
+
+	commentBody := "Visible-to-commenter-only " + uuid.NewString()
+	commentID := uuid.New()
+	comment, err := testServer.queries.CreateCommentNode(t.Context(), db.CreateCommentNodeParams{
+		NodeID:      parent.ID,
+		AuthorID:    commenter.ID,
+		ParentID:    nil,
+		CommentID:   commentID,
+		Body:        commentBody,
+		CommentSlug: commentSlug(commentID),
+	})
+	if err != nil {
+		t.Fatalf("create comment: %v", err)
+	}
+
+	// Sanity: the commenter (mutual with author) can see the parent.
+	resp := get(t, commenterClient, "/graph/data")
+	defer resp.Body.Close()
+	var commenterData views.ArgumentGraphData
+	if err := json.NewDecoder(resp.Body).Decode(&commenterData); err != nil {
+		t.Fatalf("decode commenter graph data: %v", err)
+	}
+	commenterIDs := make(map[string]struct{}, len(commenterData.Nodes))
+	for _, n := range commenterData.Nodes {
+		commenterIDs[n.ID] = struct{}{}
+	}
+	if _, ok := commenterIDs[parent.ID.String()]; !ok {
+		t.Fatalf("commenter should see parent node; nodes=%+v", commenterData.Nodes)
+	}
+	if _, ok := commenterIDs[comment.ID.String()]; !ok {
+		t.Fatalf("commenter should see their own comment; nodes=%+v", commenterData.Nodes)
+	}
+
+	// The actual regression: viewer is connected to the commenter but
+	// NOT to the parent author. They must see neither node.
+	resp2 := get(t, viewerClient, "/graph/data")
+	defer resp2.Body.Close()
+	var viewerData views.ArgumentGraphData
+	if err := json.NewDecoder(resp2.Body).Decode(&viewerData); err != nil {
+		t.Fatalf("decode viewer graph data: %v", err)
+	}
+	for _, n := range viewerData.Nodes {
+		if n.ID == parent.ID.String() {
+			t.Fatalf("viewer should not see hidden parent; node=%+v", n)
+		}
+		if n.ID == comment.ID.String() {
+			t.Fatalf("viewer should not see comment on hidden parent; node=%+v", n)
+		}
+	}
+}
