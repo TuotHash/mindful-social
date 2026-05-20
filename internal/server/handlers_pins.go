@@ -43,7 +43,7 @@ func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -86,11 +86,11 @@ func (s *Server) handlePinDelete(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("pin delete", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if rows == 0 {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
@@ -137,7 +137,7 @@ func (s *Server) lookupPin(w http.ResponseWriter, r *http.Request, userID, nodeI
 		return nil, true
 	default:
 		s.logger.Error("pin lookup", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return nil, false
 	}
 }

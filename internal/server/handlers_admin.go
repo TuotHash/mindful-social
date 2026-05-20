@@ -25,7 +25,7 @@ func (s *Server) handleAdminIndex(w http.ResponseWriter, r *http.Request) {
 	users, err := s.queries.ListUsersForAdmin(r.Context())
 	if err != nil {
 		s.logger.Error("admin: list users", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	rows := make([]views.AdminUserRow, 0, len(users))
@@ -52,11 +52,11 @@ func (s *Server) handleAdminSetRole(w http.ResponseWriter, r *http.Request) {
 	idStr := chiURLParam(r, "id")
 	targetID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	role := db.UserRole(r.PostFormValue("role"))
@@ -68,11 +68,11 @@ func (s *Server) handleAdminSetRole(w http.ResponseWriter, r *http.Request) {
 	target, err := s.queries.GetUser(r.Context(), targetID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.logger.Error("admin set role: get user", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if target.ID == viewer.ID && role != db.UserRoleAdmin {
@@ -87,7 +87,7 @@ func (s *Server) handleAdminSetRole(w http.ResponseWriter, r *http.Request) {
 		count, countErr := s.queries.CountAdmins(r.Context())
 		if countErr != nil {
 			s.logger.Error("admin set role: count admins", "err", countErr)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		if count <= 1 {
@@ -122,7 +122,7 @@ func (s *Server) handleAdminUserDeleteConfirm(w http.ResponseWriter, r *http.Req
 	nodeCount, err := s.queries.CountNodesAuthoredBy(r.Context(), target.ID)
 	if err != nil {
 		s.logger.Error("admin delete confirm: count nodes", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.AdminUserDelete(viewerFor(viewer), target, nodeCount, target.ID == viewer.ID))
@@ -147,7 +147,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		count, err := s.queries.CountAdmins(r.Context())
 		if err != nil {
 			s.logger.Error("admin delete: count admins", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		if count <= 1 {
@@ -190,7 +190,7 @@ func (s *Server) handleAdminUpdateUsername(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	username := r.PostFormValue("username")
@@ -210,7 +210,7 @@ func (s *Server) handleAdminUpdateEmail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	email := r.PostFormValue("email")
@@ -238,7 +238,7 @@ func (s *Server) handleAdminResetPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	newPw := r.PostFormValue("new_password")
@@ -267,17 +267,17 @@ func (s *Server) lookupAdminTarget(w http.ResponseWriter, r *http.Request) (db.U
 	idStr := chiURLParam(r, "id")
 	targetID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.User{}, false
 	}
 	target, err := s.queries.GetUser(r.Context(), targetID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.User{}, false
 		}
 		s.logger.Error("admin: get user", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.User{}, false
 	}
 	return target, true

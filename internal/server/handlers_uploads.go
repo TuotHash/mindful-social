@@ -29,7 +29,7 @@ import (
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	rel := strings.TrimPrefix(r.URL.Path, "/uploads/")
 	if rel == "" || strings.Contains(rel, "..") {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	parts := strings.SplitN(rel, "/", 2)
@@ -47,33 +47,33 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	case "topics":
 		if rest == "" {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		subParts := strings.SplitN(rest, "/", 2)
 		rootID, err := uuid.Parse(subParts[0])
 		if err != nil {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		node, err := s.queries.GetNode(r.Context(), rootID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.NotFound(w, r)
+				s.notFound(w, r)
 				return
 			}
 			s.logger.Error("upload: load root node", "err", err, "root_id", rootID)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		visible, err := s.canViewNode(r.Context(), node, viewerID(r))
 		if err != nil {
 			s.logger.Error("upload: visibility", "err", err, "root_id", rootID)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		if !visible {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.serveUpload(w, r, rel, uploadCachePrivate)
@@ -85,13 +85,13 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		// drafts to their uploader so only that user (and downstream
 		// viewers of the published node) can fetch them.
 		if currentUser(r) == nil {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.serveUpload(w, r, rel, uploadCachePrivate)
 
 	default:
-		http.NotFound(w, r)
+		s.notFound(w, r)
 	}
 }
 
@@ -109,13 +109,13 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request, rel string,
 	// happens to resolve to one.
 	clean := filepath.Clean(rel)
 	if clean != rel || strings.HasPrefix(clean, "/") || strings.HasPrefix(clean, "..") {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	full := filepath.Join(s.cfg.UploadDir, filepath.FromSlash(clean))
 	info, err := os.Stat(full)
 	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 

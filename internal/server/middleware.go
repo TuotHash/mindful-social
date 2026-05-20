@@ -43,7 +43,7 @@ func (s *Server) loadUser(next http.Handler) http.Handler {
 				return
 			}
 			s.logger.Error("loadUser: db", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxUserKey, &u)
@@ -68,7 +68,7 @@ func (s *Server) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := currentUser(r)
 		if u == nil || u.Role != db.UserRoleAdmin {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -114,7 +114,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 				"stack", string(debug.Stack()),
 			)
 			if r.Header.Get("Connection") != "Upgrade" {
-				w.WriteHeader(http.StatusInternalServerError)
+				s.renderError(w, r, http.StatusInternalServerError)
 			}
 		}()
 		next.ServeHTTP(w, r)

@@ -102,7 +102,7 @@ func (s *Server) handleNodeHistory(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.queries.ListNodeRevisions(r.Context(), node.ID)
 	if err != nil {
 		s.logger.Error("list revisions", "err", err, "node_id", node.ID)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	user := currentUser(r)
@@ -142,7 +142,7 @@ func (s *Server) handleNodeRevisionView(w http.ResponseWriter, r *http.Request) 
 		Revision: rev,
 	})
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	user := currentUser(r)
@@ -179,7 +179,7 @@ func (s *Server) handleNodeRevert(w http.ResponseWriter, r *http.Request) {
 	allowed, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("revert: policy check", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if !allowed {

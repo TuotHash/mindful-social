@@ -19,17 +19,17 @@ const profileNodesLimit = 25
 func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	username := chiURLParam(r, "username")
 	if username == "" {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	user, err := s.queries.GetUserByUsername(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.logger.Error("profile: get user", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("profile: list authored", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	pins, err := s.queries.ListPinsByUser(r.Context(), db.ListPinsByUserParams{
@@ -49,7 +49,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("profile: list pins", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -59,13 +59,13 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 	followers, err := s.queries.CountFollowers(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("profile: count followers", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	following, err := s.queries.CountFollowing(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("profile: count following", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -77,7 +77,7 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			s.logger.Error("profile: follow state", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		relation.ViewerFollows = state.ViewerFollows

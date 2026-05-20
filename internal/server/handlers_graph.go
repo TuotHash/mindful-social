@@ -112,7 +112,7 @@ func (s *Server) handleArgumentGraph(w http.ResponseWriter, r *http.Request) {
 	data, err := s.loadArgumentGraph(r, filters)
 	if err != nil {
 		s.logger.Error("argument graph: load", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, graphFiltersForView(filters)))
@@ -123,7 +123,7 @@ func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request)
 	data, err := s.loadArgumentGraph(r, filters)
 	if err != nil {
 		s.logger.Error("argument graph data: load", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

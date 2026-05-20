@@ -47,7 +47,7 @@ func (s *Server) handleSignupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	username := r.PostFormValue("username")
@@ -62,7 +62,7 @@ func (s *Server) handleSignupPost(w http.ResponseWriter, r *http.Request) {
 
 	if err := auth.LoginUser(r.Context(), s.sessions, user.ID); err != nil {
 		s.logger.Error("signup: login", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	s.logger.Info("signup", "user_id", user.ID, "username", user.Username, "method", "password")
@@ -75,7 +75,7 @@ func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	email := r.PostFormValue("email")
@@ -90,7 +90,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	if err := auth.LoginUser(r.Context(), s.sessions, id); err != nil {
 		s.logger.Error("login: session", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	s.logger.Info("login", "user_id", id, "method", "password")
@@ -153,13 +153,13 @@ func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	key := chiURLParam(r, "provider")
 	prov, ok := s.oauth.Get(key)
 	if !ok {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	state, err := auth.NewState()
 	if err != nil {
 		s.logger.Error("oauth start: state", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	s.sessions.Put(r.Context(), oauthStateKey, state)
@@ -173,7 +173,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	key := chiURLParam(r, "provider")
 	prov, ok := s.oauth.Get(key)
 	if !ok {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 
@@ -215,7 +215,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	if err := auth.LoginUser(r.Context(), s.sessions, user.ID); err != nil {
 		s.logger.Error("oauth callback: login", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	// Tag the session with the IdP identifiers so a later OIDC backchannel

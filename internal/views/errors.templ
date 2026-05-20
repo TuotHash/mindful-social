@@ -1,0 +1,97 @@
+package views
+
+import "fmt"
+
+// ErrorPage is the styled HTTP error response shared across statuses. The
+// status code is rendered as a serif display number; headline + body explain
+// what happened in plain language. Action buttons let the visitor recover —
+// back to the previous page, home, or sign in when the failure looks like an
+// auth issue.
+templ ErrorPage(viewer *Viewer, status int, headline, body string) {
+	@Layout(fmt.Sprintf("%d %s", status, errorEyebrow(status)), viewer) {
+		<section class="error-page">
+			<div aria-hidden="true" class="error-bloom-wrap">
+				@bloom(380, errorHue(status), "position: absolute; left: -120px; top: -80px; opacity: 0.55; animation: drift 18s ease-in-out infinite;")
+				@bloom(220, errorHue(status)+30, "position: absolute; right: -60px; bottom: -60px; opacity: 0.55; animation: drift 14s ease-in-out infinite reverse;")
+			</div>
+			<div class="page narrow error-page-inner">
+				<span class="eyebrow">{ errorEyebrow(status) }</span>
+				<div class="error-status" aria-hidden="true">{ fmt.Sprintf("%d", status) }</div>
+				<h1 class="h-1">{ headline }</h1>
+				<p class="lede">{ body }</p>
+				<div class="row gap-12 wrap" style="margin-top: 8px;">
+					<a class="btn accent" href={ errorHomeURL(viewer) }>
+						if viewer != nil {
+							Back home
+						} else {
+							Go to homepage
+						}
+					</a>
+					<a class="btn" href="/graph">Open the graph</a>
+					<a class="btn" href="/tags">Browse tags</a>
+					if viewer == nil && (status == 401 || status == 403) {
+						<a class="btn ghost" href="/login">Sign in</a>
+					}
+				</div>
+				<div class="error-meta muted">
+					<code class="mono">HTTP { fmt.Sprintf("%d", status) }</code>
+					<span aria-hidden="true">·</span>
+					<span>If this looks like a bug, please report it on <a href={ templ.SafeURL(SourceURL + "/issues") } rel="noopener" target="_blank">GitHub</a>.</span>
+				</div>
+			</div>
+		</section>
+	}
+}
+
+// errorEyebrow returns the small monospace label above the status number.
+// Keeping the copy tied to the status keeps the page legible even when the
+// caller didn't pass a custom headline.
+func errorEyebrow(status int) string {
+	switch status {
+	case 400:
+		return "Bad request"
+	case 401:
+		return "Sign-in required"
+	case 403:
+		return "Forbidden"
+	case 404:
+		return "Page not found"
+	case 405:
+		return "Method not allowed"
+	case 410:
+		return "Gone"
+	case 429:
+		return "Too many requests"
+	case 500:
+		return "Server error"
+	case 502:
+		return "Bad gateway"
+	case 503:
+		return "Service unavailable"
+	case 504:
+		return "Gateway timeout"
+	}
+	if status >= 500 {
+		return "Server error"
+	}
+	return "Request error"
+}
+
+// errorHue picks a bloom hue that loosely signals severity: green for 4xx
+// (visitor-recoverable), red for 5xx (server-side). Hues match existing
+// edge / node tokens so error pages feel of-a-piece with the rest of the UI.
+func errorHue(status int) int {
+	if status >= 500 {
+		return 22
+	}
+	return 168
+}
+
+// errorHomeURL points the primary CTA at /home for signed-in visitors and /
+// for anonymous ones — same logic the TopNav uses.
+func errorHomeURL(viewer *Viewer) templ.SafeURL {
+	if viewer != nil {
+		return templ.SafeURL("/home")
+	}
+	return templ.SafeURL("/")
+}

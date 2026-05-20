@@ -44,7 +44,7 @@ func validateSourceURL(raw string) string {
 func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, bool) {
 	raw := chiURLParam(r, "id")
 	if raw == "" {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.Node{}, false
 	}
 	var node db.Node
@@ -56,21 +56,21 @@ func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, b
 	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.Node{}, false
 		}
 		s.logger.Error("resolve node", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.Node{}, false
 	}
 	visible, err := s.canViewNode(r.Context(), node, viewerID(r))
 	if err != nil {
 		s.logger.Error("resolve node: visibility", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.Node{}, false
 	}
 	if !visible {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.Node{}, false
 	}
 	return node, true
@@ -91,7 +91,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("home: list recent", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	items := make([]views.FeedItem, len(rows))
@@ -106,7 +106,7 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("node new: groups", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
@@ -167,7 +167,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -194,7 +194,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if groupsErr != nil {
 		s.logger.Error("create node: groups", "err", groupsErr)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -406,7 +406,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("node detail: outgoing edges", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	in, err := s.queries.ListEdgesToNodeForViewer(r.Context(), db.ListEdgesToNodeForViewerParams{
@@ -415,7 +415,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("node detail: incoming edges", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	feat, err := s.queries.ListHighlightedEdgesForNode(r.Context(), db.ListHighlightedEdgesForNodeParams{
@@ -424,13 +424,13 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("node detail: highlighted edges", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	tags, err := s.queries.ListTagsForNode(r.Context(), id)
 	if err != nil {
 		s.logger.Error("node detail: list tags", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -449,20 +449,20 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	author, err := s.queries.GetUser(r.Context(), node.CreatedBy)
 	if err != nil {
 		s.logger.Error("node detail: author", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
 	canEdit, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: edit policy", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	canDelete, err := s.canDeleteNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node detail: delete policy", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -475,7 +475,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			s.logger.Error("node detail: topic views", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		topicViews = topicViewsFromRows(rows)
@@ -487,7 +487,7 @@ func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 		rows, err := s.queries.ListCommentsForNode(r.Context(), id)
 		if err != nil {
 			s.logger.Error("node detail: comments", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		comments, commentCount = commentThreadFromRows(rows, user)
@@ -519,7 +519,7 @@ func (s *Server) handleEdgeHighlight(w http.ResponseWriter, r *http.Request) {
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	rows, err := s.queries.HighlightEdge(r.Context(), db.HighlightEdgeParams{
@@ -528,11 +528,11 @@ func (s *Server) handleEdgeHighlight(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("highlight edge", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if rows == 0 {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
@@ -548,7 +548,7 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	rows, err := s.queries.UnhighlightEdge(r.Context(), db.UnhighlightEdgeParams{
@@ -557,11 +557,11 @@ func (s *Server) handleEdgeUnhighlight(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("unhighlight edge", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if rows == 0 {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+povNode.Slug, http.StatusSeeOther)
@@ -575,7 +575,7 @@ func (s *Server) requireEditPermission(w http.ResponseWriter, r *http.Request, n
 	allowed, err := s.canEditNode(r.Context(), node, currentUser(r))
 	if err != nil {
 		s.logger.Error("policy check", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return false
 	}
 	if !allowed {
@@ -599,17 +599,17 @@ func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request)
 	allowed, err := s.canDeleteNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node delete confirm: delete policy", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if !allowed {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	edgeCount, err := s.queries.CountEdgesForNode(r.Context(), id)
 	if err != nil {
 		s.logger.Error("node delete confirm: count edges", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	otherPinCount, err := s.queries.CountOtherUserPinsForNode(r.Context(), db.CountOtherUserPinsForNodeParams{
@@ -618,7 +618,7 @@ func (s *Server) handleNodeDeleteConfirm(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		s.logger.Error("node delete confirm: count pins", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.NodeDelete(viewerFor(user), node, edgeCount, otherPinCount))
@@ -637,16 +637,16 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	allowed, err := s.canDeleteNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node delete: delete policy", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if !allowed {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	if err := s.queries.DeleteNode(r.Context(), node.ID); err != nil {
 		s.logger.Error("node delete", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	s.logger.Info("node deleted", "node_id", node.ID, "slug", node.Slug, "type", node.Type, "user_id", user.ID)
@@ -686,7 +686,7 @@ func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	edgeID, err := uuid.Parse(chiURLParam(r, "edgeID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	rows, err := s.queries.DeleteEdge(r.Context(), db.DeleteEdgeParams{
@@ -695,11 +695,11 @@ func (s *Server) handleEdgeDelete(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("delete edge", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if rows == 0 {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+pageNode.Slug, http.StatusSeeOther)
@@ -714,7 +714,7 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	allowed, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node edit: policy check", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if !allowed {
@@ -729,13 +729,13 @@ func (s *Server) handleNodeEdit(w http.ResponseWriter, r *http.Request) {
 	tags, err := s.queries.ListTagsForNode(r.Context(), id)
 	if err != nil {
 		s.logger.Error("node edit: list tags", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("node edit: groups", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	isAuthor := node.CreatedBy == user.ID
@@ -774,7 +774,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	allowed, err := s.canEditNode(r.Context(), node, user)
 	if err != nil {
 		s.logger.Error("node update: policy check", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if !allowed {
@@ -785,7 +785,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	canChangeVisibility := isAuthor || isStaff(user)
 	id := node.ID
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -804,7 +804,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 	groups, groupsErr := s.queries.ListGroupsForUser(r.Context(), user.ID)
 	if groupsErr != nil {
 		s.logger.Error("update node: groups", "err", groupsErr)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -915,7 +915,7 @@ func (s *Server) handleEdgeNew(w http.ResponseWriter, r *http.Request) {
 	candidates, err := s.searchEdgeCandidates(r, id, find)
 	if err != nil {
 		s.logger.Error("edge new: search candidates", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	// htmx-driven Connect button opens the form in a modal; direct URL
@@ -943,7 +943,7 @@ func (s *Server) handleEdgePicker(w http.ResponseWriter, r *http.Request) {
 	candidates, err := s.searchEdgeCandidates(r, id, find)
 	if err != nil {
 		s.logger.Error("edge picker fragment: search candidates", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.CandidatePicker(find, candidates))
@@ -989,7 +989,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	fromID := fromNode.ID
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -1010,7 +1010,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		candidates, lerr := s.searchEdgeCandidates(r, fromID, find)
 		if lerr != nil {
 			s.logger.Error("edge create: search candidates", "err", lerr)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		if isHTMX(r) {

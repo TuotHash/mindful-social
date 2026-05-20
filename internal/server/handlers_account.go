@@ -46,7 +46,7 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	identities, err := s.queries.ListIdentitiesForUser(r.Context(), user.ID)
 	if err != nil {
 		s.logger.Error("account: list identities", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	media, err := s.accountMedia(r, user.ID)
 	if err != nil {
 		s.logger.Error("account: list media", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -132,7 +132,7 @@ func (s *Server) accountMedia(r *http.Request, userID uuid.UUID) ([]views.Accoun
 func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -165,7 +165,7 @@ func (s *Server) handleAccountPreferences(w http.ResponseWriter, r *http.Request
 		Timezone:              tz,
 	}); err != nil {
 		s.logger.Error("account prefs: update", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -204,7 +204,7 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		s.logger.Error("account image: read", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if len(data) == 0 {
@@ -246,7 +246,7 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 	dir := filepath.Join(s.cfg.UploadDir, "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		s.logger.Error("account image: mkdir", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	sum := sha256.Sum256(processed)
@@ -254,7 +254,7 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, processed, profileImageUploadPerm); err != nil {
 		s.logger.Error("account image: write", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	publicPath := "/uploads/profiles/" + name
@@ -264,7 +264,7 @@ func (s *Server) handleAccountProfileImage(w http.ResponseWriter, r *http.Reques
 		ProfileImagePath: publicPath,
 	}); err != nil {
 		s.logger.Error("account image: update user", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	removePreviousProfileImage(s.cfg.UploadDir, previousPath, publicPath)
@@ -376,7 +376,7 @@ func resizeImageNearest(src image.Image, width, height int) *image.RGBA {
 func (s *Server) handleAccountPasswordSet(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	current := r.PostFormValue("current_password")
@@ -393,7 +393,7 @@ func (s *Server) handleAccountPasswordSet(w http.ResponseWriter, r *http.Request
 	hasPassword := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.logger.Error("account: lookup password identity", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 
@@ -434,14 +434,14 @@ func (s *Server) handleAccountIdentityDisconnect(w http.ResponseWriter, r *http.
 	idStr := chiURLParam(r, "id")
 	identityID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	switch err := s.authSvc.DisconnectIdentity(r.Context(), user.ID, identityID); {
 	case err == nil:
 		s.successAccount(r, "Sign-in method disconnected.")
 	case errors.Is(err, auth.ErrIdentityNotFound):
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	case errors.Is(err, auth.ErrLastIdentity):
 		s.flashAccount(r, "You can't disconnect your last sign-in method.")

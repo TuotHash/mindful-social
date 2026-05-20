@@ -23,7 +23,7 @@ func (s *Server) handleFollow(w http.ResponseWriter, r *http.Request) {
 		FollowedID: target.ID,
 	}); err != nil {
 		s.logger.Error("follow", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/users/"+target.Username, http.StatusSeeOther)
@@ -41,7 +41,7 @@ func (s *Server) handleUnfollow(w http.ResponseWriter, r *http.Request) {
 		FollowedID: target.ID,
 	}); err != nil {
 		s.logger.Error("unfollow", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/users/"+target.Username, http.StatusSeeOther)
@@ -52,17 +52,17 @@ func (s *Server) handleUnfollow(w http.ResponseWriter, r *http.Request) {
 func (s *Server) resolveProfileTarget(w http.ResponseWriter, r *http.Request, viewer *db.User) (db.User, bool) {
 	username := chiURLParam(r, "username")
 	if username == "" {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.User{}, false
 	}
 	target, err := s.queries.GetUserByUsername(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.User{}, false
 		}
 		s.logger.Error("resolve profile target", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.User{}, false
 	}
 	if target.ID == viewer.ID {

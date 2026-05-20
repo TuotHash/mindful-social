@@ -22,7 +22,7 @@ func (s *Server) handleGroupsIndex(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.queries.ListVisibleGroups(r.Context(), viewerID(r))
 	if err != nil {
 		s.logger.Error("groups index", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.GroupsIndex(viewerFor(currentUser(r)), "", rows))
@@ -31,7 +31,7 @@ func (s *Server) handleGroupsIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	name := strings.TrimSpace(r.PostFormValue("name"))
@@ -42,7 +42,7 @@ func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
 		rows, err := s.queries.ListVisibleGroups(r.Context(), viewerID(r))
 		if err != nil {
 			s.logger.Error("groups create rerender", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		render(w, r, views.GroupsIndex(viewerFor(user), flash, rows))
@@ -178,11 +178,11 @@ func (s *Server) handleGroupAddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canManageGroup(membership) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	username := strings.TrimSpace(r.PostFormValue("username"))
@@ -197,7 +197,7 @@ func (s *Server) handleGroupAddMember(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.logger.Error("group add member: lookup", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if err := s.queries.AddGroupMember(r.Context(), db.AddGroupMemberParams{
@@ -218,16 +218,16 @@ func (s *Server) handleGroupSetMemberRole(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !canManageGroup(membership) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	memberID, err := uuid.Parse(chiURLParam(r, "userID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	newRole, ok := parseAssignableRole(r.PostFormValue("role"))
@@ -262,11 +262,11 @@ func (s *Server) handleGroupSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canManageGroup(membership) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 
@@ -320,12 +320,12 @@ func (s *Server) handleGroupRemoveMember(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !canManageGroup(membership) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	memberID, err := uuid.Parse(chiURLParam(r, "userID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	if err := s.queries.RemoveGroupMember(r.Context(), db.RemoveGroupMemberParams{
@@ -333,7 +333,7 @@ func (s *Server) handleGroupRemoveMember(w http.ResponseWriter, r *http.Request)
 		UserID:  memberID,
 	}); err != nil {
 		s.logger.Error("group remove member", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/groups/"+group.Slug, http.StatusSeeOther)
@@ -408,17 +408,17 @@ func canSeeGroupMembers(group db.Group, membership *db.GroupMembership) bool {
 func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group, *db.GroupMembership, bool) {
 	slug := strings.TrimSpace(chiURLParam(r, "slug"))
 	if slug == "" {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.Group{}, nil, false
 	}
 	group, err := s.queries.GetGroupBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.Group{}, nil, false
 		}
 		s.logger.Error("resolve group", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.Group{}, nil, false
 	}
 	var membership *db.GroupMembership
@@ -431,7 +431,7 @@ func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group,
 			membership = &row
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			s.logger.Error("resolve group: membership", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return db.Group{}, nil, false
 		}
 	}
@@ -446,11 +446,11 @@ func (s *Server) resolveGroup(w http.ResponseWriter, r *http.Request) (db.Group,
 		})
 		if err != nil {
 			s.logger.Error("resolve group: can view", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return db.Group{}, nil, false
 		}
 		if !canView {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.Group{}, nil, false
 		}
 	}
@@ -464,7 +464,7 @@ func (s *Server) renderGroupDetail(w http.ResponseWriter, r *http.Request, group
 		rows, err := s.queries.ListGroupMembers(r.Context(), group.ID)
 		if err != nil {
 			s.logger.Error("group detail: members", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
 		members = rows
@@ -476,7 +476,7 @@ func (s *Server) renderGroupDetail(w http.ResponseWriter, r *http.Request, group
 	})
 	if err != nil {
 		s.logger.Error("group detail: nodes", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.GroupDetail(viewerFor(currentUser(r)), flash, group, membership, members, nodes, canManageGroup(membership), canOwnGroup(membership), canSee))

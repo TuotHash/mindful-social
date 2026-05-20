@@ -86,13 +86,6 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	csrfMw, err := csrfMiddleware(logger, cfg.PublicBaseURL)
-	if err != nil {
-		pool.Close()
-		_ = sqlDB.Close()
-		return nil, err
-	}
-
 	s := &Server{
 		cfg:      cfg,
 		logger:   logger,
@@ -102,8 +95,14 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		authSvc:  auth.NewService(pool),
 		sessions: sm,
 		oauth:    registry,
-		csrf:     csrfMw,
 	}
+	csrfMw, err := s.csrfMiddleware(cfg.PublicBaseURL)
+	if err != nil {
+		pool.Close()
+		_ = sqlDB.Close()
+		return nil, err
+	}
+	s.csrf = csrfMw
 	views.SetSignupEnabled(cfg.SignupEnabled)
 	if err := s.bootstrapAdmins(ctx); err != nil {
 		// Don't fail boot if admin reconcile fails — just log it. A
@@ -178,6 +177,17 @@ func (s *Server) routes() {
 
 		s.userFacingRoutes(r)
 	})
+
+	// Chi only invokes a single router-level NotFound / MethodNotAllowed
+	// handler — middleware inside groups doesn't apply. Wrap ours in the
+	// session + user chain so the styled error page can show the right
+	// nav for signed-in visitors.
+	errChain := func(h http.HandlerFunc) http.HandlerFunc {
+		wrapped := s.sessions.LoadAndSave(s.loadUser(h))
+		return wrapped.ServeHTTP
+	}
+	r.NotFound(errChain(s.notFound))
+	r.MethodNotAllowed(errChain(s.methodNotAllowed))
 
 	s.router = r
 }

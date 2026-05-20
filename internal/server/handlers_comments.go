@@ -26,7 +26,7 @@ func (s *Server) handleCommentCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	body := strings.TrimSpace(r.PostFormValue("body"))
@@ -54,7 +54,7 @@ func (s *Server) handleCommentCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.logger.Error("create comment", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug+"#comment-"+comment.ID.String(), http.StatusSeeOther)
@@ -71,7 +71,7 @@ func (s *Server) handleCommentEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEditComment(comment.AuthorID, comment.DeletedAt, user) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	render(w, r, views.CommentEdit(viewerFor(user), node, commentForEdit(comment), "", comment.Body))
@@ -88,11 +88,11 @@ func (s *Server) handleCommentUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEditComment(comment.AuthorID, comment.DeletedAt, user) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		s.renderError(w, r, http.StatusBadRequest)
 		return
 	}
 	body := strings.TrimSpace(r.PostFormValue("body"))
@@ -107,7 +107,7 @@ func (s *Server) handleCommentUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.logger.Error("update comment", "err", err)
@@ -128,7 +128,7 @@ func (s *Server) handleCommentDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canDeleteComment(comment.AuthorID, comment.DeletedAt, user) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		s.renderError(w, r, http.StatusForbidden)
 		return
 	}
 
@@ -146,11 +146,11 @@ func (s *Server) handleCommentDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.logger.Error("delete comment", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	if rows == 0 {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug+"#comments", http.StatusSeeOther)
@@ -163,7 +163,7 @@ func (s *Server) resolveComment(w http.ResponseWriter, r *http.Request) (db.Node
 	}
 	commentID, err := uuid.Parse(chiURLParam(r, "commentID"))
 	if err != nil {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return db.Node{}, db.GetCommentForNodeRow{}, false
 	}
 	comment, err := s.queries.GetCommentForNode(r.Context(), db.GetCommentForNodeParams{
@@ -172,11 +172,11 @@ func (s *Server) resolveComment(w http.ResponseWriter, r *http.Request) (db.Node
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return db.Node{}, db.GetCommentForNodeRow{}, false
 		}
 		s.logger.Error("resolve comment", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return db.Node{}, db.GetCommentForNodeRow{}, false
 	}
 	return node, comment, true

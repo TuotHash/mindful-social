@@ -29,7 +29,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("search nodes", "err", err, "q", q)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	userRows, err := s.queries.SearchUsers(r.Context(), db.SearchUsersParams{
@@ -38,7 +38,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("search users", "err", err, "q", q)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	groupRows, err := s.queries.SearchGroups(r.Context(), db.SearchGroupsParams{
@@ -48,7 +48,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("search groups", "err", err, "q", q)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.SearchResults(viewer, q, searchHits(nodeRows), userHits(userRows), groupHits(groupRows)))

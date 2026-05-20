@@ -101,7 +101,7 @@ func (s *Server) handleTagsIndex(w http.ResponseWriter, r *http.Request) {
 	tags, err := s.queries.ListAllTagsForViewer(r.Context(), viewerID(r))
 	if err != nil {
 		s.logger.Error("tags index", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.TagsIndex(viewerFor(currentUser(r)), tags))
@@ -111,17 +111,17 @@ func (s *Server) handleTagsIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTagDetail(w http.ResponseWriter, r *http.Request) {
 	name := strings.ToLower(strings.TrimSpace(chiURLParam(r, "name")))
 	if name == "" {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	tag, err := s.queries.GetTagByName(r.Context(), name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.NotFound(w, r)
+			s.notFound(w, r)
 			return
 		}
 		s.logger.Error("tag detail: get tag", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	nodes, err := s.queries.ListNodesWithTagForViewer(r.Context(), db.ListNodesWithTagForViewerParams{
@@ -130,7 +130,7 @@ func (s *Server) handleTagDetail(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.logger.Error("tag detail: list nodes", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
 	render(w, r, views.TagDetail(viewerFor(currentUser(r)), tag.Name, nodes))

@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -21,7 +20,7 @@ import (
 //
 // Cookie security follows the public base URL: HTTPS turns on Secure;
 // anything else leaves it off so local HTTP dev still works.
-func csrfMiddleware(logger *slog.Logger, publicBaseURL string) (func(http.Handler) http.Handler, error) {
+func (s *Server) csrfMiddleware(publicBaseURL string) (func(http.Handler) http.Handler, error) {
 	key, err := loadCSRFKey()
 	if err != nil {
 		return nil, err
@@ -34,8 +33,8 @@ func csrfMiddleware(logger *slog.Logger, publicBaseURL string) (func(http.Handle
 		csrf.Path("/"),
 		csrf.HttpOnly(true),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger.Warn("csrf rejected", "method", r.Method, "path", r.URL.Path, "reason", csrf.FailureReason(r))
-			http.Error(w, "CSRF token missing or invalid", http.StatusForbidden)
+			s.logger.Warn("csrf rejected", "method", r.Method, "path", r.URL.Path, "reason", csrf.FailureReason(r))
+			s.renderError(w, r, http.StatusForbidden)
 		})),
 	)
 	bridge := func(next http.Handler) http.Handler {
