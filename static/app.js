@@ -995,7 +995,19 @@
             n.vy += (cy - n.y) * 0.015 * alpha;
           });
 
-          // ⑤ Integrate + damp.
+          // ⑤ Type gravity — nudge each node type toward its natural x-region
+          //    (topics left, views centre, findings right). This exploits the
+          //    topic→view→finding flow to reduce edge crossings without any
+          //    expensive intersection checks. The force is intentionally weak
+          //    so link springs and charge still govern the actual positions.
+          var typeX = { topic: 220, view: 600, finding: 980, comment: 600 };
+          nodes.forEach(function (n) {
+            var tx = typeX[n.type];
+            if (tx === undefined) return;
+            n.vx += (tx - n.x) * 0.006 * alpha;
+          });
+
+          // ⑥ Integrate + damp.
           nodes.forEach(function (n) {
             n.vx *= 0.65; n.vy *= 0.65;
             n.x += n.vx;  n.y += n.vy;
