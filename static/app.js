@@ -942,14 +942,16 @@
         for (var iter = 0; iter < ITERS; iter++) {
           alpha *= (1 - alphaDecay);
 
-          // ① Charge — every pair of nodes repels.
+          // ① Charge — every pair of nodes repels. Uses 1/d falloff (longer
+          //    range than inverse-square) with a minimum distance cap so
+          //    very-close nodes don't receive unbounded force.
           for (var i = 0; i < nodes.length; i++) {
             for (var j = i + 1; j < nodes.length; j++) {
               var dx = nodes[j].x - nodes[i].x || 0.1;
               var dy = nodes[j].y - nodes[i].y || 0.1;
               var d2 = Math.max(1, dx * dx + dy * dy);
               var d  = Math.sqrt(d2);
-              var f  = (8100 / d2) * alpha;
+              var f  = (130 / Math.max(d, 25)) * alpha;
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
@@ -1033,11 +1035,11 @@
       }
 
       function appendMarkers(defs) {
-        ["supports", "opposes", "related", "comments_on"].forEach(function (kind) {
+        ["supports", "opposes", "related", "refines", "cites", "comments_on"].forEach(function (kind) {
           var marker = svgEl("marker", {
             id: markerID(kind),
             viewBox: "0 0 10 10",
-            refX: "9",
+            refX: "10",
             refY: "5",
             markerWidth: "7",
             markerHeight: "7",
@@ -1049,15 +1051,20 @@
         });
       }
 
+      // edgePath draws a straight line from the source circle's edge to the
+      // target circle's edge along the actual angle between the two nodes.
+      // refX:"10" on the marker puts the arrowhead tip exactly at the line
+      // endpoint, so the arrow lands flush with the target circle border.
       function edgePath(from, to) {
+        var rFrom = nodeRadius(from);
+        var rTo   = nodeRadius(to);
         var dx = to.x - from.x;
-        var bend = Math.max(70, Math.min(190, Math.abs(dx) * 0.45));
-        if (dx < 0) bend = -bend;
+        var dy = to.y - from.y;
+        var d  = Math.sqrt(dx * dx + dy * dy) || 1;
+        var ux = dx / d, uy = dy / d;
         return [
-          "M", from.x, from.y,
-          "C", from.x + bend, from.y,
-          to.x - bend, to.y,
-          to.x, to.y,
+          "M", (from.x + ux * rFrom).toFixed(1), (from.y + uy * rFrom).toFixed(1),
+          "L", (to.x   - ux * rTo).toFixed(1),   (to.y   - uy * rTo).toFixed(1),
         ].join(" ");
       }
 
