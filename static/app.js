@@ -1079,7 +1079,6 @@
       }
 
       function layout(nodes) {
-        viewHeight = Math.max(600, Math.round(nodes.length * 7 + 400));
         var key = simNodeSetKey(nodes);
         if (key !== simKey) {
           simKey = key;
@@ -1251,6 +1250,12 @@
           selectedID = "";
         }
 
+        // Derive viewHeight from the SVG's actual rendered dimensions so
+        // the viewBox matches the CSS box exactly — no letterboxing.
+        var svgRect = svg.getBoundingClientRect();
+        if (svgRect.width > 1 && svgRect.height > 1) {
+          viewHeight = Math.round(1200 * svgRect.height / svgRect.width);
+        }
         layout(nodes);
         svg.setAttribute("viewBox", "0 0 1200 " + viewHeight);
         while (svg.firstChild) svg.removeChild(svg.firstChild);
