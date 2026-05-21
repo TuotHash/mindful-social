@@ -82,7 +82,7 @@ func (s *Server) resolveNode(w http.ResponseWriter, r *http.Request) (db.Node, b
 // ensures anonymous visitors only see public content.
 func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.queries.ListRecentNodesForViewer(r.Context(), db.ListRecentNodesForViewerParams{
-		Limit:    6,
+		Limit:    3,
 		ViewerID: viewerID(r),
 	})
 	if err != nil {
