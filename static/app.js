@@ -1008,6 +1008,15 @@
         }
         nodes.forEach(function (n) { if (depthOf[n.id] === undefined) depthOf[n.id] = 0; });
 
+        // Neighbor map: nodeID → array of adjacent node objects (undirected).
+        var neighborMap = {};
+        nodes.forEach(function (n) { neighborMap[n.id] = []; });
+        simEdges.forEach(function (e) {
+          var a = nodesByID[e.from], b = nodesByID[e.to];
+          if (a && neighborMap[a.id]) neighborMap[a.id].push(b);
+          if (b && neighborMap[b.id]) neighborMap[b.id].push(a);
+        });
+
         var ITERS = 220;
         var alpha = 1.0;
         var alphaDecay = 1 - Math.pow(0.001, 1 / ITERS);
@@ -1049,7 +1058,19 @@
             b.vx -= dx * f; b.vy -= dy * f;
           });
 
-          // ③ Kind affinity — nodes that share an edge kind drift gently
+          // ③ Neighbor centroid — each node is pulled toward the average
+          //    position of its direct neighbors, drawing connected groups
+          //    into tighter clusters regardless of edge kind.
+          nodes.forEach(function (n) {
+            var nbrs = neighborMap[n.id];
+            if (!nbrs || !nbrs.length) return;
+            var sx = 0, sy = 0;
+            nbrs.forEach(function (nb) { sx += nb.x; sy += nb.y; });
+            n.vx += (sx / nbrs.length - n.x) * 0.04 * alpha;
+            n.vy += (sy / nbrs.length - n.y) * 0.04 * alpha;
+          });
+
+          // ④ Kind affinity — nodes that share an edge kind drift gently
           //    toward each other's centroid, forming soft semantic clusters.
           Object.keys(kindParts).forEach(function (kind) {
             var ids = Object.keys(kindParts[kind]);
