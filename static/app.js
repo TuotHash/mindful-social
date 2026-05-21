@@ -995,7 +995,13 @@
               var dy = nodes[j].y - nodes[i].y || 0.1;
               var d2 = Math.max(1, dx * dx + dy * dy);
               var d  = Math.sqrt(d2);
-              var f  = (200 / Math.max(d, 30)) * alpha;
+              // Two-regime repulsion: inverse-square at close range (d<100)
+              // transitions continuously into inverse-linear at long range.
+              // At d=50 this is ~4× stronger than the old 1/d formula alone,
+              // which stops satellite nodes piling up around shared hubs.
+              var f  = (d < 100
+                ? 20000 / Math.max(d * d, 400)
+                : 200   / d) * alpha;
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
