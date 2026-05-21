@@ -406,7 +406,7 @@
     // before any data loads, so the default view is 3× further out.
     // onEngineStop fires only after cooldownTime (15 s default) — too late to
     // be useful — so we set the position synchronously here instead.
-    Graph.camera().position.z *= 1.6;
+    Graph.camera().position.z *= 1.3;
 
     // ── Graph data update ─────────────────────────────────────────────────────
     function updateGraph() {
