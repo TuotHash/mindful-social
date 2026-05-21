@@ -354,6 +354,64 @@
       return force;
     })());
 
+    // ── Cursor-based zoom ─────────────────────────────────────────────────────
+    // OrbitControls' default zoom moves the camera along its forward axis toward
+    // a fixed target point, so the perceived pivot drifts to wherever the target
+    // happens to be. We replace it with a wheel handler that scales both the
+    // camera position AND the orbit target around the cursor's 3D world point,
+    // making the scene expand/contract exactly under the pointer.
+    var orbitControls = Graph.controls();
+    if (orbitControls) {
+      orbitControls.enableZoom = false;
+
+      var glCanvas = Graph.renderer().domElement;
+      glCanvas.addEventListener("wheel", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var camera   = Graph.camera();
+        var controls = Graph.controls();
+        var rect     = glCanvas.getBoundingClientRect();
+
+        // Cursor in normalised device coordinates (NDC: −1..1 on each axis).
+        var ndcX = ((e.clientX - rect.left)  / rect.width)  *  2 - 1;
+        var ndcY = ((e.clientY - rect.top)   / rect.height) * -2 + 1;
+
+        // World-space direction from camera through cursor.
+        // camera.position.clone() gives us a THREE.Vector3 without importing THREE.
+        var dir = camera.position.clone()
+          .set(ndcX, ndcY, 0.5)
+          .unproject(camera)
+          .sub(camera.position)
+          .normalize();
+
+        // Project cursor onto a plane at the current camera→target distance,
+        // giving a stable world-space pivot point directly under the pointer.
+        var dist  = camera.position.distanceTo(controls.target);
+        var pivot = camera.position.clone().addScaledVector(dir, dist);
+
+        // Zoom factor: < 1 pulls in, > 1 pushes out.
+        var factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+
+        // Scale both camera and orbit target around the pivot.
+        var camDelta    = camera.position.clone().sub(pivot);
+        var targetDelta = controls.target.clone().sub(pivot);
+        camera.position.copy(pivot).addScaledVector(camDelta,    factor);
+        controls.target.copy(pivot).addScaledVector(targetDelta, factor);
+        controls.update();
+      }, { passive: false });
+    }
+
+    // After the force simulation settles, snap the orbit target to the actual
+    // graph centroid so the rotation pivot sits inside the cloud, not at the
+    // world origin (which can be off-centre depending on node positions).
+    var initialFitDone = false;
+    Graph.onEngineStop(function () {
+      if (initialFitDone) return;
+      initialFitDone = true;
+      Graph.zoomToFit(400); // 400 ms fly-in; also updates controls.target
+    });
+
     // ── Graph data update ─────────────────────────────────────────────────────
     function updateGraph() {
       var nodes = filteredNodes();
