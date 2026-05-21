@@ -3908,8 +3908,11 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   border-color: var(--border-strong);
   box-shadow: var(--shadow);
 }
-.recent-card .chip {
-  align-self: flex-start;
+.recent-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 .recent-card-title {
   font-family: var(--serif);
@@ -3937,8 +3940,8 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   line-height: 1.5;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 7;
+  line-clamp: 7;
   overflow: hidden;
 }
 .recent-card-author {
@@ -3950,7 +3953,6 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   font-size: 13px;
   color: var(--ink-3);
   text-decoration: none;
-  margin-top: auto;
 }
 .recent-card-author:hover {
   color: var(--ink);

@@ -198,18 +198,20 @@ templ landingRecent(items []FeedItem) {
 // /users/{username} link still wins clicks over the stretched overlay.
 templ recentNodeCard(n FeedItem) {
 	<article class="card recent-card">
-		<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
-			<span class="dot"></span>
-			{ nodeTypeAliasLabel(n.Type) }
-		</span>
+		<div class="recent-card-meta">
+			<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
+				<span class="dot"></span>
+				{ nodeTypeAliasLabel(n.Type) }
+			</span>
+			<a class="recent-card-author" href={ templ.SafeURL("/users/" + n.AuthorUsername) }>
+				@Avatar(n.AuthorUsername, 18)
+				{ n.AuthorUsername }
+			</a>
+		</div>
 		<a class="recent-card-title" href={ templ.SafeURL("/nodes/" + n.Slug) }>{ n.Title }</a>
-		if excerpt := NodePlainExcerpt(n.Body, 240); excerpt != "" {
+		if excerpt := NodePlainExcerpt(n.Body, 480); excerpt != "" {
 			<p class="recent-card-body">{ excerpt }</p>
 		}
-		<a class="recent-card-author" href={ templ.SafeURL("/users/" + n.AuthorUsername) }>
-			@Avatar(n.AuthorUsername, 18)
-			{ n.AuthorUsername }
-		</a>
 	</article>
 }
 
