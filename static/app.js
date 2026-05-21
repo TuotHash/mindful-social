@@ -985,6 +985,29 @@
           kindParts[e.kind][e.to] = true;
         });
 
+        // BFS depth from graph roots (nodes with no incoming edges).
+        // Used by the charge force to push roots away from their grandchildren.
+        var inDeg = {};
+        nodes.forEach(function (n) { inDeg[n.id] = 0; });
+        simEdges.forEach(function (e) { if (inDeg[e.to] !== undefined) inDeg[e.to]++; });
+        var depthOf = {};
+        var bfsQ = [];
+        nodes.forEach(function (n) {
+          if (inDeg[n.id] === 0) { depthOf[n.id] = 0; bfsQ.push(n.id); }
+        });
+        var bfsOut = {};
+        simEdges.forEach(function (e) {
+          bfsOut[e.from] = bfsOut[e.from] || [];
+          bfsOut[e.from].push(e.to);
+        });
+        for (var bi = 0; bi < bfsQ.length; bi++) {
+          var bd = depthOf[bfsQ[bi]];
+          (bfsOut[bfsQ[bi]] || []).forEach(function (nb) {
+            if (depthOf[nb] === undefined) { depthOf[nb] = bd + 1; bfsQ.push(nb); }
+          });
+        }
+        nodes.forEach(function (n) { if (depthOf[n.id] === undefined) depthOf[n.id] = 0; });
+
         var ITERS = 220;
         var alpha = 1.0;
         var alphaDecay = 1 - Math.pow(0.001, 1 / ITERS);
@@ -995,19 +1018,19 @@
           // ① Charge — every pair of nodes repels. Uses 1/d falloff (longer
           //    range than inverse-square) with a minimum distance cap so
           //    very-close nodes don't receive unbounded force.
+          //    Root→grandchild pairs (depth-0 vs depth≥2) get 6× extra
+          //    repulsion so roots forcefully push second-layer nodes outward.
           for (var i = 0; i < nodes.length; i++) {
             for (var j = i + 1; j < nodes.length; j++) {
               var dx = nodes[j].x - nodes[i].x || 0.1;
               var dy = nodes[j].y - nodes[i].y || 0.1;
               var d2 = Math.max(1, dx * dx + dy * dy);
               var d  = Math.sqrt(d2);
-              // Two-regime repulsion: inverse-square at close range (d<100)
-              // transitions continuously into inverse-linear at long range.
-              // At d=50 this is ~4× stronger than the old 1/d formula alone,
-              // which stops satellite nodes piling up around shared hubs.
+              var di = depthOf[nodes[i].id], dj = depthOf[nodes[j].id];
+              var rootGrandchild = (di === 0 && dj >= 2) || (dj === 0 && di >= 2);
               var f  = (d < 100
                 ? 20000 / Math.max(d * d, 400)
-                : 200   / d) * alpha;
+                : 200   / d) * alpha * (rootGrandchild ? 6 : 1);
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
