@@ -226,6 +226,7 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 	r.Get("/nodes/{id}/history/{revision}", s.handleNodeRevisionView)
 	r.Get("/graph", s.handleArgumentGraph)
 	r.Get("/graph/data", s.handleArgumentGraphData)
+	r.Get("/graph/3d", s.handleArgumentGraph3D)
 	r.Get("/users/{username}", s.handleProfile)
 	r.Get("/tags", s.handleTagsIndex)
 	r.Get("/tags/{name}", s.handleTagDetail)

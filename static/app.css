@@ -2014,6 +2014,16 @@ label.field {
   cursor: grabbing;
 }
 
+.argument-graph-stage-3d {
+  background: #0d0d14;
+}
+
+.argument-graph-3d-container {
+  width: 100%;
+  height: min(72vh, 740px);
+  min-height: 620px;
+}
+
 .argument-graph-background {
   fill: transparent;
 }

@@ -118,6 +118,17 @@ func (s *Server) handleArgumentGraph(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.ArgumentGraph(viewerFor(currentUser(r)), data, graphFiltersForView(filters)))
 }
 
+func (s *Server) handleArgumentGraph3D(w http.ResponseWriter, r *http.Request) {
+	filters := parseGraphFilters(r)
+	data, err := s.loadArgumentGraph(r, filters)
+	if err != nil {
+		s.logger.Error("argument graph 3d: load", "err", err)
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
+	render(w, r, views.ArgumentGraph3D(viewerFor(currentUser(r)), data, graphFiltersForView(filters)))
+}
+
 func (s *Server) handleArgumentGraphData(w http.ResponseWriter, r *http.Request) {
 	filters := parseGraphFilters(r)
 	data, err := s.loadArgumentGraph(r, filters)
