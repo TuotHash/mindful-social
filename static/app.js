@@ -912,19 +912,63 @@
         var W = 1200, H = viewHeight;
         var cx = W / 2, cy = H / 2;
 
-        // Seed positions from cache (warm start) or a random ring scatter.
+        // Restore cached positions; zero velocities for everyone.
         nodes.forEach(function (n) {
           var cached = simPositions[n.id];
-          if (cached) {
-            n.x = cached.x; n.y = cached.y;
-          } else {
-            var angle = Math.random() * 2 * Math.PI;
-            var r = 100 + Math.random() * 280;
-            n.x = cx + Math.cos(angle) * r;
-            n.y = cy + Math.sin(angle) * r;
-          }
+          if (cached) { n.x = cached.x; n.y = cached.y; }
           n.vx = 0; n.vy = 0;
         });
+
+        // Place uncached nodes by connected component so isolated nodes
+        // never start inside a dense cluster. Each component gets its own
+        // sector of the canvas; the largest component sits nearest the centre.
+        var uncached = nodes.filter(function (n) { return !simPositions[n.id]; });
+        if (uncached.length > 0) {
+          var adj = {};
+          uncached.forEach(function (n) { adj[n.id] = []; });
+          simEdges.forEach(function (e) {
+            if (adj[e.from] !== undefined && adj[e.to] !== undefined) {
+              adj[e.from].push(e.to);
+              adj[e.to].push(e.from);
+            }
+          });
+
+          var visited = {};
+          var components = [];
+          uncached.forEach(function (n) {
+            if (visited[n.id]) return;
+            var comp = [];
+            var stack = [n.id];
+            while (stack.length) {
+              var id = stack.pop();
+              if (visited[id]) continue;
+              visited[id] = true;
+              var node = nodesByID[id];
+              if (node) comp.push(node);
+              (adj[id] || []).forEach(function (nb) {
+                if (!visited[nb]) stack.push(nb);
+              });
+            }
+            if (comp.length) components.push(comp);
+          });
+
+          // Largest component first; spread ring radius scales with canvas.
+          components.sort(function (a, b) { return b.length - a.length; });
+          var nc = components.length;
+          var ring = Math.min(W, H) * 0.28;
+          components.forEach(function (comp, ci) {
+            var spread = nc > 1 ? ring : 0;
+            var angle = (ci / nc) * 2 * Math.PI - Math.PI / 2;
+            var ox = cx + Math.cos(angle) * spread;
+            var oy = cy + Math.sin(angle) * spread;
+            comp.forEach(function (node, ii) {
+              var a2 = (ii / Math.max(comp.length, 1)) * 2 * Math.PI;
+              var r2 = 20 + Math.random() * 50;
+              node.x = ox + Math.cos(a2) * r2;
+              node.y = oy + Math.sin(a2) * r2;
+            });
+          });
+        }
 
         // Build same-kind participant sets for the affinity force.
         // kindParts[kind] = {nodeID: true, ...}
