@@ -1544,6 +1544,17 @@
         });
       });
 
+      var reshuffleBtn = graph.querySelector("[data-graph-reshuffle]");
+      if (reshuffleBtn) {
+        reshuffleBtn.addEventListener("click", function () {
+          simPositions = {};
+          simKey = "";
+          selectedID = "";
+          resetView();
+          render();
+        });
+      }
+
       svg.addEventListener("click", function (event) {
         if (!event.target.classList || !event.target.classList.contains("argument-graph-background")) return;
         selectedID = "";

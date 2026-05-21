@@ -567,7 +567,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<label class=\"argument-graph-depth\" title=\"How many extra hops of connected nodes to include around each match.\"><span class=\"argument-graph-depth-label\">Depth</span> <input type=\"range\" min=\"0\" max=\"5\" step=\"1\" value=\"2\" data-graph-depth aria-label=\"Levels of connections shown around each match\"> <span class=\"argument-graph-depth-value\" data-graph-depth-value aria-live=\"polite\">2</span></label><div class=\"argument-graph-zoom\" aria-label=\"Graph zoom controls\"><button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"out\" title=\"Zoom out\" aria-label=\"Zoom out\"><span class=\"material-symbols-outlined\">remove</span></button> <button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"reset\" title=\"Reset view\" aria-label=\"Reset view\"><span class=\"material-symbols-outlined\">center_focus_strong</span></button> <button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"in\" title=\"Zoom in\" aria-label=\"Zoom in\"><span class=\"material-symbols-outlined\">add</span></button></div></div><div class=\"argument-graph-workspace\"><div class=\"argument-graph-stage\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<label class=\"argument-graph-depth\" title=\"How many extra hops of connected nodes to include around each match.\"><span class=\"argument-graph-depth-label\">Depth</span> <input type=\"range\" min=\"0\" max=\"5\" step=\"1\" value=\"2\" data-graph-depth aria-label=\"Levels of connections shown around each match\"> <span class=\"argument-graph-depth-value\" data-graph-depth-value aria-live=\"polite\">2</span></label><div class=\"argument-graph-zoom\" aria-label=\"Graph zoom controls\"><button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"out\" title=\"Zoom out\" aria-label=\"Zoom out\"><span class=\"material-symbols-outlined\">remove</span></button> <button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"reset\" title=\"Reset view\" aria-label=\"Reset view\"><span class=\"material-symbols-outlined\">center_focus_strong</span></button> <button type=\"button\" class=\"btn ghost sm\" data-graph-zoom=\"in\" title=\"Zoom in\" aria-label=\"Zoom in\"><span class=\"material-symbols-outlined\">add</span></button> <button type=\"button\" class=\"btn ghost sm\" data-graph-reshuffle title=\"Reshuffle layout\" aria-label=\"Reshuffle layout\"><span class=\"material-symbols-outlined\">shuffle</span></button></div></div><div class=\"argument-graph-workspace\"><div class=\"argument-graph-stage\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -609,7 +609,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var36 templ.SafeURL
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/nodes/" + n.Slug))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 347, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 350, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 					if templ_7745c5c3_Err != nil {
@@ -644,7 +644,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var39 string
 					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(nodeTypeOriginalLabel(db.NodeType(n.Type)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 348, Col: 92}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 351, Col: 92}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
@@ -657,7 +657,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var40 string
 					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(nodeTypeAliasLabel(db.NodeType(n.Type)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 350, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 353, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
@@ -670,7 +670,7 @@ func ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGraph
 					var templ_7745c5c3_Var41 string
 					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(n.Title)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 352, Col: 40}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/graph.templ`, Line: 355, Col: 40}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 					if templ_7745c5c3_Err != nil {
