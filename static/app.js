@@ -951,7 +951,7 @@
               var dy = nodes[j].y - nodes[i].y || 0.1;
               var d2 = Math.max(1, dx * dx + dy * dy);
               var d  = Math.sqrt(d2);
-              var f  = (130 / Math.max(d, 25)) * alpha;
+              var f  = (600 / Math.max(d, 30)) * alpha;
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
