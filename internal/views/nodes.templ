@@ -20,7 +20,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 			<div class="col gap-12" style="margin-bottom: 24px;">
 				<span class="eyebrow">Post</span>
 				<h1 class="h-1">New post</h1>
-				<p class="muted" style="margin: 0;">An opinion is a stance. A topic groups opinions together. An occurence attaches an observation to an existing node and says how it relates.</p>
+				<p class="muted" style="margin: 0;">An opinion is a stance. A topic groups opinions together. Evidence attaches an observation to an existing node and says how it relates.</p>
 			</div>
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
@@ -49,7 +49,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			</div>
 			<h2 id="post-modal-title" style="margin: 0 0 6px; font-size: 22px;">New post</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
-				Share an opinion, start a topic, or attach an occurence to an existing node.
+				Share an opinion, start a topic, or attach evidence to an existing node.
 			</p>
 			@Flash(flash)
 			<form
@@ -90,13 +90,13 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 				<span class="material-symbols-outlined">workspaces</span>
 				Topic
 			</label>
-			<label class="toggle-btn" data-type="finding" title="Finding">
+			<label class="toggle-btn" data-type="finding" title="Evidence">
 				<input type="radio" name="type" value="finding" required checked?={ formType == "finding" || formType == "" }/>
 				<span class="material-symbols-outlined">fact_check</span>
-				Occurence
+				Evidence
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">An opinion takes a stance. A topic groups opinions. An occurence attaches an observation to any existing node.</small>
+		<small class="muted" style="font-size: 12px;">An opinion takes a stance. A topic groups opinions. Evidence attaches an observation to any existing node.</small>
 	</fieldset>
 	<fieldset class="toggle-group if-topic">
 		<legend>Position</legend>
@@ -133,7 +133,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 				Related
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">How this occurence relates to its parent — supports backs it, opposes argues against, related is for citations or loose links.</small>
+		<small class="muted" style="font-size: 12px;">How this evidence relates to its parent — supports backs it, opposes argues against, related is for citations or loose links.</small>
 	</fieldset>
 	<label>
 		Title
@@ -203,7 +203,7 @@ templ postFormFields(formType, formTitle, formBody, formPin, formTags, formVisib
 			/>
 			<small class="if-view">Pick the topic this anchors under.</small>
 			<small class="if-topic">Pick the topic this anchors under.</small>
-			<small class="if-finding">Pick the node this occurence attaches to — any topic, opinion, or occurence.</small>
+			<small class="if-finding">Pick the node this evidence attaches to — any topic, opinion, or evidence node.</small>
 		</label>
 		@TopicCandidatePicker(findParent, formParentNodeID, parentCandidates)
 	</div>
@@ -457,10 +457,10 @@ func topicViewExcerpt(body string) string {
 }
 
 // nodeTypeChip renders a chip with the node-type pastel. The displayed
-// label uses the user-facing alias (view → opinion, finding → occurence);
-// the title attribute carries the original term so a hover/long-press
-// reveals it. The CSS class stays on the original type name so the
-// per-type colours don't move.
+// label uses the user-facing alias (view → opinion, finding → evidence);
+// the title attribute carries the capitalised alias for hover/long-press.
+// The CSS class stays on the original type name so the per-type colours
+// don't move.
 templ nodeTypeChip(t db.NodeType) {
 	<span class={ "chip", string(t) } title={ nodeTypeOriginalLabel(t) }>
 		<span class="dot"></span>
@@ -469,26 +469,27 @@ templ nodeTypeChip(t db.NodeType) {
 }
 
 // nodeTypeAliasLabel returns the user-facing label for a node type. View
-// renders as "opinion" and finding as "occurence"; the chip's CSS uppercases
+// renders as "opinion" and finding as "evidence"; the chip's CSS uppercases
 // the result. Topic and comment stay as they are.
 func nodeTypeAliasLabel(t db.NodeType) string {
 	switch t {
 	case db.NodeTypeView:
 		return "opinion"
 	case db.NodeTypeFinding:
-		return "occurence"
+		return "evidence"
 	}
 	return string(t)
 }
 
-// nodeTypeOriginalLabel returns the original (pre-alias) capitalised name
-// for the title tooltip on chips and buttons.
+// nodeTypeOriginalLabel returns the capitalised user-facing name for the
+// title tooltip on chips and buttons. The backend term ("finding") is
+// masked here so users never see it during the rename to "evidence".
 func nodeTypeOriginalLabel(t db.NodeType) string {
 	switch t {
 	case db.NodeTypeView:
 		return "View"
 	case db.NodeTypeFinding:
-		return "Finding"
+		return "Evidence"
 	case db.NodeTypeTopic:
 		return "Topic"
 	case db.NodeTypeComment:
@@ -500,7 +501,7 @@ func nodeTypeOriginalLabel(t db.NodeType) string {
 // StanceRow renders the on-post stance controls + meter. For views the
 // row carries three one-click toggles (Support / Oppose / Resonate); for
 // other node types only Resonate applies (support and oppose are stance
-// statements that don't make sense on topics, occurences, or comments).
+// statements that don't make sense on topics, evidence nodes, or comments).
 // The meter renders only when at least one viewer has taken a stance.
 // Logged-out viewers see read-only counts and a sign-in nudge — keeps
 // the percentage visible to anyone browsing.
@@ -615,7 +616,7 @@ templ NodeDetail(viewer *Viewer, node db.Node, authorUsername string, featured [
 
 			if len(featured) > 0 {
 				<section class="featured">
-					<h2 title="Key findings">Key occurences</h2>
+					<h2 title="Key evidence">Key evidence</h2>
 					for _, f := range featured {
 						<article class={ "featured-card", "edge-" + string(f.Kind) }>
 							<header class="featured-head">
@@ -993,7 +994,7 @@ templ PinForm(viewer *Viewer, node db.Node, flash, formKind string) {
 			<h1 class="h-1" style="margin-bottom: 12px; font-size: 36px;">{ node.Title }</h1>
 			<p class="muted" style="margin: 0 0 24px;">
 				if node.Type == db.NodeTypeView {
-					Take a stance — support or oppose — or simply resonate. Evidence and reasoning live in the graph; use Connect to add an occurence.
+					Take a stance — support or oppose — or simply resonate. Reasoning and sources live in the graph; use Connect to add evidence.
 				} else {
 					Resonate with this on your profile.
 				}
@@ -1219,13 +1220,13 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 				<span class="material-symbols-outlined">search</span>
 				Existing node
 			</label>
-			<label class="toggle-btn" data-to-mode="new" title="New finding">
+			<label class="toggle-btn" data-to-mode="new" title="New evidence">
 				<input type="radio" name="to_mode" value="new" checked?={ formToMode == "new" }/>
 				<span class="material-symbols-outlined">add_circle</span>
-				New occurence
+				New evidence
 			</label>
 		</div>
-		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new occurence attached to this one. The new occurence inherits visibility from this node.</small>
+		<small class="muted" style="font-size: 12px;">Pick a node already in the graph, or create a new evidence node attached to this one. The new node inherits visibility from this one.</small>
 	</fieldset>
 	<div class="edge-target-existing">
 		<label>
@@ -1245,7 +1246,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 		@CandidatePicker(find, candidates)
 	</div>
 	<label class="edge-target-new">
-		New occurence title
+		New evidence title
 		<input
 			type="text"
 			name="new_finding_title"
@@ -1253,7 +1254,7 @@ templ edgeFormFields(fromNode db.Node, formKind, formToMode, find, formNewFindin
 			maxlength="200"
 			placeholder="e.g. The 2023 IPCC synthesis report"
 		/>
-		<small>The occurence is created with this title and attached by the chosen relationship kind.</small>
+		<small>The evidence node is created with this title and attached by the chosen relationship kind.</small>
 	</label>
 }
 

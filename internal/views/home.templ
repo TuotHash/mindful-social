@@ -51,7 +51,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 					</h1>
 					<p class="lede" style="font-size: 21px; max-width: 50ch;">
 						Mindful Social is a community where people commit to opinions,
-						share their findings, and connect ideas in a shared
+						share their evidence, and connect ideas in a shared
 						argument graph — not a feed of hot takes.
 					</p>
 					<div class="row gap-12 wrap">
@@ -89,7 +89,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 									Explore the graph
 								</div>
 								<p class="muted" style="font-size: 14px; margin: 0;">
-									Trace visible topics, opinions, and occurences in one visual space.
+									Trace visible topics, opinions, and evidence in one visual space.
 								</p>
 								<a class="btn accent sm" href="/graph" style="align-self: center;">Open graph</a>
 							</div>
@@ -111,7 +111,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
 				@primitiveCard("topic", "Topic", "Big questions you want to think about — UBI, AI alignment, urban transit. Containers for opinions.")
 				@primitiveCard("view", "Opinion", "A specific stance someone could commit to. Sharper than a topic, debatable as a sentence.")
-				@primitiveCard("finding", "Occurence", "An argument or piece of evidence. Whether reasoned or sourced, it supports or contests an opinion — and can be challenged on its own.")
+				@primitiveCard("finding", "Evidence", "An argument or piece of reasoning. Whether reasoned or sourced, it supports or contests an opinion — and can be challenged on its own.")
 			</div>
 			<div class="card" style="margin-top: 32px; padding: 28px;">
 				<div class="row between wrap gap-16" style="margin-bottom: 18px;">
@@ -138,9 +138,9 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 				<h2 class="h-1">From scrolling to thinking.</h2>
 			</div>
 			<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
-				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-opinions and occurence chains expand below.")
-				@stepCard("02", "Read the opinions and their occurences", "Each opinion shows who commits, opposing opinions, and cited occurences.")
-				@stepCard("03", "Share your own occurences", "Take a stance — Support, Oppose, or Resonate — then link the occurences that shaped it.")
+				@stepCard("01", "Find a topic you care about", "Browse topics by tag. Sub-opinions and evidence chains expand below.")
+				@stepCard("02", "Read the opinions and their evidence", "Each opinion shows who commits, opposing opinions, and cited evidence.")
+				@stepCard("03", "Share your own evidence", "Take a stance — Support, Oppose, or Resonate — then link the evidence that shaped it.")
 				@stepCard("04", "Watch the graph rebuild itself", "Your contribution rewires the conversation — visible, named, accountable.")
 			</div>
 		</div>
@@ -152,7 +152,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 			<div style="position: relative; z-index: 2; max-width: 640px; margin: 0 auto;">
 				<h2 class="h-1" style="font-size: 56px;">Stop dunking. Start <em style="font-style: italic; color: var(--accent-deep);">thinking together.</em></h2>
 				<p class="lede" style="margin: 20px auto 32px;">
-					Free forever. No ads. No algorithm. Just you, your occurences, and a slowly-better-organized internet.
+					Free forever. No ads. No algorithm. Just you, your evidence, and a slowly-better-organized internet.
 				</p>
 				<div class="row gap-12" style="justify-content: center;">
 					if SignupEnabled() {
@@ -237,9 +237,9 @@ templ homeFeed(viewer *Viewer, items []FeedItem) {
 					for _, n := range items {
 						<li>
 							<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
-								<span class={ "chip", string(n.Type) }>
+								<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
 									<span class="dot"></span>
-									{ string(n.Type) }
+									{ nodeTypeAliasLabel(n.Type) }
 								</span>
 								<span class="title">{ n.Title }</span>
 							</a>
@@ -262,7 +262,7 @@ templ argumentGraphPromo() {
 		<div class="promo-inner">
 			<span class="badge accent">Live graph</span>
 			<h2>The argument graph</h2>
-			<p>See how topics, opinions, and occurences connect — and trace any claim back to what supports or opposes it.</p>
+			<p>See how topics, opinions, and evidence connect — and trace any claim back to what supports or opposes it.</p>
 			<a class="btn accent" href="/graph">Open graph</a>
 		</div>
 		<div class="promo-graph" aria-hidden="true">

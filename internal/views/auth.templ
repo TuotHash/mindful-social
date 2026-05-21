@@ -49,7 +49,7 @@ templ authShell(title, subtitle string) {
 
 templ Signup(flash string, oauth []OAuthButton, formUsername, formEmail string) {
 	@Layout("Sign up", nil) {
-		@authShell("Bring your occurences.", "Pick a handle. We'll never email you marketing.") {
+		@authShell("Bring your evidence.", "Pick a handle. We'll never email you marketing.") {
 			@Flash(flash)
 			<form method="post" action="/signup" class="col gap-16">
 				@CSRFField()
