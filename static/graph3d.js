@@ -409,7 +409,20 @@
     Graph.onEngineStop(function () {
       if (initialFitDone) return;
       initialFitDone = true;
-      Graph.zoomToFit(400); // 400 ms fly-in; also updates controls.target
+
+      // Snap fit instantly (0 ms) so camera.position and controls.target are
+      // updated synchronously and we can read them on the next lines.
+      Graph.zoomToFit(0);
+
+      // Pull the camera 3× further from the orbit target, then animate in.
+      var cam = Graph.camera();
+      var ctl = Graph.controls();
+      var p = cam.position, t = ctl.target;
+      Graph.cameraPosition(
+        { x: t.x + (p.x - t.x) * 3, y: t.y + (p.y - t.y) * 3, z: t.z + (p.z - t.z) * 3 },
+        { x: t.x, y: t.y, z: t.z },
+        400
+      );
     });
 
     // ── Graph data update ─────────────────────────────────────────────────────
