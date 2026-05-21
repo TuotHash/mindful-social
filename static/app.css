@@ -1642,9 +1642,14 @@ label.field {
    ========================================================================= */
 
 .graph-page {
-  width: min(var(--container-wide), calc(100vw - 2 * var(--s-8)));
+  width: calc(100vw - 2 * var(--s-4));
   margin-left: 50%;
   transform: translateX(-50%);
+}
+
+main:has(.graph-page) {
+  padding-top: var(--s-4);
+  padding-bottom: var(--s-6);
 }
 
 .argument-graph-head {
@@ -1974,7 +1979,7 @@ label.field {
 .argument-graph-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
-  min-height: 620px;
+  min-height: 560px;
 }
 
 .argument-graph-stage {
@@ -2004,8 +2009,8 @@ label.field {
 .argument-graph-svg {
   display: block;
   width: 100%;
-  height: min(72vh, 740px);
-  min-height: 620px;
+  height: min(80vh, 920px);
+  min-height: 560px;
   cursor: grab;
   touch-action: none;
 }
@@ -2020,8 +2025,8 @@ label.field {
 
 .argument-graph-3d-container {
   width: 100%;
-  height: min(72vh, 740px);
-  min-height: 620px;
+  height: min(80vh, 920px);
+  min-height: 560px;
 }
 
 .argument-graph-background {
@@ -2183,7 +2188,7 @@ label.field {
 
 @media (max-width: 720px) {
   .graph-page {
-    width: min(var(--container-wide), calc(100vw - 2 * var(--s-4)));
+    width: calc(100vw - 2 * var(--s-3));
   }
   .argument-graph-head {
     align-items: flex-start;
@@ -2204,10 +2209,10 @@ label.field {
     padding-left: 0;
   }
   .argument-graph-svg {
-    min-height: 520px;
+    min-height: 480px;
   }
   .argument-graph-workspace {
-    min-height: 520px;
+    min-height: 480px;
   }
 }
 
