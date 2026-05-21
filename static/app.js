@@ -1037,9 +1037,12 @@
               var d  = Math.sqrt(d2);
               var di = depthOf[nodes[i].id], dj = depthOf[nodes[j].id];
               var rootGrandchild = (di === 0 && dj >= 2) || (dj === 0 && di >= 2);
+              // Root→grandchild: stronger close-range push (×14) and a much
+              // higher long-range coefficient (1200 vs 200) so the force
+              // carries across the full canvas, not just nearby pairs.
               var f  = (d < 100
-                ? 20000 / Math.max(d * d, 400)
-                : 200   / d) * alpha * (rootGrandchild ? 6 : 1);
+                ? 20000 / Math.max(d * d, 400) * (rootGrandchild ? 14 : 1)
+                : (rootGrandchild ? 1200 : 200) / d) * alpha;
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
