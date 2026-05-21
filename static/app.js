@@ -894,7 +894,7 @@
       // tightly; opposes is kept further apart; relates_to (stored as
       // "related" after normalizeGraphData) is the loosest.
       var KIND_LINK = {
-        supports:    { distance: 110, strength: 0.65 },
+        supports:    { distance: 110, strength: 0.45 },
         opposes:     { distance: 190, strength: 0.25 },
         refines:     { distance: 120, strength: 0.50 },
         cites:       { distance: 145, strength: 0.40 },
@@ -951,7 +951,7 @@
               var dy = nodes[j].y - nodes[i].y || 0.1;
               var d2 = Math.max(1, dx * dx + dy * dy);
               var d  = Math.sqrt(d2);
-              var f  = (600 / Math.max(d, 30)) * alpha;
+              var f  = (250 / Math.max(d, 30)) * alpha;
               var fx = (dx / d) * f, fy = (dy / d) * f;
               nodes[i].vx -= fx; nodes[i].vy -= fy;
               nodes[j].vx += fx; nodes[j].vy += fy;
