@@ -888,30 +888,144 @@
         });
       }
 
+      // ── Force-directed layout ─────────────────────────────────────────────
+      // Per-kind spring parameters: distance is the rest length (px),
+      // strength is how hard the spring pulls each step. supports clusters
+      // tightly; opposes is kept further apart; relates_to (stored as
+      // "related" after normalizeGraphData) is the loosest.
+      var KIND_LINK = {
+        supports:    { distance: 110, strength: 0.65 },
+        opposes:     { distance: 190, strength: 0.25 },
+        refines:     { distance: 120, strength: 0.50 },
+        cites:       { distance: 145, strength: 0.40 },
+        related:     { distance: 175, strength: 0.28 },
+        comments_on: { distance: 115, strength: 0.45 },
+      };
+      var simPositions = {};   // nodeID -> {x, y}  — persists across renders
+      var simKey = "";         // node-set key of the last simulation run
+
+      function simNodeSetKey(nodes) {
+        return nodes.map(function (n) { return n.id; }).sort().join("|");
+      }
+
+      function runForceSimulation(nodes, simEdges) {
+        var W = 1200, H = viewHeight;
+        var cx = W / 2, cy = H / 2;
+
+        // Seed positions from cache (warm start) or a random ring scatter.
+        nodes.forEach(function (n) {
+          var cached = simPositions[n.id];
+          if (cached) {
+            n.x = cached.x; n.y = cached.y;
+          } else {
+            var angle = Math.random() * 2 * Math.PI;
+            var r = 100 + Math.random() * 280;
+            n.x = cx + Math.cos(angle) * r;
+            n.y = cy + Math.sin(angle) * r;
+          }
+          n.vx = 0; n.vy = 0;
+        });
+
+        // Build same-kind participant sets for the affinity force.
+        // kindParts[kind] = {nodeID: true, ...}
+        var kindParts = {};
+        simEdges.forEach(function (e) {
+          kindParts[e.kind] = kindParts[e.kind] || {};
+          kindParts[e.kind][e.from] = true;
+          kindParts[e.kind][e.to] = true;
+        });
+
+        var ITERS = 220;
+        var alpha = 1.0;
+        var alphaDecay = 1 - Math.pow(0.001, 1 / ITERS);
+
+        for (var iter = 0; iter < ITERS; iter++) {
+          alpha *= (1 - alphaDecay);
+
+          // ① Charge — every pair of nodes repels.
+          for (var i = 0; i < nodes.length; i++) {
+            for (var j = i + 1; j < nodes.length; j++) {
+              var dx = nodes[j].x - nodes[i].x || 0.1;
+              var dy = nodes[j].y - nodes[i].y || 0.1;
+              var d2 = Math.max(1, dx * dx + dy * dy);
+              var d  = Math.sqrt(d2);
+              var f  = (8100 / d2) * alpha;
+              var fx = (dx / d) * f, fy = (dy / d) * f;
+              nodes[i].vx -= fx; nodes[i].vy -= fy;
+              nodes[j].vx += fx; nodes[j].vy += fy;
+            }
+          }
+
+          // ② Link — connected nodes spring toward their kind's rest distance.
+          simEdges.forEach(function (e) {
+            var a = nodesByID[e.from], b = nodesByID[e.to];
+            if (!a || !b) return;
+            var dx = b.x - a.x, dy = b.y - a.y;
+            var d  = Math.sqrt(dx * dx + dy * dy) || 1;
+            var p  = KIND_LINK[e.kind] || { distance: 150, strength: 0.30 };
+            var f  = ((d - p.distance) / d) * p.strength * alpha * 0.5;
+            a.vx += dx * f; a.vy += dy * f;
+            b.vx -= dx * f; b.vy -= dy * f;
+          });
+
+          // ③ Kind affinity — nodes that share an edge kind drift gently
+          //    toward each other's centroid, forming soft semantic clusters.
+          Object.keys(kindParts).forEach(function (kind) {
+            var ids = Object.keys(kindParts[kind]);
+            if (ids.length < 3) return;
+            var sx = 0, sy = 0, cnt = 0;
+            ids.forEach(function (id) {
+              var n = nodesByID[id]; if (!n) return;
+              sx += n.x; sy += n.y; cnt++;
+            });
+            if (!cnt) return;
+            var kx = sx / cnt, ky = sy / cnt;
+            ids.forEach(function (id) {
+              var n = nodesByID[id]; if (!n) return;
+              n.vx += (kx - n.x) * 0.025 * alpha;
+              n.vy += (ky - n.y) * 0.025 * alpha;
+            });
+          });
+
+          // ④ Centering — gentle pull toward the canvas centre.
+          nodes.forEach(function (n) {
+            n.vx += (cx - n.x) * 0.015 * alpha;
+            n.vy += (cy - n.y) * 0.015 * alpha;
+          });
+
+          // ⑤ Integrate + damp.
+          nodes.forEach(function (n) {
+            n.vx *= 0.65; n.vy *= 0.65;
+            n.x += n.vx;  n.y += n.vy;
+          });
+        }
+
+        // Clamp to canvas and cache final positions.
+        nodes.forEach(function (n) {
+          n.x = Math.max(60, Math.min(W - 60, n.x));
+          n.y = Math.max(60, Math.min(H - 60, n.y));
+          simPositions[n.id] = { x: n.x, y: n.y };
+        });
+      }
+
       function layout(nodes) {
-        var grouped = { topic: [], view: [], finding: [], other: [] };
-        nodes.forEach(function (node) {
-          (grouped[node.type] || grouped.other).push(node);
-        });
-        Object.keys(grouped).forEach(function (key) {
-          grouped[key].sort(function (a, b) {
-            return (a.title || "").localeCompare(b.title || "");
+        viewHeight = Math.max(600, Math.round(nodes.length * 7 + 400));
+        var key = simNodeSetKey(nodes);
+        if (key !== simKey) {
+          simKey = key;
+          var vis = {};
+          nodes.forEach(function (n) { vis[n.id] = true; });
+          runForceSimulation(nodes, edges.filter(function (e) {
+            return vis[e.from] && vis[e.to];
+          }));
+        } else {
+          // Same node set — restore cached positions onto the current
+          // node objects (they may be new objects after a data refresh).
+          nodes.forEach(function (n) {
+            var p = simPositions[n.id];
+            if (p) { n.x = p.x; n.y = p.y; }
           });
-        });
-
-        var maxCount = Math.max(grouped.topic.length, grouped.view.length, grouped.finding.length, grouped.other.length, 1);
-        viewHeight = Math.max(560, maxCount * 92 + 120);
-        var columns = { topic: 210, view: 600, finding: 990, other: 600 };
-
-        Object.keys(grouped).forEach(function (type) {
-          var list = grouped[type];
-          var gap = viewHeight / (list.length + 1);
-          list.forEach(function (node, index) {
-            var jitter = (hashString(node.id) % 45) - 22;
-            node.x = columns[type] + jitter;
-            node.y = Math.round((index + 1) * gap);
-          });
-        });
+        }
       }
 
       function markerID(kind) {

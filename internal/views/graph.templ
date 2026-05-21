@@ -163,7 +163,7 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGrap
 						<div class="search-suggest-anchor">
 							<input
 								type="search"
-								name="author"
+								name="q"
 								data-graph-author
 								value={ filters.Author }
 								placeholder="Author"
@@ -181,7 +181,7 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGrap
 						<div class="search-suggest-anchor">
 							<input
 								type="search"
-								name="group"
+								name="q"
 								data-graph-group
 								value={ filters.Group }
 								placeholder="Group"
@@ -203,6 +203,7 @@ templ ArgumentGraph(viewer *Viewer, data ArgumentGraphData, filters ArgumentGrap
 						<div class="search-suggest-anchor">
 							<input
 								type="search"
+								name="q"
 								data-graph-tag-input
 								data-graph-tag-csv={ graphTagsCSV(filters.Tags) }
 								placeholder={ tagPlaceholder(len(filters.Tags)) }
