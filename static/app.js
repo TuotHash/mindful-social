@@ -952,15 +952,21 @@
             if (comp.length) components.push(comp);
           });
 
-          // Largest component first; spread ring radius scales with canvas.
+          // Largest component starts at canvas centre so it has equal room
+          // to expand in all directions. Smaller components and isolated
+          // nodes are spread on a ring around it.
           components.sort(function (a, b) { return b.length - a.length; });
           var nc = components.length;
-          var ring = Math.min(W, H) * 0.28;
+          var ring = Math.min(W, H) * 0.38;
           components.forEach(function (comp, ci) {
-            var spread = nc > 1 ? ring : 0;
-            var angle = (ci / nc) * 2 * Math.PI - Math.PI / 2;
-            var ox = cx + Math.cos(angle) * spread;
-            var oy = cy + Math.sin(angle) * spread;
+            var ox, oy;
+            if (ci === 0) {
+              ox = cx; oy = cy;
+            } else {
+              var angle = ((ci - 1) / Math.max(nc - 1, 1)) * 2 * Math.PI;
+              ox = cx + Math.cos(angle) * ring;
+              oy = cy + Math.sin(angle) * ring;
+            }
             comp.forEach(function (node, ii) {
               var a2 = (ii / Math.max(comp.length, 1)) * 2 * Math.PI;
               var r2 = 20 + Math.random() * 50;
