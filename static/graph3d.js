@@ -338,7 +338,7 @@
         .strength(function (e)  { return (KIND_LINK[e.kind] || {}).strength || 0.28; });
     }
     var chargeForce = Graph.d3Force("charge");
-    if (chargeForce) chargeForce.strength(-300);
+    if (chargeForce) chargeForce.strength(-180).distanceMax(200);
 
     // Z-axis type gravity: topics at back, findings at front.
     Graph.d3Force("typeZ", (function () {
@@ -402,28 +402,11 @@
       }, { passive: false });
     }
 
-    // After the force simulation settles, snap the orbit target to the actual
-    // graph centroid so the rotation pivot sits inside the cloud, not at the
-    // world origin (which can be off-centre depending on node positions).
-    var initialFitDone = false;
-    Graph.onEngineStop(function () {
-      if (initialFitDone) return;
-      initialFitDone = true;
-
-      // Snap fit instantly (0 ms) so camera.position and controls.target are
-      // updated synchronously and we can read them on the next lines.
-      Graph.zoomToFit(0);
-
-      // Pull the camera 3× further from the orbit target, then animate in.
-      var cam = Graph.camera();
-      var ctl = Graph.controls();
-      var p = cam.position, t = ctl.target;
-      Graph.cameraPosition(
-        { x: t.x + (p.x - t.x) * 3, y: t.y + (p.y - t.y) * 3, z: t.z + (p.z - t.z) * 3 },
-        { x: t.x, y: t.y, z: t.z },
-        400
-      );
-    });
+    // The library sets camera.position.z = 1000 at init. Multiply by 3 now,
+    // before any data loads, so the default view is 3× further out.
+    // onEngineStop fires only after cooldownTime (15 s default) — too late to
+    // be useful — so we set the position synchronously here instead.
+    Graph.camera().position.z *= 3;
 
     // ── Graph data update ─────────────────────────────────────────────────────
     function updateGraph() {
