@@ -402,10 +402,11 @@
       }, { passive: false });
     }
 
-    // The library sets camera.position.z = 1000 at init. Multiply by 3 now,
-    // before any data loads, so the default view is 3× further out.
+    // The library sets camera.position.z = 1000 at init. Multiply now,
+    // before any data loads, so the default view is slightly further out.
     // onEngineStop fires only after cooldownTime (15 s default) — too late to
     // be useful — so we set the position synchronously here instead.
+    Graph.camera().position.z *= 1.2;
 
     // ── Graph data update ─────────────────────────────────────────────────────
     function updateGraph() {
