@@ -35,7 +35,7 @@ templ Feed(viewer *Viewer, items []FeedItem) {
 }
 
 templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
-	<section class="hero">
+	<section class="hero" style="margin-bottom: 0;">
 		<div class="page" style="position: relative; z-index: 2;">
 			<div class="hero-grid">
 				<div class="col gap-24 fadein">
@@ -51,7 +51,7 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 					</h1>
 					<p class="lede" style="font-size: 21px; max-width: 50ch;">
 						Mindful Social is a community where people commit to opinions,
-						share their occurences, and connect ideas in a shared
+						share their findings, and connect ideas in a shared
 						argument graph — not a feed of hot takes.
 					</p>
 					<div class="row gap-12 wrap">
@@ -175,12 +175,9 @@ templ landingMarketing(viewer *Viewer, recentNodes []FeedItem) {
 // community content before reading the marketing primitives.
 templ landingRecent(items []FeedItem) {
 	if len(items) > 0 {
-		<section class="page" style="padding-top: 48px; padding-bottom: 16px;">
+		<section class="page" style="padding-top: 0; padding-bottom: 16px;">
 			<div class="row between wrap gap-16" style="margin-bottom: 24px;">
-				<div class="col gap-8" style="max-width: 560px;">
-					<span class="eyebrow">From the graph</span>
-					<h2 class="h-2" style="margin: 0;">A few recent additions.</h2>
-				</div>
+				<h2 class="h-2" style="margin: 0; max-width: 560px;">Hot Today</h2>
 				<a class="btn" href="/graph">Open graph</a>
 			</div>
 			<div class="recent-grid">
