@@ -894,12 +894,12 @@
       // tightly; opposes is kept further apart; relates_to (stored as
       // "related" after normalizeGraphData) is the loosest.
       var KIND_LINK = {
-        supports:    { distance: 150, strength: 0.28 },
-        opposes:     { distance: 190, strength: 0.25 },
-        refines:     { distance: 120, strength: 0.50 },
-        cites:       { distance: 145, strength: 0.40 },
-        related:     { distance: 175, strength: 0.28 },
-        comments_on: { distance: 115, strength: 0.45 },
+        supports:    { distance: 180, strength: 0.28 },
+        opposes:     { distance: 230, strength: 0.25 },
+        refines:     { distance: 145, strength: 0.50 },
+        cites:       { distance: 175, strength: 0.40 },
+        related:     { distance: 210, strength: 0.28 },
+        comments_on: { distance: 140, strength: 0.45 },
       };
       var simPositions = {};   // nodeID -> {x, y}  — persists across renders
       var simKey = "";         // node-set key of the last simulation run
