@@ -331,7 +331,9 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 }
 
 const listRecentNodesForViewer = `-- name: ListRecentNodesForViewer :many
-SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username
+SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username,
+  (SELECT count(*) FROM user_node_pins p WHERE p.node_id = n.id AND p.kind = 'supports')::bigint AS supports_count,
+  (SELECT count(*) FROM user_node_pins p WHERE p.node_id = n.id AND p.kind = 'opposes')::bigint AS opposes_count
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE n.type <> 'comment'
@@ -369,6 +371,8 @@ type ListRecentNodesForViewerRow struct {
 	Body           string             `json:"body"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	AuthorUsername string             `json:"author_username"`
+	SupportsCount  int64              `json:"supports_count"`
+	OpposesCount   int64              `json:"opposes_count"`
 }
 
 // Home page feed and landing-page teaser. node_visible_to() handles the
@@ -412,6 +416,8 @@ func (q *Queries) ListRecentNodesForViewer(ctx context.Context, arg ListRecentNo
 			&i.Body,
 			&i.CreatedAt,
 			&i.AuthorUsername,
+			&i.SupportsCount,
+			&i.OpposesCount,
 		); err != nil {
 			return nil, err
 		}

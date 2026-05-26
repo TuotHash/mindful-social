@@ -25,6 +25,8 @@ type FeedItem struct {
 	Title          string
 	Body           string
 	AuthorUsername string
+	SupportsCount  int64
+	OpposesCount   int64
 }
 
 // Feed renders the personal feed at /home for logged-in users.
@@ -236,17 +238,23 @@ templ homeFeed(viewer *Viewer, items []FeedItem) {
 				<ul class="node-list">
 					for _, n := range items {
 						<li>
-							<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
-								<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
-									<span class="dot"></span>
-									{ nodeTypeAliasLabel(n.Type) }
-								</span>
-								<span class="title">{ n.Title }</span>
-							</a>
-							<a href={ templ.SafeURL("/users/" + n.AuthorUsername) } class="node-author">
-								@Avatar(n.AuthorUsername, 18)
-								{ n.AuthorUsername }
-							</a>
+							<div class="node-feed-top">
+								<a href={ templ.SafeURL("/nodes/" + n.Slug) }>
+									<span class={ "chip", string(n.Type) } title={ nodeTypeOriginalLabel(n.Type) }>
+										<span class="dot"></span>
+										{ nodeTypeAliasLabel(n.Type) }
+									</span>
+									<span class="title">{ n.Title }</span>
+								</a>
+								<a href={ templ.SafeURL("/users/" + n.AuthorUsername) } class="node-author">
+									@Avatar(n.AuthorUsername, 18)
+									{ n.AuthorUsername }
+								</a>
+							</div>
+							if excerpt := NodePlainExcerpt(n.Body, 200); excerpt != "" {
+								<p class="node-feed-excerpt">{ excerpt }</p>
+							}
+							@feedVoteBar(n.SupportsCount, n.OpposesCount)
 						</li>
 					}
 				</ul>
@@ -354,6 +362,25 @@ templ argumentGraphPromo() {
 			</svg>
 		</div>
 	</section>
+}
+
+templ feedVoteBar(supports, opposes int64) {
+	if supports+opposes > 0 {
+		<div class="node-feed-bar">
+			<div class="stance-bar node-feed-stance">
+				<span class="stance-fill" style={ feedSupportBarStyle(supports, opposes) }></span>
+			</div>
+			<span class="node-feed-votes">{ fmt.Sprintf("%d support · %d oppose", supports, opposes) }</span>
+		</div>
+	}
+}
+
+func feedSupportBarStyle(supports, opposes int64) string {
+	total := supports + opposes
+	if total == 0 {
+		return "width:50%"
+	}
+	return fmt.Sprintf("width:%.0f%%", float64(supports)/float64(total)*100)
 }
 
 templ checkIcon() {

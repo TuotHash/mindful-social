@@ -91,7 +91,7 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]views.FeedItem, len(rows))
 	for i, row := range rows {
-		items[i] = views.FeedItem{Slug: row.Slug, Type: row.Type, Title: row.Title, Body: row.Body, AuthorUsername: row.AuthorUsername}
+		items[i] = views.FeedItem{Slug: row.Slug, Type: row.Type, Title: row.Title, Body: row.Body, AuthorUsername: row.AuthorUsername, SupportsCount: row.SupportsCount, OpposesCount: row.OpposesCount}
 	}
 	render(w, r, views.Landing(viewerFor(currentUser(r)), items))
 }

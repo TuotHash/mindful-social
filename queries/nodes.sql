@@ -48,7 +48,9 @@ WHERE n.id = $1;
 -- keeps the signal a deliberate "engagement with this post" rather than
 -- "drama anywhere downstream". n.created_at DESC is the tiebreaker so
 -- identical scores resolve newest-first.
-SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username
+SELECT n.id, n.slug, n.type, n.title, n.body, n.created_at, u.username AS author_username,
+  (SELECT count(*) FROM user_node_pins p WHERE p.node_id = n.id AND p.kind = 'supports')::bigint AS supports_count,
+  (SELECT count(*) FROM user_node_pins p WHERE p.node_id = n.id AND p.kind = 'opposes')::bigint AS opposes_count
 FROM nodes n
 JOIN users u ON u.id = n.created_by
 WHERE n.type <> 'comment'
