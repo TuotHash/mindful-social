@@ -1572,7 +1572,7 @@ label.field {
   color: var(--text);
 }
 .node-feed-thumb-link {
-  flex: 0 0 40%;
+  flex: 0 0 50%;
   display: block;
   border-radius: 8px;
   overflow: hidden;
