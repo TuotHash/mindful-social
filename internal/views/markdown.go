@@ -3,6 +3,7 @@ package views
 import (
 	"bytes"
 	"html"
+	"regexp"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -103,33 +104,23 @@ func NodeMarkdown(source string) templ.Component {
 	return templ.Raw(renderNodeMarkdown(source))
 }
 
-// NodeFirstImageURL returns the src of the first <img> in the rendered,
-// sanitized HTML of source, or "" if there is none. Used by the feed to
-// show a thumbnail without a separate DB query.
+// mdImageRE matches inline markdown images: ![alt](url) or ![alt](url "title").
+// Group 1 captures the URL (no whitespace, no closing paren).
+var mdImageRE = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)`)
+
+// NodeFirstImageURL returns the URL of the first inline image in the markdown
+// source, or "" if none is found. It matches directly against the raw markdown
+// so no rendering pass is needed.
 func NodeFirstImageURL(source string) string {
-	if !nodeMarkdownHasText(source) {
+	m := mdImageRE.FindStringSubmatch(source)
+	if m == nil {
 		return ""
 	}
-	var buf bytes.Buffer
-	if err := nodeMarkdown.Convert([]byte(source), &buf); err != nil {
+	u := m[1]
+	if !strings.HasPrefix(u, "/") && !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		return ""
 	}
-	sanitized := nodeMarkdownPolicy.Sanitize(buf.String())
-	imgIdx := strings.Index(sanitized, "<img")
-	if imgIdx < 0 {
-		return ""
-	}
-	rest := sanitized[imgIdx:]
-	srcIdx := strings.Index(rest, `src="`)
-	if srcIdx < 0 {
-		return ""
-	}
-	rest = rest[srcIdx+5:]
-	end := strings.Index(rest, `"`)
-	if end < 0 {
-		return ""
-	}
-	return rest[:end]
+	return u
 }
 
 // NodePlainExcerpt renders the markdown body to HTML, strips every tag, and
