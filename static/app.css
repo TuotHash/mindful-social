@@ -1553,7 +1553,6 @@ label.field {
   align-items: stretch;
   gap: 12px;
   margin-top: 7px;
-  min-height: 110px;
 }
 .node-feed-excerpt {
   flex: 1;
