@@ -57,6 +57,18 @@ func (s *Server) handleCommentCreate(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
+	// Notify the node author on a top-level comment; notify the parent
+	// comment author on a reply (they may differ from the node author).
+	nodeID := node.ID
+	if parentID == nil {
+		s.notifyBestEffort(r.Context(), node.CreatedBy, user.ID, notifKindCommentOnNode, &nodeID)
+	} else {
+		parentNode, err := s.queries.GetNode(r.Context(), *parentID)
+		if err == nil {
+			s.notifyBestEffort(r.Context(), parentNode.CreatedBy, user.ID, notifKindReplyToComment, &nodeID)
+		}
+	}
+
 	http.Redirect(w, r, "/nodes/"+node.Slug+"#comment-"+comment.ID.String(), http.StatusSeeOther)
 }
 

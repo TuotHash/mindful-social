@@ -1058,6 +1058,7 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 	// inheriting its visibility/group; that scoping is the whole reason
 	// we don't expose a free-form node creator at the same spot.
 	var toID uuid.UUID
+	var toNodeAuthor *uuid.UUID // set only for existing-node branch; used for notification
 	if rawToMode == "new" {
 		if rawNewFindingTitle == "" {
 			rerender("Type a title for the new occurence.")
@@ -1111,6 +1112,8 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 			rerender("Target node not found.")
 			return
 		}
+		author := toNode.CreatedBy
+		toNodeAuthor = &author
 		toID = parsed
 	}
 
@@ -1129,6 +1132,9 @@ func (s *Server) handleEdgeCreate(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("edge create", "err", err)
 		rerender("Could not create connection. Please try again.")
 		return
+	}
+	if toNodeAuthor != nil {
+		s.notifyBestEffort(r.Context(), *toNodeAuthor, user.ID, notifKindEdgeOnNode, &toID)
 	}
 	// On success from htmx, ask htmx to do a full page navigation back to
 	// the node — that closes the modal and shows the new edge in the

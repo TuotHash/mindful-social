@@ -556,6 +556,16 @@ type NodeVideo struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type Notification struct {
+	ID          uuid.UUID          `json:"id"`
+	RecipientID uuid.UUID          `json:"recipient_id"`
+	ActorID     uuid.UUID          `json:"actor_id"`
+	Kind        string             `json:"kind"`
+	NodeID      *uuid.UUID         `json:"node_id"`
+	ReadAt      pgtype.Timestamptz `json:"read_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type PinFinding struct {
 	PinID     uuid.UUID          `json:"pin_id"`
 	FindingID uuid.UUID          `json:"finding_id"`

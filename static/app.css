@@ -4032,3 +4032,100 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
 .recent-card-author:hover {
   color: var(--ink);
 }
+
+/* ── Notification bell ──────────────────────────────────────────────────── */
+.notif-bell {
+  position: relative;
+  padding: 0 10px;
+}
+.notif-bell-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.notif-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── Notifications page ─────────────────────────────────────────────────── */
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev-1);
+  transition: background 0.1s;
+}
+.notif-item:last-child {
+  border-bottom: none;
+}
+.notif-item.notif-unread {
+  background: var(--accent-bg);
+}
+.notif-item:hover {
+  background: var(--bg-elev-2);
+}
+.notif-avatar {
+  flex: none;
+  display: block;
+  text-decoration: none;
+}
+.notif-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.notif-text {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.notif-actor {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.notif-actor:hover {
+  text-decoration: underline;
+}
+.notif-node-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.notif-node-link:hover {
+  text-decoration: underline;
+}
+.notif-time {
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+}

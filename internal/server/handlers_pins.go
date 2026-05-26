@@ -64,6 +64,8 @@ func (s *Server) handlePinSet(w http.ResponseWriter, r *http.Request) {
 		s.rerenderPinForm(w, r, user, node, "Could not save your pin. Please try again.", rawKind)
 		return
 	}
+	nodeID := node.ID
+	s.notifyBestEffort(r.Context(), node.CreatedBy, user.ID, notifKindPinOnNode, &nodeID)
 	// htmx submits get a full-page navigation back to the node, which closes
 	// the modal and shows the new banner. Non-htmx submits get the usual 303.
 	if isHTMX(r) {
@@ -120,6 +122,8 @@ func (s *Server) handleStanceSet(w http.ResponseWriter, r *http.Request) {
 			s.renderError(w, r, http.StatusInternalServerError)
 			return
 		}
+		nodeID := node.ID
+		s.notifyBestEffort(r.Context(), node.CreatedBy, user.ID, notifKindPinOnNode, &nodeID)
 	}
 	http.Redirect(w, r, "/nodes/"+node.Slug, http.StatusSeeOther)
 }

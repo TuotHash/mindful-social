@@ -48,6 +48,7 @@ type Querier interface {
 	// pin is excluded — they obviously consent to losing it. Other users' pins
 	// are surfaced on the confirmation page so the author knows what cascades.
 	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
+	CountUnreadNotifications(ctx context.Context, recipientID uuid.UUID) (int64, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	// Comments are stored as nodes (type='comment') attached to their target
 	// via a 'comments_on' edge. Top-level comments point at the discussed
@@ -78,6 +79,7 @@ type Querier interface {
 	// revision) constraint backs this up if two updates race.
 	CreateNodeRevision(ctx context.Context, arg CreateNodeRevisionParams) (NodeRevision, error)
 	CreateNodeVideo(ctx context.Context, arg CreateNodeVideoParams) (NodeVideo, error)
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAuthIdentityForUser(ctx context.Context, arg DeleteAuthIdentityForUserParams) error
 	// Page-node editors can delete only edges touching the page node they are
@@ -245,6 +247,7 @@ type Querier interface {
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
 	// Filtered through node_visible_to() so a viewer only sees nodes they can.
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)
+	ListNotificationsForUser(ctx context.Context, recipientID uuid.UUID) ([]ListNotificationsForUserRow, error)
 	ListPendingGroupInvitesForUser(ctx context.Context, invitedUserID uuid.UUID) ([]ListPendingGroupInvitesForUserRow, error)
 	// A user's pins with the joined node — for the "On my profile" section on
 	// a profile page. node_visible_to() hides pins whose underlying node the
@@ -294,6 +297,7 @@ type Querier interface {
 	// groups index; member_count is a per-row aggregate so we don't need a
 	// separate hit per group.
 	ListVisibleGroups(ctx context.Context, viewerID *uuid.UUID) ([]ListVisibleGroupsRow, error)
+	MarkAllNotificationsRead(ctx context.Context, recipientID uuid.UUID) error
 	// Trigram fuzzy match against the title for the edge-creation picker.
 	// Handles prefix ("nuc" → "Nuclear"), infix ("uclear" → "Nuclear") and
 	// typo tolerance ("nucear" → "Nuclear") in one mechanism. The %> operator

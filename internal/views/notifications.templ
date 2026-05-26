@@ -1,0 +1,83 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type NotificationItem struct {
+	ID                    uuid.UUID
+	Kind                  string
+	NodeID                *uuid.UUID
+	NodeTitle             string
+	NodeSlug              string
+	ActorID               uuid.UUID
+	ActorUsername         string
+	ActorProfileImagePath string
+	ReadAt                pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+}
+
+templ NotificationsPage(viewer *Viewer, items []NotificationItem) {
+	@Layout("Notifications", viewer) {
+		<div class="page-container narrow">
+			<h1 class="page-title">Notifications</h1>
+			if len(items) == 0 {
+				<p class="empty-state">No notifications yet.</p>
+			} else {
+				<ul class="notif-list">
+					for _, item := range items {
+						@notificationRow(viewer, item)
+					}
+				</ul>
+			}
+		</div>
+	}
+}
+
+templ notificationRow(viewer *Viewer, item NotificationItem) {
+	<li class={ "notif-item", templ.KV("notif-unread", !item.ReadAt.Valid) }>
+		<a href={ templ.SafeURL("/users/" + item.ActorUsername) } class="notif-avatar">
+			@AvatarImage(item.ActorUsername, item.ActorProfileImagePath, 36)
+		</a>
+		<div class="notif-body">
+			<div class="notif-text">
+				<a href={ templ.SafeURL("/users/" + item.ActorUsername) } class="notif-actor">{ item.ActorUsername }</a>
+				{ notifDescription(item.Kind) }
+				if item.NodeSlug != "" {
+					<a href={ templ.SafeURL("/nodes/" + item.NodeSlug) } class="notif-node-link">{ item.NodeTitle }</a>
+				}
+			</div>
+			<time
+				class="notif-time"
+				datetime={ timestampDatetime(item.CreatedAt) }
+				title={ timestampTitle(viewer, item.CreatedAt) }
+			>{ timestampRelative(item.CreatedAt) }</time>
+		</div>
+	</li>
+}
+
+func notifDescription(kind string) string {
+	switch kind {
+	case "comment_on_node":
+		return " commented on "
+	case "reply_to_comment":
+		return " replied to your comment on "
+	case "edge_on_node":
+		return " connected to "
+	case "pin_on_node":
+		return " pinned "
+	case "new_follower":
+		return " started following you"
+	default:
+		return " interacted with your content"
+	}
+}
+
+templ NotificationBadge(count int64) {
+	if count > 0 {
+		<span class="notif-count">{ fmt.Sprintf("%d", count) }</span>
+	}
+}

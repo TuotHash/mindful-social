@@ -238,11 +238,16 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 	r.Get("/users/suggest", s.handleUsersSuggest)
 	r.Get("/tags/suggest", s.handleTagsSuggest)
 	r.Get("/groups/suggest", s.handleGroupsSuggest)
+	// Notification badge count — returns empty HTML when not logged in rather
+	// than redirecting, so the htmx poll in the nav degrades gracefully on
+	// session expiry.
+	r.Get("/notifications/count", s.handleNotificationsCount)
 
 	// Routes that require an authenticated user.
 	r.Group(func(r chi.Router) {
 		r.Use(s.requireUser)
 		r.Get("/home", s.handleHome)
+		r.Get("/notifications", s.handleNotificationsIndex)
 		r.Get("/account", s.handleAccount)
 		r.Post("/account/preferences", s.handleAccountPreferences)
 		r.Post("/account/profile-image", s.handleAccountProfileImage)

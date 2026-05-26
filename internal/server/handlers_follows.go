@@ -26,6 +26,7 @@ func (s *Server) handleFollow(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
+	s.notifyBestEffort(r.Context(), target.ID, viewer.ID, notifKindNewFollower, nil)
 	http.Redirect(w, r, "/users/"+target.Username, http.StatusSeeOther)
 }
 
