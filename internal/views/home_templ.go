@@ -532,7 +532,7 @@ func homeFeed(viewer *Viewer, items []FeedItem) templ.Component {
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"page\"><section class=\"col gap-16\" style=\"margin-bottom: 32px;\"><span class=\"eyebrow\">Welcome back, ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"page medium\"><section class=\"col gap-16\" style=\"margin-bottom: 32px;\"><span class=\"eyebrow\">Welcome back, ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
