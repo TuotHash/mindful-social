@@ -110,7 +110,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]views.FeedItem, len(rows))
 	for i, r := range rows {
-		items[i] = views.FeedItem{Slug: r.Slug, Type: r.Type, Title: r.Title, Body: r.Body, AuthorUsername: r.AuthorUsername}
+		items[i] = views.FeedItem{Slug: r.Slug, Type: r.Type, Title: r.Title, Body: r.Body, AuthorUsername: r.AuthorUsername, SupportsCount: r.SupportsCount, OpposesCount: r.OpposesCount, FirstImageURL: views.NodeFirstImageURL(r.Body)}
 	}
 	render(w, r, views.Feed(viewerFor(user), items))
 }
