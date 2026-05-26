@@ -27,6 +27,7 @@ type FeedItem struct {
 	AuthorUsername string
 	SupportsCount  int64
 	OpposesCount   int64
+	FirstImageURL  string
 }
 
 // Feed renders the personal feed at /home for logged-in users.
@@ -251,8 +252,17 @@ templ homeFeed(viewer *Viewer, items []FeedItem) {
 									{ n.AuthorUsername }
 								</a>
 							</div>
-							if excerpt := NodePlainExcerpt(n.Body, 200); excerpt != "" {
-								<p class="node-feed-excerpt">{ excerpt }</p>
+							if excerpt := NodePlainExcerpt(n.Body, 200); excerpt != "" || n.FirstImageURL != "" {
+								<div class="node-feed-body">
+									if excerpt != "" {
+										<a class="node-feed-excerpt" href={ templ.SafeURL("/nodes/" + n.Slug) }>{ excerpt }</a>
+									}
+									if n.FirstImageURL != "" {
+										<a href={ templ.SafeURL("/nodes/" + n.Slug) } class="node-feed-thumb-link">
+											<img class="node-feed-thumb" src={ templ.SafeURL(n.FirstImageURL) } alt="" loading="lazy"/>
+										</a>
+									}
+								</div>
 							}
 							@feedVoteBar(n.SupportsCount, n.OpposesCount)
 						</li>

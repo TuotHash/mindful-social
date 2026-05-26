@@ -103,6 +103,35 @@ func NodeMarkdown(source string) templ.Component {
 	return templ.Raw(renderNodeMarkdown(source))
 }
 
+// NodeFirstImageURL returns the src of the first <img> in the rendered,
+// sanitized HTML of source, or "" if there is none. Used by the feed to
+// show a thumbnail without a separate DB query.
+func NodeFirstImageURL(source string) string {
+	if !nodeMarkdownHasText(source) {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := nodeMarkdown.Convert([]byte(source), &buf); err != nil {
+		return ""
+	}
+	sanitized := nodeMarkdownPolicy.Sanitize(buf.String())
+	imgIdx := strings.Index(sanitized, "<img")
+	if imgIdx < 0 {
+		return ""
+	}
+	rest := sanitized[imgIdx:]
+	srcIdx := strings.Index(rest, `src="`)
+	if srcIdx < 0 {
+		return ""
+	}
+	rest = rest[srcIdx+5:]
+	end := strings.Index(rest, `"`)
+	if end < 0 {
+		return ""
+	}
+	return rest[:end]
+}
+
 // NodePlainExcerpt renders the markdown body to HTML, strips every tag, and
 // collapses whitespace so callers get a plain-text snippet suitable for a
 // teaser line. The result is truncated to maxRunes (counted as runes, not

@@ -1548,8 +1548,15 @@ label.field {
   color: var(--text);
   text-decoration: none;
 }
+.node-feed-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 7px;
+}
 .node-feed-excerpt {
-  margin: 7px 0 0;
+  flex: 1;
+  min-width: 0;
   padding: 8px 12px;
   font-size: var(--fs-base);
   color: var(--text);
@@ -1561,6 +1568,29 @@ label.field {
   background: var(--bg-elev-1);
   border: 1px solid var(--border);
   border-radius: 8px;
+  text-decoration: none;
+}
+.node-feed-excerpt:hover {
+  border-color: var(--border-strong);
+  text-decoration: none;
+  color: var(--text);
+}
+.node-feed-thumb-link {
+  flex-shrink: 0;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  line-height: 0;
+}
+.node-feed-thumb-link:hover {
+  border-color: var(--border-strong);
+}
+.node-feed-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  display: block;
 }
 .node-feed-bar {
   display: flex;
