@@ -1562,10 +1562,6 @@ label.field {
   font-size: var(--fs-base);
   color: var(--text);
   line-height: 1.6;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
   background: var(--bg-elev-1);
   border: 1px solid var(--border);
   border-radius: 8px;
