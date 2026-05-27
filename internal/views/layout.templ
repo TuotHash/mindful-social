@@ -124,17 +124,6 @@ templ TopNav(currentUser *Viewer) {
 				}
 			</div>
 			<span class="nav-spacer"></span>
-			if currentUser != nil {
-				<a class="nav-link notif-bell" href="/notifications" aria-label="Notifications">
-					<span class="material-symbols-outlined notif-bell-icon">notifications</span>
-					<span
-						id="notif-badge"
-						hx-get="/notifications/count"
-						hx-trigger="load, every 60s"
-						hx-swap="innerHTML"
-					></span>
-				</a>
-			}
 			<form method="get" action="/search" class="nav-search" role="search">
 				<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
 					<circle cx="6" cy="6" r="4.2" stroke="currentColor" stroke-width="1.4" fill="none"></circle>
@@ -154,6 +143,17 @@ templ TopNav(currentUser *Viewer) {
 				<div id="nav-suggest" class="search-suggest" hidden></div>
 			</form>
 			<button id="theme-toggle" class="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle theme">☀</button>
+			if currentUser != nil {
+				<a class="nav-link notif-bell" href="/notifications" aria-label="Notifications">
+					<span class="material-symbols-outlined notif-bell-icon">notifications</span>
+					<span
+						id="notif-badge"
+						hx-get="/notifications/count"
+						hx-trigger="load, every 60s"
+						hx-swap="innerHTML"
+					></span>
+				</a>
+			}
 			if currentUser != nil {
 				<details class="user-menu">
 					<summary class="user-menu-trigger" aria-label="Account menu">
