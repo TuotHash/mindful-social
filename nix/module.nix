@@ -9,6 +9,24 @@
 
 let
   cfg = config.services.mindful-social;
+  ttsCfg = cfg.tts;
+
+  # Snapshot of the TTS sidecar source files. Copied into the runtime
+  # state directory on every start so a package upgrade replaces the
+  # running code, while the venv + downloaded models stay where they
+  # are (in /var/lib) instead of being rebuilt every deploy.
+  ttsSource = pkgs.runCommand "mindful-tts-source" {} ''
+    mkdir -p $out
+    cp ${../tts/pyproject.toml}    $out/pyproject.toml
+    cp ${../tts/uv.lock}           $out/uv.lock
+    cp ${../tts/.python-version}   $out/.python-version
+    cp ${../tts/server.py}         $out/server.py
+    cp ${../tts/setup.sh}          $out/setup.sh
+    cp ${../tts/run.sh}            $out/run.sh
+    chmod +x $out/setup.sh $out/run.sh
+  '';
+
+  ttsSidecarURL = "http://${ttsCfg.listenAddr}:${toString ttsCfg.port}";
 in {
   options.services.mindful-social = {
     enable = lib.mkEnableOption "the Mindful Social server";
@@ -154,6 +172,71 @@ in {
         description = "Local database role and matching system user. Only used when createLocally is true.";
       };
     };
+
+    tts = {
+      enable = lib.mkEnableOption "the Kokoro TTS sidecar (adds podcast-style narration to nodes)";
+
+      listenAddr = lib.mkOption {
+        type = lib.types.str;
+        default = "127.0.0.1";
+        description = ''
+          Loopback address the Python sidecar binds to. Keep this on
+          localhost; the main service talks to it over HTTP and nothing
+          else should reach it.
+        '';
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 8090;
+        description = ''
+          TCP port for the sidecar. The main service composes
+          TTS_SIDECAR_URL from listenAddr + this value.
+        '';
+      };
+
+      user = lib.mkOption {
+        type = lib.types.str;
+        default = "mindful-tts";
+        description = ''
+          System user that owns the sidecar's state directory (venv +
+          downloaded models). Kept separate from the main service user
+          so the TTS sandbox is independent — a future model bug can't
+          touch the Postgres socket.
+        '';
+      };
+
+      stateDirectoryName = lib.mkOption {
+        type = lib.types.str;
+        default = "mindful-social-tts";
+        description = ''
+          Name under /var/lib for the sidecar's state directory. The
+          Python venv (.venv) and downloaded models (~700 MB) live
+          there and persist across restarts.
+        '';
+      };
+
+      memoryHigh = lib.mkOption {
+        type = lib.types.str;
+        default = "3G";
+        description = ''
+          systemd MemoryHigh budget for the sidecar. Loaded models sit
+          around 1.5-2 GB; the cap leaves headroom for synthesis spikes
+          without letting the unit grow into the rest of the VPS.
+        '';
+      };
+
+      firstBootTimeout = lib.mkOption {
+        type = lib.types.int;
+        default = 30 * 60;
+        description = ''
+          TimeoutStartSec, in seconds. First boot has to install ~1 GB
+          of Python wheels (PyTorch CPU is the biggest) and download
+          two Kokoro ONNX models from Hugging Face. Subsequent starts
+          are fast because both caches are idempotent.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -172,17 +255,34 @@ in {
     # A static system user is required when talking to local Postgres
     # via peer auth: the OS user name has to match the database role.
     # DynamicUser would generate a fresh UID every boot and break that.
-    users.users = lib.mkIf cfg.database.createLocally {
-      "${cfg.database.user}" = {
-        isSystemUser = true;
-        group = cfg.database.user;
-        description = "Mindful Social service user";
-      };
-    };
+    # The TTS user is independent — it never needs Postgres — but we
+    # declare both here in a single attrset to keep the module
+    # composable with itself.
+    users.users = lib.mkMerge [
+      (lib.mkIf cfg.database.createLocally {
+        "${cfg.database.user}" = {
+          isSystemUser = true;
+          group = cfg.database.user;
+          description = "Mindful Social service user";
+        };
+      })
+      (lib.mkIf ttsCfg.enable {
+        "${ttsCfg.user}" = {
+          isSystemUser = true;
+          group = ttsCfg.user;
+          description = "Mindful Social TTS sidecar user";
+        };
+      })
+    ];
 
-    users.groups = lib.mkIf cfg.database.createLocally {
-      "${cfg.database.user}" = {};
-    };
+    users.groups = lib.mkMerge [
+      (lib.mkIf cfg.database.createLocally {
+        "${cfg.database.user}" = {};
+      })
+      (lib.mkIf ttsCfg.enable {
+        "${ttsCfg.user}" = {};
+      })
+    ];
 
     systemd.services.mindful-social = {
       description = "Mindful Social — community discourse server";
@@ -215,6 +315,9 @@ in {
       }
       // lib.optionalAttrs cfg.database.createLocally {
         DATABASE_URL = "postgres:///${cfg.database.name}?host=/run/postgresql";
+      }
+      // lib.optionalAttrs ttsCfg.enable {
+        TTS_SIDECAR_URL = ttsSidecarURL;
       }
       // cfg.environment;
 
@@ -254,6 +357,116 @@ in {
         LockPersonality = true;
         SystemCallArchitectures = "native";
         SystemCallFilter = [ "@system-service" "~@privileged" "~@resources" ];
+        RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+        CapabilityBoundingSet = [];
+        AmbientCapabilities = [];
+        UMask = "0077";
+      };
+    };
+
+    # Kokoro TTS sidecar. Boots a Python venv inside StateDirectory on
+    # first start (downloading wheels + Kokoro models — slow once, fast
+    # forever after), then runs the FastAPI server. The main service
+    # autoconfigures TTS_SIDECAR_URL above when ttsCfg.enable is true,
+    # so the two units come up independently without ordering coupling.
+    systemd.services.mindful-social-tts = lib.mkIf ttsCfg.enable {
+      description = "Mindful Social — Kokoro TTS sidecar";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+
+      # Runtime PATH needs:
+      #   - uv         to manage the Python venv
+      #   - python3    interpreter the venv targets
+      #   - espeak-ng  phonemizer used by misaki / Kokoro
+      #   - ffmpeg     pipes synthesized WAV through libopus encoding
+      path = with pkgs; [ uv python312 espeak-ng ffmpeg-headless ];
+
+      environment = {
+        # uv keeps the venv inside the state directory so it survives
+        # reboots and package upgrades. Without this it would try to
+        # build .venv next to pyproject.toml — which sits in the
+        # read-only Nix store and would fail.
+        UV_PROJECT_ENVIRONMENT = "/var/lib/${ttsCfg.stateDirectoryName}/.venv";
+
+        # Pin uv's cache and the HuggingFace cache into the state dir
+        # too, otherwise they'd land in $HOME (which doesn't exist for
+        # the sandboxed unit) or /root (also denied).
+        UV_CACHE_DIR = "/var/lib/${ttsCfg.stateDirectoryName}/.uv-cache";
+        HF_HOME = "/var/lib/${ttsCfg.stateDirectoryName}/hf-cache";
+        XDG_CACHE_HOME = "/var/lib/${ttsCfg.stateDirectoryName}/.cache";
+
+        # Force uv to use the nix-provided Python instead of fetching
+        # its own managed build. The managed-install path writes outside
+        # the state directory and tries to call out to astral, which the
+        # sandbox blocks anyway.
+        UV_PYTHON_PREFERENCE = "only-system";
+
+        TTS_HOST = ttsCfg.listenAddr;
+        TTS_PORT = toString ttsCfg.port;
+      };
+
+      # The package only ships the source tree; we sync it into the
+      # state dir on every start so an upgrade to the flake instantly
+      # replaces server.py, setup.sh, etc. without re-running setup
+      # from scratch. rsync -a keeps permissions (the +x bits on the
+      # shell scripts).
+      preStart = ''
+        set -eu
+        cd "$STATE_DIRECTORY"
+        ${pkgs.rsync}/bin/rsync -a --delete --exclude=.venv --exclude=models \
+          --exclude=.uv-cache --exclude=hf-cache --exclude=.cache \
+          ${ttsSource}/ "$STATE_DIRECTORY"/
+        # setup.sh syncs the venv (no-op if up to date) and pulls the
+        # German Martin ONNX model + pre-warms the upstream Kokoro
+        # cache. Each step is idempotent.
+        ./setup.sh
+      '';
+
+      serviceConfig = {
+        Type = "exec";
+        ExecStart = "${pkgs.bash}/bin/bash -c './run.sh'";
+        WorkingDirectory = "/var/lib/${ttsCfg.stateDirectoryName}";
+
+        User = ttsCfg.user;
+        Group = ttsCfg.user;
+
+        StateDirectory = ttsCfg.stateDirectoryName;
+        StateDirectoryMode = "0750";
+
+        Restart = "on-failure";
+        RestartSec = 10;
+        TimeoutStartSec = ttsCfg.firstBootTimeout;
+
+        # Memory ceiling. MemoryHigh throttles softly, MemoryMax is the
+        # hard kill point at 1.5x the soft target.
+        MemoryHigh = ttsCfg.memoryHigh;
+        MemoryMax = ttsCfg.memoryHigh;
+
+        # Sandboxing. The sidecar only needs to bind a localhost port
+        # and reach out to PyPI / HuggingFace on first boot. Everything
+        # else gets locked down, same shape as the main service.
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        ProtectClock = true;
+        ProtectHostname = true;
+        ProtectProc = "invisible";
+        ProcSubset = "pid";
+        NoNewPrivileges = true;
+        RestrictSUIDSGID = true;
+        RestrictRealtime = true;
+        RestrictNamespaces = true;
+        LockPersonality = true;
+        SystemCallArchitectures = "native";
+        # @resources is allowed here (unlike the main service) because
+        # PyTorch's CPU backend touches scheduler affinity calls.
+        SystemCallFilter = [ "@system-service" "~@privileged" ];
         RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
         CapabilityBoundingSet = [];
         AmbientCapabilities = [];
