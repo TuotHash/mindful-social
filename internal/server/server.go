@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	mindfulsocial "github.com/TuotHash/mindful-social"
+	"github.com/TuotHash/mindful-social/internal/audio"
 	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/config"
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -24,16 +25,17 @@ import (
 )
 
 type Server struct {
-	cfg      config.Config
-	logger   *slog.Logger
-	db       *pgxpool.Pool
-	sqlDB    *sql.DB // bridge for scs/postgresstore
-	queries  *db.Queries
-	authSvc  *auth.Service
-	sessions *scs.SessionManager
-	oauth    *auth.Registry
-	csrf     func(http.Handler) http.Handler
-	router   chi.Router
+	cfg         config.Config
+	logger      *slog.Logger
+	db          *pgxpool.Pool
+	sqlDB       *sql.DB // bridge for scs/postgresstore
+	queries     *db.Queries
+	authSvc     *auth.Service
+	sessions    *scs.SessionManager
+	oauth       *auth.Registry
+	csrf        func(http.Handler) http.Handler
+	router      chi.Router
+	audioWorker *audio.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
@@ -109,8 +111,43 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		// transient DB error shouldn't keep the whole server down.
 		logger.Warn("admin bootstrap", "err", err)
 	}
+	if err := s.startAudioWorker(); err != nil {
+		// Audio is opt-in; treat startup failures as a warning so the
+		// app comes up even when the sidecar isn't running yet.
+		logger.Warn("audio worker disabled", "err", err)
+	}
 	s.routes()
 	return s, nil
+}
+
+// startAudioWorker brings up the background TTS worker if the sidecar
+// URL is configured. With TTS_SIDECAR_URL empty, audio is disabled —
+// node uploads still succeed but no /audio routes will return content.
+func (s *Server) startAudioWorker() error {
+	if s.cfg.TTSSidecarURL == "" {
+		s.logger.Info("audio: TTS_SIDECAR_URL unset, TTS disabled")
+		w, err := audio.NewWorker(s.queries, nil, s.cfg.AudioDir, s.logger.With("subsys", "audio"))
+		if err != nil {
+			return err
+		}
+		s.audioWorker = w
+		return nil
+	}
+	client := audio.NewSidecarClient(s.cfg.TTSSidecarURL)
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := client.Healthz(pingCtx); err != nil {
+		// Sidecar is configured but not reachable. Spin up the worker
+		// anyway — jobs will fail loudly until the operator brings it
+		// up, but the rest of the app keeps working.
+		s.logger.Warn("audio: sidecar /healthz failed; worker will retry per-job", "url", s.cfg.TTSSidecarURL, "err", err)
+	}
+	w, err := audio.NewWorker(s.queries, client, s.cfg.AudioDir, s.logger.With("subsys", "audio"))
+	if err != nil {
+		return err
+	}
+	s.audioWorker = w
+	return nil
 }
 
 // bootstrapAdmins reconciles cfg.AdminUsers with the role column. Listed
@@ -139,6 +176,9 @@ func (s *Server) bootstrapAdmins(ctx context.Context) error {
 func (s *Server) Handler() http.Handler { return s.router }
 
 func (s *Server) Close() error {
+	if s.audioWorker != nil {
+		_ = s.audioWorker.Close()
+	}
 	s.db.Close()
 	return s.sqlDB.Close()
 }

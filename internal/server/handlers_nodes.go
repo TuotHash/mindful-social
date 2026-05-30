@@ -395,6 +395,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.snapshotNodeRevision(r.Context(), node.ID, &user.ID, node.Title, node.Body, "Created.", tagNames)
+	s.enqueueAudioForNode(r.Context(), node)
 	// Modal submit: ask htmx to do a full navigation to the new post so the
 	// modal closes and the page actually changes. Non-htmx submits get the
 	// usual 303 redirect.
@@ -889,7 +890,7 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		srcPtr = &sourceURL
 	}
 
-	_, err = s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
+	updated, err := s.queries.UpdateNode(r.Context(), db.UpdateNodeParams{
 		ID:                id,
 		Title:             title,
 		Body:              body,
@@ -909,6 +910,9 @@ func (s *Server) handleNodeUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("node updated", "node_id", id, "slug", node.Slug, "type", node.Type, "user_id", user.ID, "is_author", isAuthor)
+	if updated.Title != node.Title || updated.Body != node.Body {
+		s.enqueueAudioForNode(r.Context(), updated)
+	}
 	newTags := parseTagsInput(rawTags)
 	if err := s.setTagsForNode(r, id, newTags); err != nil {
 		s.logger.Error("update node: set tags", "err", err)
