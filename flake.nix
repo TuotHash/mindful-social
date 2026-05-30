@@ -39,13 +39,20 @@
             air
             postgresql_16
             golangci-lint
+
+            # TTS sidecar (./tts): Python interpreter, uv for the venv, and
+            # espeak-ng for Kokoro's phonemizer. The Python packages
+            # themselves (kokoro_onnx, onnxruntime, fastapi, ...) live in a
+            # uv-managed venv at tts/.venv — see tts/setup.sh.
+            python312
+            uv
+            espeak-ng
           ]
-          # The node-video upload handler shells out to ffmpeg/ffprobe.
-          # On Linux the dev shell ships the headless build so the
-          # toolchain is self-contained; on macOS we defer to the
-          # system install (Homebrew etc.) because nix-built ffmpeg
-          # binaries are killed by Apple's hardened-runtime policy on
-          # recent macOS releases.
+          # ffmpeg is used by the node-video upload handler AND by the TTS
+          # sidecar (Opus encoding of synthesized audio). On Linux we ship
+          # the headless build; on macOS we defer to the system install
+          # (Homebrew etc.) because nix-built ffmpeg binaries are killed
+          # by Apple's hardened-runtime policy on recent macOS releases.
           ++ lib.optional (!pkgs.stdenv.isDarwin) pkgs.ffmpeg-headless;
 
           shellHook = ''
@@ -76,6 +83,10 @@
 
             Run the app:
               go run ./cmd/server          listens on 127.0.0.1:8080
+
+            TTS sidecar (optional):
+              ./tts/setup.sh               install Python deps + download Kokoro models
+              ./tts/run.sh                 start the sidecar on 127.0.0.1:8090
 
             EOF
           '';

@@ -1,0 +1,38 @@
+[project]
+name = "mindful-tts"
+version = "0.1.0"
+description = "Kokoro TTS sidecar for Mindful Social"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    # Upstream multi-language Kokoro (en/es/fr/it via misaki G2P).
+    "kokoro>=0.9.4",
+    "misaki[en,es,fr,it]>=0.9.4",
+    # German fine-tune is shipped as an ONNX file with its own voices.bin;
+    # kokoro-onnx runs it without needing a second PyTorch model in memory.
+    "kokoro-onnx>=0.4.9",
+    "onnxruntime>=1.20",
+    # PyTorch is pulled in transitively by `kokoro`; we pin CPU-only because
+    # the VPS has no GPU and the CUDA wheels are huge.
+    "torch>=2.5",
+    "numpy>=2.0",
+    "soundfile>=0.13",
+    # HTTP service.
+    "fastapi>=0.118",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    # Model downloads from the Hugging Face Hub.
+    "huggingface-hub>=0.27",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
