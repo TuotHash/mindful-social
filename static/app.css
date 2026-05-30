@@ -4129,3 +4129,96 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   font-size: var(--fs-xs);
   color: var(--text-subtle);
 }
+
+/* TTS player — sits under a node's body, above the stance row.
+   Uses the same card vocabulary as the rest of the page so it reads
+   as part of the post, not a foreign embed. */
+.tts-player {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated, var(--bg-subtle, transparent));
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.tts-player[aria-busy="true"] {
+  opacity: 0.55;
+}
+.tts-play {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: var(--accent-on);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.tts-play .material-symbols-outlined {
+  font-size: 24px;
+  line-height: 1;
+}
+.tts-play:hover {
+  filter: brightness(1.05);
+}
+.tts-meter {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tts-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tts-progress {
+  flex: 1 1 auto;
+  height: 6px;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.tts-progress::-webkit-progress-bar { background: var(--border); border-radius: 3px; }
+.tts-progress::-webkit-progress-value { background: var(--accent); border-radius: 3px; }
+.tts-progress::-moz-progress-bar { background: var(--accent); border-radius: 3px; }
+.tts-time {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  min-width: 3.5ch;
+}
+.tts-time-total { text-align: right; }
+.tts-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.tts-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tts-label .material-symbols-outlined {
+  font-size: 14px;
+}
+.tts-lang {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.tts-status {
+  font-style: italic;
+}

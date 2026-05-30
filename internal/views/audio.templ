@@ -1,0 +1,30 @@
+package views
+
+// AudioPlayer renders the TTS player widget for a node. The actual
+// playback machinery (manifest fetch, chunk prefetch, gapless swap) is
+// in /static/audio.js, which lazy-binds to any [data-tts-player]
+// element on DOMContentLoaded. The widget hides itself if the node has
+// no audio chunks planned (e.g. unsupported language).
+templ AudioPlayer(nodeID string) {
+	<section class="tts-player" data-tts-player={ nodeID } aria-busy="true" aria-label="Listen to this post">
+		<button type="button" class="tts-play" data-tts-action="play" title="Play/pause">
+			<span class="material-symbols-outlined">play_arrow</span>
+		</button>
+		<div class="tts-meter">
+			<div class="tts-meter-row">
+				<span class="tts-time" data-tts-position>0:00</span>
+				<progress class="tts-progress" data-tts-progress value="0" max="100"></progress>
+				<span class="tts-time tts-time-total" data-tts-duration>0:00</span>
+			</div>
+			<div class="tts-meta">
+				<span class="tts-label">
+					<span class="material-symbols-outlined">headphones</span>
+					Listen
+				</span>
+				<span class="tts-lang" data-tts-lang></span>
+				<span class="tts-status" data-tts-status></span>
+			</div>
+		</div>
+		<audio preload="none" data-tts-audio></audio>
+	</section>
+}

@@ -40,6 +40,7 @@ templ Layout(title string, currentUser *Viewer) {
 			<script src={ StaticAsset("/static/htmx.min.js") } defer></script>
 			<script src={ StaticAsset("/static/easymde.min.js") } defer></script>
 			<script src={ StaticAsset("/static/app.js") } defer></script>
+			<script src={ StaticAsset("/static/audio.js") } defer></script>
 			<script>
 				// Forward the CSRF token on every htmx request from the
 				// meta tag above so hx-post/hx-delete etc. don't need
