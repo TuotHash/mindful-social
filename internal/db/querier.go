@@ -29,10 +29,16 @@ type Querier interface {
 	// membership.
 	CanViewGroup(ctx context.Context, arg CanViewGroupParams) (bool, error)
 	CanViewNode(ctx context.Context, arg CanViewNodeParams) (bool, error)
+	// Atomically grabs the highest-priority pending job. SKIP LOCKED lets
+	// multiple worker goroutines/processes run safely. Returns no rows when the
+	// queue is empty — callers should treat pgx.ErrNoRows as "nothing to do".
+	ClaimNextAudioJob(ctx context.Context) (AudioJob, error)
+	CompleteAudioJob(ctx context.Context, id uuid.UUID) error
 	// Used to refuse demotions that would leave the instance with no admins.
 	// A site with zero admins can't be managed through the UI; recovery
 	// requires either ADMIN_USERS at boot or a DB-level fix.
 	CountAdmins(ctx context.Context) (int64, error)
+	CountAudioChunksByNode(ctx context.Context, nodeID uuid.UUID) (CountAudioChunksByNodeRow, error)
 	// Total edges (incoming + outgoing) that would cascade-delete if the node
 	// were removed. Used on the deletion confirmation page.
 	CountEdgesForNode(ctx context.Context, fromNode uuid.UUID) (int64, error)
@@ -49,6 +55,7 @@ type Querier interface {
 	// are surfaced on the confirmation page so the author knows what cascades.
 	CountOtherUserPinsForNode(ctx context.Context, arg CountOtherUserPinsForNodeParams) (int64, error)
 	CountUnreadNotifications(ctx context.Context, recipientID uuid.UUID) (int64, error)
+	CreateAudioChunk(ctx context.Context, arg CreateAudioChunkParams) (AudioChunk, error)
 	CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentityParams) (AuthIdentity, error)
 	// Comments are stored as nodes (type='comment') attached to their target
 	// via a 'comments_on' edge. Top-level comments point at the discussed
@@ -100,11 +107,20 @@ type Querier interface {
 	// revisions keep their content but lose the edited_by attribution
 	// (ON DELETE SET NULL).
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	// Upsert: if a job already exists for (node, chunk_index) leave it alone so
+	// we don't reset attempts/status on retry. Returns the row either way so the
+	// caller can decide whether it just created work.
+	EnqueueAudioJob(ctx context.Context, arg EnqueueAudioJobParams) (AudioJob, error)
+	// Marks failed but leaves attempts/last_error intact for diagnostics. If we
+	// ever want retries with backoff we can flip status back to 'pending' from
+	// a separate scheduler instead of handling it here.
+	FailAudioJob(ctx context.Context, arg FailAudioJobParams) error
 	// Walk the parent chain to the topmost ancestor. Returns the id only when
 	// that ancestor is a topic; otherwise no row (callers reject the upload).
 	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —
 	// a malformed cycle would otherwise loop forever.
 	FindRootTopicForNode(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	GetAudioChunk(ctx context.Context, arg GetAudioChunkParams) (AudioChunk, error)
 	// Loads a single comment attached (one or two hops) to the named node.
 	// Used by the edit/update/delete handlers so a comment from one view
 	// can't be touched via another view's URL.
@@ -122,6 +138,8 @@ type Querier interface {
 	// whether the incoming save actually changes anything — if title/body/tags
 	// all match, we skip writing a spurious duplicate.
 	GetLatestNodeRevision(ctx context.Context, nodeID uuid.UUID) (NodeRevision, error)
+	// Returns -1 if no chunks exist yet (the next chunk_index is then 0).
+	GetMaxAudioChunkIndex(ctx context.Context, nodeID uuid.UUID) (int32, error)
 	GetNode(ctx context.Context, id uuid.UUID) (Node, error)
 	GetNodeBySlug(ctx context.Context, slug string) (Node, error)
 	// A single revision identified by (node_id, revision). Returns the full body
@@ -147,6 +165,7 @@ type Querier interface {
 	// replies (comment nodes whose comments_on edge points at this comment).
 	// The matching edges are removed by their own ON DELETE CASCADE.
 	HardDeleteComment(ctx context.Context, id uuid.UUID) (int64, error)
+	HasPendingAudioJobsForNode(ctx context.Context, nodeID uuid.UUID) (bool, error)
 	// Promote an edge into the highlights section from the perspective of
 	// `pov_node`, which must be one of the edge's endpoints. The rank is the
 	// next-highest across the existing highlights on that side, so the new
@@ -197,6 +216,7 @@ type Querier interface {
 	// SearchNodes (which uses tsvector + trigram) and is intersected at the
 	// Go layer when both are active. The cap matches the canvas budget.
 	ListArgumentGraphSeeds(ctx context.Context, arg ListArgumentGraphSeedsParams) ([]uuid.UUID, error)
+	ListAudioChunksByNode(ctx context.Context, nodeID uuid.UUID) ([]AudioChunk, error)
 	// Returns top-level comments attached to node_id, plus their direct
 	// replies. parent_id is NULL on top-level rows and set to the parent
 	// comment's id on reply rows. Soft-deleted comments stay in the result
@@ -354,6 +374,8 @@ type Querier interface {
 	// number of affected rows so callers can distinguish "no such member"
 	// from "owner protected".
 	SetGroupMemberRole(ctx context.Context, arg SetGroupMemberRoleParams) (int64, error)
+	// Sets the detected (or user-chosen) language on a node. Two-letter code.
+	SetNodeLanguage(ctx context.Context, arg SetNodeLanguageParams) error
 	// Upsert: changing your stance from supports → opposes (or any other
 	// transition) replaces the existing row in place. created_at is reset on
 	// update so the profile shows the most recent stance change first. Returns

@@ -56,7 +56,7 @@ new_comment AS (
         target_node.group_id
     FROM target_node
     WHERE EXISTS (SELECT 1 FROM attach_to)
-    RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
+    RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language
 ),
 new_edge AS (
     INSERT INTO edges (from_node, to_node, kind, created_by)
@@ -64,7 +64,7 @@ new_edge AS (
     FROM new_comment, attach_to
     RETURNING from_node
 )
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM new_comment
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language FROM new_comment
 `
 
 type CreateCommentNodeParams struct {
@@ -93,6 +93,7 @@ type CreateCommentNodeRow struct {
 	GroupID           *uuid.UUID         `json:"group_id"`
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	Language          *string            `json:"language"`
 }
 
 // Comments are stored as nodes (type='comment') attached to their target
@@ -139,6 +140,7 @@ func (q *Queries) CreateCommentNode(ctx context.Context, arg CreateCommentNodePa
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }
@@ -343,7 +345,7 @@ WHERE id = $2::uuid
   AND type = 'comment'
   AND created_by = $3::uuid
   AND deleted_at IS NULL
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language
 `
 
 type UpdateCommentParams struct {
@@ -375,6 +377,7 @@ func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (N
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }

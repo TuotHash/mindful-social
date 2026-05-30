@@ -12,6 +12,61 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AudioJobStatus string
+
+const (
+	AudioJobStatusPending   AudioJobStatus = "pending"
+	AudioJobStatusRunning   AudioJobStatus = "running"
+	AudioJobStatusCompleted AudioJobStatus = "completed"
+	AudioJobStatusFailed    AudioJobStatus = "failed"
+)
+
+func (e *AudioJobStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AudioJobStatus(s)
+	case string:
+		*e = AudioJobStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AudioJobStatus: %T", src)
+	}
+	return nil
+}
+
+type NullAudioJobStatus struct {
+	AudioJobStatus AudioJobStatus `json:"audio_job_status"`
+	Valid          bool           `json:"valid"` // Valid is true if AudioJobStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAudioJobStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.AudioJobStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AudioJobStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAudioJobStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AudioJobStatus), nil
+}
+
+func (e AudioJobStatus) Valid() bool {
+	switch e {
+	case AudioJobStatusPending,
+		AudioJobStatusRunning,
+		AudioJobStatusCompleted,
+		AudioJobStatusFailed:
+		return true
+	}
+	return false
+}
+
 type EdgeKind string
 
 const (
@@ -444,6 +499,37 @@ func (e VisibilityKind) Valid() bool {
 	return false
 }
 
+type AudioChunk struct {
+	ID         uuid.UUID          `json:"id"`
+	NodeID     uuid.UUID          `json:"node_id"`
+	ChunkIndex int32              `json:"chunk_index"`
+	CharStart  int32              `json:"char_start"`
+	CharEnd    int32              `json:"char_end"`
+	DurationMs int32              `json:"duration_ms"`
+	Bytes      int64              `json:"bytes"`
+	FilePath   string             `json:"file_path"`
+	Language   string             `json:"language"`
+	Voice      string             `json:"voice"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type AudioJob struct {
+	ID          uuid.UUID          `json:"id"`
+	NodeID      uuid.UUID          `json:"node_id"`
+	ChunkIndex  int32              `json:"chunk_index"`
+	CharStart   int32              `json:"char_start"`
+	CharEnd     int32              `json:"char_end"`
+	Language    string             `json:"language"`
+	Voice       string             `json:"voice"`
+	Priority    int32              `json:"priority"`
+	Status      AudioJobStatus     `json:"status"`
+	Attempts    int32              `json:"attempts"`
+	LastError   *string            `json:"last_error"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
 type AuthIdentity struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`
@@ -514,6 +600,7 @@ type Node struct {
 	GroupID           *uuid.UUID         `json:"group_id"`
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	Language          *string            `json:"language"`
 }
 
 type NodeImage struct {

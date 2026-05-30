@@ -107,7 +107,7 @@ INSERT INTO nodes (
     parent_node_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language
 `
 
 type CreateNodeParams struct {
@@ -154,6 +154,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }
@@ -168,7 +169,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id uuid.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes WHERE id = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language FROM nodes WHERE id = $1
 `
 
 func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
@@ -191,12 +192,13 @@ func (q *Queries) GetNode(ctx context.Context, id uuid.UUID) (Node, error) {
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }
 
 const getNodeBySlug = `-- name: GetNodeBySlug :one
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes WHERE slug = $1
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language FROM nodes WHERE slug = $1
 `
 
 func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) {
@@ -219,12 +221,13 @@ func (q *Queries) GetNodeBySlug(ctx context.Context, slug string) (Node, error) 
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }
 
 const listNodesAuthoredByForViewer = `-- name: ListNodesAuthoredByForViewer :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes n
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language FROM nodes n
 WHERE n.created_by = $1
   AND n.type <> 'comment'
   AND n.deleted_at IS NULL
@@ -269,6 +272,7 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 			&i.GroupID,
 			&i.VisibilityGroupID,
 			&i.DeletedAt,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -281,7 +285,7 @@ func (q *Queries) ListNodesAuthoredByForViewer(ctx context.Context, arg ListNode
 }
 
 const listNodesByType = `-- name: ListNodesByType :many
-SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at FROM nodes
+SELECT id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language FROM nodes
 WHERE type = $1
   AND deleted_at IS NULL
 ORDER BY created_at DESC
@@ -319,6 +323,7 @@ func (q *Queries) ListNodesByType(ctx context.Context, arg ListNodesByTypeParams
 			&i.GroupID,
 			&i.VisibilityGroupID,
 			&i.DeletedAt,
+			&i.Language,
 		); err != nil {
 			return nil, err
 		}
@@ -740,7 +745,7 @@ SET title = $2,
     edit_policy = $8,
     updated_at = now()
 WHERE id = $1
-RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at
+RETURNING id, type, title, body, source_url, created_by, created_at, updated_at, search_tsv, slug, visibility, edit_policy, parent_node_id, group_id, visibility_group_id, deleted_at, language
 `
 
 type UpdateNodeParams struct {
@@ -783,6 +788,7 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.GroupID,
 		&i.VisibilityGroupID,
 		&i.DeletedAt,
+		&i.Language,
 	)
 	return i, err
 }
