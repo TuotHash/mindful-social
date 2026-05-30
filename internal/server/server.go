@@ -264,6 +264,8 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 	r.Get("/nodes/{id}", s.handleNodeDetail)
 	r.Get("/nodes/{id}/history", s.handleNodeHistory)
 	r.Get("/nodes/{id}/history/{revision}", s.handleNodeRevisionView)
+	r.Get("/nodes/{id}/audio/manifest", s.handleAudioManifest)
+	r.Get("/nodes/{id}/audio/chunks/{n}", s.handleAudioChunk)
 	r.Get("/graph", s.handleArgumentGraph)
 	r.Get("/graph/data", s.handleArgumentGraphData)
 	r.Get("/graph/3d", s.handleArgumentGraph3D)
