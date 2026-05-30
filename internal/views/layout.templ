@@ -100,10 +100,17 @@ templ Layout(title string, currentUser *Viewer) {
 templ TopNav(currentUser *Viewer) {
 	<header class="nav">
 		<div class="nav-inner">
-			<a class="brand" href="/">
-				<span class="brand-mark"></span>
-				<span>Mindful Social</span>
-			</a>
+			if currentUser != nil {
+				<a class="brand" href="/home">
+					<span class="brand-mark"></span>
+					<span>Mindful Social</span>
+				</a>
+			} else {
+				<a class="brand" href="/">
+					<span class="brand-mark"></span>
+					<span>Mindful Social</span>
+				</a>
+			}
 			<div class="nav-links">
 				if currentUser != nil {
 					<a class="nav-link" href="/home">Home</a>
