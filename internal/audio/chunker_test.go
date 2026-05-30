@@ -69,6 +69,29 @@ func TestPlanChunks_OffsetsExact(t *testing.T) {
 	}
 }
 
+func TestReadTextJoined_AddsPeriodWhenTitleLacksTerminator(t *testing.T) {
+	cases := []struct {
+		title string
+		body  string
+		want  string
+	}{
+		{"Audio TTS smoke test", "Hello world.", "Audio TTS smoke test.\n\nHello world."},
+		{"Already ends with period.", "More.", "Already ends with period.\n\nMore."},
+		{"What about a question?", "Body.", "What about a question?\n\nBody."},
+		{"Exclaim!", "Body.", "Exclaim!\n\nBody."},
+		{"  Trim whitespace  ", "Body.", "Trim whitespace.\n\nBody."},
+		// No body — title is returned as-is, no period appended.
+		{"Lonely title", "", "Lonely title"},
+	}
+	for _, tc := range cases {
+		got := ReadText{Title: tc.title, Body: tc.body}.Joined()
+		if got != tc.want {
+			t.Errorf("Joined(title=%q, body=%q) = %q, want %q",
+				tc.title, tc.body, got, tc.want)
+		}
+	}
+}
+
 func TestIsShortPost(t *testing.T) {
 	short := strings.Repeat("word ", 100) // ~40s
 	long := strings.Repeat("word ", 1000) // ~6:40

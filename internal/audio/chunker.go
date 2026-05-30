@@ -14,11 +14,30 @@ type ReadText struct {
 
 // Joined returns the canonical narration text. Char offsets used by
 // ChunkSpec are byte offsets into this string.
+//
+// A period is appended to the title when it doesn't already end with
+// sentence-ending punctuation. Most Kokoro voices pause on real sentence
+// boundaries but the German Martin ONNX fine-tune in particular runs the
+// title straight into the body when the title is just a noun phrase, so
+// we force a terminator. Cheap to do for all languages.
 func (r ReadText) Joined() string {
 	if r.Body == "" {
 		return r.Title
 	}
-	return r.Title + "\n\n" + r.Body
+	title := strings.TrimSpace(r.Title)
+	if !endsWithSentenceTerminator(title) {
+		title += "."
+	}
+	return title + "\n\n" + r.Body
+}
+
+func endsWithSentenceTerminator(s string) bool {
+	for _, suffix := range []string{".", "!", "?", ":", "…", "。", "！", "？"} {
+		if strings.HasSuffix(s, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // ChunkSpec describes one synthesis unit. CharStart/CharEnd are byte
