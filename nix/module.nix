@@ -376,11 +376,14 @@ in {
       wants = [ "network-online.target" ];
 
       # Runtime PATH needs:
-      #   - uv         to manage the Python venv
+      #   - bash       resolves the #!/usr/bin/env bash shebang in
+      #                setup.sh and run.sh
+      #   - coreutils  setup.sh calls cp, mkdir, etc.
+      #   - uv         manages the Python venv
       #   - python3    interpreter the venv targets
       #   - espeak-ng  phonemizer used by misaki / Kokoro
       #   - ffmpeg     pipes synthesized WAV through libopus encoding
-      path = with pkgs; [ uv python312 espeak-ng ffmpeg-headless ];
+      path = with pkgs; [ bash coreutils uv python312 espeak-ng ffmpeg-headless ];
 
       environment = {
         # uv keeps the venv inside the state directory so it survives
