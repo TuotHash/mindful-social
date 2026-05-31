@@ -409,25 +409,34 @@ in {
         TTS_PORT = toString ttsCfg.port;
       };
 
-      # The package only ships the source tree; we sync it into the
-      # state dir on every start so an upgrade to the flake instantly
-      # replaces server.py, setup.sh, etc. without re-running setup
-      # from scratch. rsync -a keeps permissions (the +x bits on the
-      # shell scripts).
-      preStart = ''
-        set -eu
-        cd "$STATE_DIRECTORY"
-        ${pkgs.rsync}/bin/rsync -a --delete --exclude=.venv --exclude=models \
-          --exclude=.uv-cache --exclude=hf-cache --exclude=.cache \
-          ${ttsSource}/ "$STATE_DIRECTORY"/
-        # setup.sh syncs the venv (no-op if up to date) and pulls the
-        # German Martin ONNX model + pre-warms the upstream Kokoro
-        # cache. Each step is idempotent.
-        ./setup.sh
-      '';
-
       serviceConfig = {
         Type = "exec";
+
+        # Two pre-start steps. The first runs as root (the "+" prefix
+        # disables the User= switch for this line only) and fixes
+        # ownership of the state directory. systemd creates
+        # StateDirectory the first time the unit starts but doesn't
+        # re-chown it if User= changes later, so a state dir left over
+        # from a deploy that used a different user (or none) would
+        # stay root-owned and uv would EACCES on the cache dir. The
+        # chown is idempotent and cheap.
+        #
+        # The second step runs as the unit user and does the actual
+        # work: refresh source files from the store, then run setup.sh
+        # (which itself is idempotent).
+        ExecStartPre = [
+          "+${pkgs.coreutils}/bin/chown -R ${ttsCfg.user}:${ttsCfg.user} /var/lib/${ttsCfg.stateDirectoryName}"
+          (pkgs.writeShellScript "mindful-tts-prestart" ''
+            set -eu
+            cd "$STATE_DIRECTORY"
+            ${pkgs.rsync}/bin/rsync -a --delete \
+              --exclude=.venv --exclude=models \
+              --exclude=.uv-cache --exclude=hf-cache --exclude=.cache \
+              ${ttsSource}/ "$STATE_DIRECTORY"/
+            ./setup.sh
+          '').outPath
+        ];
+
         ExecStart = "${pkgs.bash}/bin/bash -c './run.sh'";
         WorkingDirectory = "/var/lib/${ttsCfg.stateDirectoryName}";
 
