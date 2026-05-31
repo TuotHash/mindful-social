@@ -433,6 +433,12 @@ in {
               --exclude=.venv --exclude=models \
               --exclude=.uv-cache --exclude=hf-cache --exclude=.cache \
               ${ttsSource}/ "$STATE_DIRECTORY"/
+            # rsync -a preserves perms, and Nix-store source files are
+            # 0444 / 0555 (read-only) — so without this chmod the
+            # state directory itself ends up 0555 and uv hits EACCES
+            # trying to create .uv-cache, .venv, etc. Restoring owner
+            # write to every synced path is idempotent and cheap.
+            ${pkgs.coreutils}/bin/chmod -R u+w "$STATE_DIRECTORY"
             ./setup.sh
           '').outPath
         ];
