@@ -142,11 +142,16 @@ func (s *Server) startAudioWorker() error {
 		// up, but the rest of the app keeps working.
 		s.logger.Warn("audio: sidecar /healthz failed; worker will retry per-job", "url", s.cfg.TTSSidecarURL, "err", err)
 	}
-	w, err := audio.NewWorker(s.queries, client, s.cfg.AudioDir, s.logger.With("subsys", "audio"))
+	audioLogger := s.logger.With("subsys", "audio")
+	w, err := audio.NewWorker(s.queries, client, s.cfg.AudioDir, audioLogger)
 	if err != nil {
 		return err
 	}
 	s.audioWorker = w
+	// Catch up posts created before TTS was wired up (or while the
+	// sidecar was down). Runs once per process, off the boot path so a
+	// large backlog doesn't slow server startup.
+	go audio.BackfillExistingNodes(context.Background(), s.queries, audioLogger)
 	return nil
 }
 

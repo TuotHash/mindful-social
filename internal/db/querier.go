@@ -264,6 +264,11 @@ type Querier interface {
 	ListNodesAuthoredByForViewer(ctx context.Context, arg ListNodesAuthoredByForViewerParams) ([]Node, error)
 	ListNodesByType(ctx context.Context, arg ListNodesByTypeParams) ([]Node, error)
 	ListNodesForGroupForViewer(ctx context.Context, arg ListNodesForGroupForViewerParams) ([]Node, error)
+	// Nodes that don't yet have any synthesized audio chunks AND don't already
+	// have a queued/in-flight job. Used by the startup backfill to catch posts
+	// that were created before TTS existed or while the sidecar was down.
+	// Comments are excluded to match the live create/update path.
+	ListNodesNeedingAudioBackfill(ctx context.Context) ([]Node, error)
 	// Nodes that carry a given tag, most recent first — for /tags/{name}.
 	// Filtered through node_visible_to() so a viewer only sees nodes they can.
 	ListNodesWithTagForViewer(ctx context.Context, arg ListNodesWithTagForViewerParams) ([]Node, error)

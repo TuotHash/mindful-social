@@ -89,3 +89,24 @@ SELECT EXISTS (
   SELECT 1 FROM audio_jobs
   WHERE node_id = $1 AND status IN ('pending', 'running')
 )::bool AS has_pending;
+
+-- name: ListNodesNeedingAudioBackfill :many
+-- Nodes that don't yet have any synthesized audio chunks AND don't already
+-- have a queued/in-flight job. Used by the startup backfill to catch posts
+-- that were created before TTS existed or while the sidecar was down.
+-- Comments are excluded to match the live create/update path.
+SELECT n.id, n.type, n.title, n.body, n.source_url, n.created_by,
+       n.created_at, n.updated_at, n.search_tsv, n.slug,
+       n.visibility, n.edit_policy, n.parent_node_id, n.group_id,
+       n.visibility_group_id, n.deleted_at, n.language
+FROM nodes n
+WHERE n.deleted_at IS NULL
+  AND n.type <> 'comment'
+  AND NOT EXISTS (
+    SELECT 1 FROM audio_chunks c WHERE c.node_id = n.id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM audio_jobs j
+    WHERE j.node_id = n.id AND j.status IN ('pending', 'running')
+  )
+ORDER BY n.created_at DESC;

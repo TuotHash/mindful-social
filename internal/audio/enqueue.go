@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -94,6 +95,37 @@ func EnqueueOnDemand(ctx context.Context, queries *db.Queries, nodeID uuid.UUID,
 		Priority:   priorityOnDemand,
 	})
 	return err
+}
+
+// BackfillExistingNodes enqueues TTS jobs for every node that has no
+// audio chunks and no in-flight job — i.e. posts created before TTS
+// existed, or while the sidecar was unreachable. Safe to call on every
+// startup: PlanAndEnqueueForUpload is idempotent (EnqueueAudioJob does
+// ON CONFLICT DO UPDATE), so a node already mid-backfill is just a
+// no-op. Per-node failures are logged and skipped; the loop keeps
+// going so one bad row can't stall the rest of the catch-up.
+func BackfillExistingNodes(ctx context.Context, queries *db.Queries, logger *slog.Logger) {
+	nodes, err := queries.ListNodesNeedingAudioBackfill(ctx)
+	if err != nil {
+		logger.Warn("audio backfill: list nodes", "err", err)
+		return
+	}
+	if len(nodes) == 0 {
+		return
+	}
+	logger.Info("audio backfill: starting", "count", len(nodes))
+	enqueued := 0
+	for _, node := range nodes {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := PlanAndEnqueueForUpload(ctx, queries, node); err != nil {
+			logger.Warn("audio backfill: enqueue", "node_id", node.ID, "err", err)
+			continue
+		}
+		enqueued++
+	}
+	logger.Info("audio backfill: done", "enqueued", enqueued, "skipped", len(nodes)-enqueued)
 }
 
 // resolveLanguage returns the node's stored language, detecting and
