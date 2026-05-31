@@ -50,13 +50,22 @@ async def lifespan(app: FastAPI):
     global de_kokoro
 
     import onnxruntime as ort
-    from kokoro import KPipeline
+    from kokoro import KModel, KPipeline
     from kokoro_onnx import Kokoro
 
-    LOG.info("loading multi-language Kokoro pipelines")
+    # KPipeline loads its own KModel by default, so four pipelines = four
+    # copies of the ~330M-parameter PyTorch weights in RAM (~2.5 GB
+    # working set). Loading one shared KModel and handing it to each
+    # KPipeline cuts that to ~700 MB at the cost of nothing: the model
+    # itself is stateless across languages, only the G2P frontend
+    # differs.
+    LOG.info("loading shared multi-language Kokoro model")
+    shared_model = KModel()
+
+    LOG.info("creating language pipelines")
     for lang_code, kokoro_code in KOKORO_LANG.items():
         LOG.info("  - %s (lang=%s)", lang_code, kokoro_code)
-        pipelines[lang_code] = KPipeline(lang_code=kokoro_code)
+        pipelines[lang_code] = KPipeline(lang_code=kokoro_code, model=shared_model)
 
     LOG.info("loading German Martin ONNX model")
     martin_dir = MODELS_DIR / "kokoro-de-martin"
