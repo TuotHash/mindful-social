@@ -405,6 +405,18 @@ in {
         # sandbox blocks anyway.
         UV_PYTHON_PREFERENCE = "only-system";
 
+        # The Python wheels for numpy, torch, and onnxruntime are
+        # pre-built against a standard FHS layout — they dlopen
+        # libstdc++.so.6, libgomp.so.1, etc. by bare filename. On
+        # NixOS those aren't on the default loader path, so we
+        # explicitly publish a small set of system libraries the
+        # wheels expect.
+        LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
+          stdenv.cc.cc.lib   # libstdc++, libgomp, libgcc_s
+          zlib               # libz — torch / onnxruntime
+          openssl            # libssl, libcrypto — HF Hub TLS
+        ]);
+
         TTS_HOST = ttsCfg.listenAddr;
         TTS_PORT = toString ttsCfg.port;
       };
