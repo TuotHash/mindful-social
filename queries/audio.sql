@@ -90,6 +90,21 @@ SELECT EXISTS (
   WHERE node_id = $1 AND status IN ('pending', 'running')
 )::bool AS has_pending;
 
+-- name: RetryFailedAudioJobs :execrows
+-- Flips status='failed' rows back to 'pending' so the worker re-picks them up.
+-- Used by the startup backfill to recover from transient errors — typically
+-- the sidecar was unreachable the first time the job ran. attempts is
+-- preserved as a guard against runaway loops: once a job has been tried 5
+-- times the row is left alone so a genuinely broken text doesn't churn the
+-- worker indefinitely. last_error / started_at are cleared so the diagnostic
+-- columns reflect the upcoming attempt, not the previous one.
+UPDATE audio_jobs
+SET status     = 'pending',
+    last_error = NULL,
+    started_at = NULL
+WHERE status = 'failed'
+  AND attempts < 5;
+
 -- name: ListNodesNeedingAudioBackfill :many
 -- Nodes that don't yet have any synthesized audio chunks AND don't already
 -- have a queued/in-flight job. Used by the startup backfill to catch posts

@@ -332,6 +332,14 @@ type Querier interface {
 	// pg_trgm operators take plain text, no query syntax to escape.
 	PickerSearchNodes(ctx context.Context, arg PickerSearchNodesParams) ([]PickerSearchNodesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
+	// Flips status='failed' rows back to 'pending' so the worker re-picks them up.
+	// Used by the startup backfill to recover from transient errors — typically
+	// the sidecar was unreachable the first time the job ran. attempts is
+	// preserved as a guard against runaway loops: once a job has been tried 5
+	// times the row is left alone so a genuinely broken text doesn't churn the
+	// worker indefinitely. last_error / started_at are cleared so the diagnostic
+	// columns reflect the upcoming attempt, not the previous one.
+	RetryFailedAudioJobs(ctx context.Context) (int64, error)
 	// Trigram fuzzy match against the group name. Mirrors SearchUsers but
 	// additionally gates each row by the viewer's right to see the group
 	// (see ListVisibleGroups for the visibility branches). The %> threshold

@@ -105,6 +105,15 @@ func EnqueueOnDemand(ctx context.Context, queries *db.Queries, nodeID uuid.UUID,
 // no-op. Per-node failures are logged and skipped; the loop keeps
 // going so one bad row can't stall the rest of the catch-up.
 func BackfillExistingNodes(ctx context.Context, queries *db.Queries, logger *slog.Logger) {
+	// Reset previously-failed jobs to 'pending' so the worker re-picks them
+	// up. Covers nodes whose first synthesis attempt failed because the
+	// sidecar was briefly unreachable — without this, those jobs stay
+	// 'failed' forever and the node never gets audio.
+	if n, err := queries.RetryFailedAudioJobs(ctx); err != nil {
+		logger.Warn("audio backfill: retry failed jobs", "err", err)
+	} else if n > 0 {
+		logger.Info("audio backfill: requeued failed jobs", "count", n)
+	}
 	nodes, err := queries.ListNodesNeedingAudioBackfill(ctx)
 	if err != nil {
 		logger.Warn("audio backfill: list nodes", "err", err)
