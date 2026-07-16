@@ -16,6 +16,7 @@ import (
 // SiteFlags struct through every template signature.
 
 var signupEnabledFlag = true
+var aiEnabledFlag = false
 var staticAssetCache sync.Map
 
 // SetSignupEnabled is called from server.New with the resolved config value.
@@ -25,6 +26,14 @@ func SetSignupEnabled(b bool) { signupEnabledFlag = b }
 // SignupEnabled reports whether the email+password signup form should be
 // rendered. OAuth/SSO is unaffected by this flag.
 func SignupEnabled() bool { return signupEnabledFlag }
+
+// SetAIEnabled is called from server.New; true when an AI endpoint is
+// configured. Templates check the result via AIEnabled() to show or hide the
+// "Generate with AI" entry point.
+func SetAIEnabled(b bool) { aiEnabledFlag = b }
+
+// AIEnabled reports whether AI-assisted node drafting is available.
+func AIEnabled() bool { return aiEnabledFlag }
 
 // Version returns the embedded build version string for display in the UI.
 func Version() string { return mindfulsocial.Version }

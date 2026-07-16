@@ -174,6 +174,85 @@ func parentCandidateRows(rows []db.SearchPostParentsRow) []views.TopicCandidate 
 	return out
 }
 
+// handleNodeGenerateForm serves the AI prompt modal (GET /nodes/generate).
+// It 404s when AI drafting isn't configured so the route surface matches the
+// hidden "Generate with AI" button. The feature is htmx-only; a non-htmx hit
+// falls back to the styled New Post page, which still carries the button.
+func (s *Server) handleNodeGenerateForm(w http.ResponseWriter, r *http.Request) {
+	if s.aiClient == nil {
+		s.notFound(w, r)
+		return
+	}
+	if !isHTMX(r) {
+		http.Redirect(w, r, "/nodes/new", http.StatusSeeOther)
+		return
+	}
+	render(w, r, views.NodeGenerateModal("", ""))
+}
+
+// handleNodeGenerate (POST /nodes/generate) turns a prompt into a draft and
+// responds with the normal New Post modal pre-filled with it. Nothing is
+// written: the user reviews, picks a parent/visibility, and submits through
+// POST /nodes like any other post. On error it re-renders the prompt modal
+// with a flash and the user's prompt preserved.
+//
+// Generation runs synchronously in the request, so it is bounded by the
+// router's 30s request timeout (see routes()). That's ample for a short
+// single node on a small local model; longer generations would need the
+// background-job pattern the audio worker uses.
+func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
+	if s.aiClient == nil {
+		s.notFound(w, r)
+		return
+	}
+	user := currentUser(r) // requireUser guarantees non-nil
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest)
+		return
+	}
+	prompt := strings.TrimSpace(r.PostFormValue("prompt"))
+	if prompt == "" {
+		render(w, r, views.NodeGenerateModal("Describe the node you want to generate.", ""))
+		return
+	}
+	const maxPromptLen = 2000
+	if len(prompt) > maxPromptLen {
+		prompt = prompt[:maxPromptLen]
+	}
+
+	draft, err := s.aiClient.GenerateNode(r.Context(), prompt)
+	if err != nil {
+		s.logger.Error("ai: generate node", "err", err, "user_id", user.ID)
+		render(w, r, views.NodeGenerateModal("Couldn't generate a draft — try again or rephrase your prompt.", prompt))
+		return
+	}
+	s.logger.Info("ai: node draft generated", "user_id", user.ID, "type", draft.Type)
+
+	// Build the same form arguments handleNodeNew does, then pre-fill type,
+	// title, and body from the draft. Everything else stays at its default so
+	// the user makes the graph-shaping choices (parent, visibility, tags).
+	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("ai generate: groups", "err", err)
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
+	initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
+		TypeFilter: "",
+		Query:      "",
+		ViewerID:   viewerID(r),
+	})
+	if err != nil {
+		s.logger.Error("ai generate: search parents", "err", err)
+		initialParents = nil
+	}
+	defaultVisibility := string(user.DefaultNodeVisibility)
+	if defaultVisibility == "" {
+		defaultVisibility = string(db.VisibilityKindPublic)
+	}
+	render(w, r, views.NodeNewModal("", draft.Type, draft.Title, draft.Body, "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidateRows(initialParents)))
+}
+
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	if user == nil {

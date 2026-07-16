@@ -22,6 +22,19 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 				<h1 class="h-1">New post</h1>
 				<p class="muted" style="margin: 0;">An opinion is a stance. A topic groups opinions together. Evidence attaches an observation to an existing node and says how it relates.</p>
 			</div>
+			if AIEnabled() {
+				<button
+					type="button"
+					class="btn ghost"
+					style="margin-bottom: 16px; align-self: flex-start;"
+					hx-get="/nodes/generate"
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				>
+					<span class="material-symbols-outlined">auto_awesome</span>
+					Generate with AI
+				</button>
+			}
 			@Flash(flash)
 			<form method="post" action="/nodes" class="form post-form">
 				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
@@ -51,6 +64,19 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
 				Share an opinion, start a topic, or attach evidence to an existing node.
 			</p>
+			if AIEnabled() {
+				<button
+					type="button"
+					class="btn ghost"
+					style="margin-bottom: 16px;"
+					hx-get="/nodes/generate"
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				>
+					<span class="material-symbols-outlined">auto_awesome</span>
+					Generate with AI
+				</button>
+			}
 			@Flash(flash)
 			<form
 				method="post"
@@ -64,6 +90,57 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// NodeGenerateModal renders the AI prompt box. GET /nodes/generate returns it
+// (swapped into #modal). Submitting posts the prompt to POST /nodes/generate;
+// on success the handler responds with a NodeNewModal pre-filled with the
+// draft, on failure with this modal again carrying a flash and the prompt.
+// Nothing is written to the graph here — the human reviews the pre-filled
+// post form and submits it through the normal create path.
+templ NodeGenerateModal(flash, prompt string) {
+	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
+			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
+				<span class="material-symbols-outlined">close</span>
+			</button>
+			<div class="row gap-12 wrap center" style="margin-bottom: 6px;">
+				<span class="eyebrow">AI draft</span>
+			</div>
+			<h2 id="ai-modal-title" style="margin: 0 0 6px; font-size: 22px;">Generate a node</h2>
+			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
+				Describe what you want and the model drafts one node. You review and edit it before posting — nothing is published automatically.
+			</p>
+			@Flash(flash)
+			<form
+				method="post"
+				action="/nodes/generate"
+				class="form"
+				hx-post="/nodes/generate"
+				hx-target="#modal"
+				hx-swap="innerHTML"
+				hx-disabled-elt="find button[type='submit']"
+			>
+				@CSRFField()
+				<label>
+					Prompt
+					<textarea name="prompt" rows="4" required autofocus placeholder="e.g. A topic about whether cities should cap rent, with room for both sides.">{ prompt }</textarea>
+					<small class="muted">One node at a time. You'll pick the parent and visibility yourself after reviewing.</small>
+				</label>
+				<div class="form-row">
+					<button type="submit" class="btn accent">
+						<span class="material-symbols-outlined">auto_awesome</span>
+						Generate
+						<span class="htmx-indicator">…</span>
+					</button>
+					<button type="button" class="btn ghost" hx-get="/nodes/new" hx-target="#modal" hx-swap="innerHTML">
+						<span class="material-symbols-outlined">arrow_back</span>
+						Back
+					</button>
 				</div>
 			</form>
 		</div>

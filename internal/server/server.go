@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	mindfulsocial "github.com/TuotHash/mindful-social"
+	"github.com/TuotHash/mindful-social/internal/ai"
 	"github.com/TuotHash/mindful-social/internal/audio"
 	"github.com/TuotHash/mindful-social/internal/auth"
 	"github.com/TuotHash/mindful-social/internal/config"
@@ -36,6 +37,10 @@ type Server struct {
 	csrf        func(http.Handler) http.Handler
 	router      chi.Router
 	audioWorker *audio.Worker
+	// aiClient drafts nodes from a prompt. nil when AI_ENDPOINT_URL is
+	// unset — the "Generate with AI" entry point is hidden and the
+	// /nodes/generate routes 404.
+	aiClient *ai.Client
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
@@ -106,6 +111,17 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	}
 	s.csrf = csrfMw
 	views.SetSignupEnabled(cfg.SignupEnabled)
+	// AI node drafting is opt-in via an OpenAI-compatible endpoint. When
+	// unset the feature stays invisible; the client is otherwise stateless
+	// so there's nothing to health-check at boot (per-request errors surface
+	// to the user as a flash).
+	if cfg.AIEndpointURL != "" {
+		s.aiClient = ai.NewClient(cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
+		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel)
+	} else {
+		logger.Info("ai: AI_ENDPOINT_URL unset, node drafting disabled")
+	}
+	views.SetAIEnabled(s.aiClient != nil)
 	if err := s.bootstrapAdmins(ctx); err != nil {
 		// Don't fail boot if admin reconcile fails — just log it. A
 		// transient DB error shouldn't keep the whole server down.
@@ -301,6 +317,8 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 		r.Post("/account/password", s.handleAccountPasswordSet)
 		r.Post("/account/identities/{id}/disconnect", s.handleAccountIdentityDisconnect)
 		r.Get("/nodes/new", s.handleNodeNew)
+		r.Get("/nodes/generate", s.handleNodeGenerateForm)
+		r.Post("/nodes/generate", s.handleNodeGenerate)
 		r.Post("/nodes/new/images", s.handleNewNodeImageUpload)
 		r.Post("/nodes/new/videos", s.handleNewNodeVideoUpload)
 		r.Get("/nodes/parent-picker", s.handleParentPicker)
