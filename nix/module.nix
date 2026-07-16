@@ -95,12 +95,20 @@ in {
       default = {};
       example = {
         GOOGLE_CLIENT_ID = "1234.apps.googleusercontent.com";
+        AI_ENDPOINT_URL = "http://127.0.0.1:11434/v1";
+        AI_MODEL = "llama3.1:8b";
       };
       description = ''
         Additional environment variables merged into the systemd unit.
         Useful for non-secret OAuth client IDs and OIDC discovery URLs.
         Put actual secrets in environmentFile instead so they stay out
         of the Nix store.
+
+        AI node drafting (optional) is configured here too: set
+        AI_ENDPOINT_URL to an OpenAI-compatible endpoint (e.g. a local
+        Ollama at http://127.0.0.1:11434/v1) and AI_MODEL to the model
+        name. Leave AI_ENDPOINT_URL unset to keep the feature disabled.
+        A hosted provider's AI_API_KEY belongs in environmentFile.
       '';
     };
 
@@ -110,10 +118,10 @@ in {
       example = "/run/secrets/mindful-social.env";
       description = ''
         Path to a systemd EnvironmentFile holding secret variables
-        (OAuth client secrets, DATABASE_URL for external databases).
-        Typically managed by sops-nix or agenix so the file is
-        decrypted into /run/secrets at boot and never written to the
-        Nix store.
+        (OAuth client secrets, DATABASE_URL for external databases,
+        AI_API_KEY for a hosted AI provider). Typically managed by
+        sops-nix or agenix so the file is decrypted into /run/secrets
+        at boot and never written to the Nix store.
       '';
     };
 
