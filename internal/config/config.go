@@ -68,6 +68,24 @@ type Config struct {
 	// but no audio is enqueued. The default 127.0.0.1:8090 matches
 	// tts/run.sh.
 	TTSSidecarURL string
+
+	// AIEndpointURL is the base URL of an OpenAI-compatible chat
+	// completions API used to draft nodes from a prompt (e.g.
+	// "http://127.0.0.1:11434/v1" for a local Ollama). Empty disables the
+	// AI draft feature: the "Generate with AI" entry point is hidden and
+	// the /nodes/generate routes 404. Anything that speaks the OpenAI
+	// wire format works (Ollama, vLLM, llama.cpp, LM Studio, OpenRouter,
+	// or a hosted provider).
+	AIEndpointURL string
+
+	// AIModel is the model name passed to the endpoint (e.g.
+	// "llama3.1:8b"). Only consulted when AIEndpointURL is set.
+	AIModel string
+
+	// AIAPIKey is the bearer token for the endpoint. Optional — local
+	// runtimes like Ollama ignore it; hosted providers require it. Keep it
+	// out of the repo; supply via an environment file in production.
+	AIAPIKey string
 }
 
 // Load reads configuration from environment variables.
@@ -94,6 +112,9 @@ func Load(logger *slog.Logger) (Config, error) {
 		NodeImageBytesPerMegapixel: envInt64(logger, "NODE_IMAGE_BYTES_PER_MEGAPIXEL", 500*1024),
 		AudioDir:                   envOr("AUDIO_DIR", filepath.Join(dataDir, "audio")),
 		TTSSidecarURL:              envOr("TTS_SIDECAR_URL", ""),
+		AIEndpointURL:              envOr("AI_ENDPOINT_URL", ""),
+		AIModel:                    envOr("AI_MODEL", ""),
+		AIAPIKey:                   envOr("AI_API_KEY", ""),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
