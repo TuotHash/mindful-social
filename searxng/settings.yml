@@ -1,0 +1,20 @@
+# Local-dev SearXNG settings for AI node drafting. Merges onto the image's
+# defaults (use_default_settings), overriding only what the app needs:
+#   - search.formats must include "json" — the SearchClient queries
+#     /search?format=json, which SearXNG disables by default.
+#   - server.limiter off, since the bot limiter would otherwise reject the
+#     app's programmatic requests.
+# This file is for a loopback dev instance only. In production, use the NixOS
+# services.searx module instead of this.
+use_default_settings: true
+
+server:
+  # Dev-only placeholder. A real deployment must set a unique secret.
+  secret_key: "dev-only-not-a-secret-change-in-prod"
+  limiter: false
+  public_instance: false
+
+search:
+  formats:
+    - html
+    - json
