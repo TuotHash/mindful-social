@@ -131,7 +131,7 @@ func Load(logger *slog.Logger) (Config, error) {
 		AIModel:                    envOr("AI_MODEL", ""),
 		AIAPIKey:                   envOr("AI_API_KEY", ""),
 		SearxngURL:                 envOr("SEARXNG_URL", ""),
-		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 5*time.Minute),
+		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 10*time.Minute),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

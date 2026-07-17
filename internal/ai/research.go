@@ -21,12 +21,12 @@ import (
 // local model has limited context, and unbounded fetching is a DoS/SSRF
 // surface. Lower = safer and faster.
 const (
-	maxSources       = 4               // total pages fed to the model
-	maxFetchBytes    = 2 << 20         // 2 MiB per page, enforced while reading
+	maxSources       = 3              // total pages fed to the model
+	maxFetchBytes    = 2 << 20        // 2 MiB per page, enforced while reading
 	fetchTimeout     = 15 * time.Second
 	maxRedirects     = 3
-	perSourceCharCap = 4000  // trim each page's extracted text to this
-	totalCharBudget  = 12000 // stop gathering once the injected text hits this
+	perSourceCharCap = 2500 // trim each page's extracted text to this
+	totalCharBudget  = 6000 // stop gathering once the injected text hits this
 )
 
 // Source is one web document the draft will be grounded in.

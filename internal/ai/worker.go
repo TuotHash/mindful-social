@@ -53,7 +53,7 @@ type Worker struct {
 // job; a non-positive value falls back to 5 minutes.
 func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeout time.Duration, logger *slog.Logger) *Worker {
 	if jobTimeout <= 0 {
-		jobTimeout = 5 * time.Minute
+		jobTimeout = 10 * time.Minute
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Worker{
