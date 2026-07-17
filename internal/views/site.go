@@ -17,6 +17,7 @@ import (
 
 var signupEnabledFlag = true
 var aiEnabledFlag = false
+var webSearchEnabledFlag = false
 var staticAssetCache sync.Map
 
 // SetSignupEnabled is called from server.New with the resolved config value.
@@ -34,6 +35,14 @@ func SetAIEnabled(b bool) { aiEnabledFlag = b }
 
 // AIEnabled reports whether AI-assisted node drafting is available.
 func AIEnabled() bool { return aiEnabledFlag }
+
+// SetWebSearchEnabled is called from server.New; true when a SearXNG instance
+// is configured. Templates check WebSearchEnabled() to show or hide the
+// "Search the web" option on the generate form.
+func SetWebSearchEnabled(b bool) { webSearchEnabledFlag = b }
+
+// WebSearchEnabled reports whether AI drafts can be grounded in web search.
+func WebSearchEnabled() bool { return webSearchEnabledFlag }
 
 // Version returns the embedded build version string for display in the UI.
 func Version() string { return mindfulsocial.Version }

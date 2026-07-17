@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/TuotHash/mindful-social/internal/ai"
 	"github.com/TuotHash/mindful-social/internal/db"
 	"github.com/TuotHash/mindful-social/internal/views"
 )
@@ -187,19 +189,13 @@ func (s *Server) handleNodeGenerateForm(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/nodes/new", http.StatusSeeOther)
 		return
 	}
-	render(w, r, views.NodeGenerateModal("", ""))
+	render(w, r, views.NodeGenerateModal("", "", "", false))
 }
 
-// handleNodeGenerate (POST /nodes/generate) turns a prompt into a draft and
-// responds with the normal New Post modal pre-filled with it. Nothing is
-// written: the user reviews, picks a parent/visibility, and submits through
-// POST /nodes like any other post. On error it re-renders the prompt modal
-// with a flash and the user's prompt preserved.
-//
-// Generation runs synchronously in the request, so it is bounded by the
-// router's 30s request timeout (see routes()). That's ample for a short
-// single node on a small local model; longer generations would need the
-// background-job pattern the audio worker uses.
+// handleNodeGenerate (POST /nodes/generate) enqueues a drafting job and returns
+// the "Generating…" modal, which polls handleNodeGenerateStatus until the
+// background worker finishes. Web fetch + long-context generation exceeds the
+// request timeout, so the work happens off the request path.
 func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
 	if s.aiClient == nil {
 		s.notFound(w, r)
@@ -211,8 +207,18 @@ func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prompt := strings.TrimSpace(r.PostFormValue("prompt"))
-	if prompt == "" {
-		render(w, r, views.NodeGenerateModal("Describe the node you want to generate.", ""))
+	rawURLs := r.PostFormValue("urls")
+	// Only honour "search the web" when a SearXNG instance is actually
+	// configured — otherwise the worker has nothing to search with.
+	useSearch := r.PostFormValue("use_search") != "" && s.cfg.SearxngURL != ""
+
+	urls, urlFlash := parseGenerateURLs(rawURLs)
+	switch {
+	case prompt == "":
+		render(w, r, views.NodeGenerateModal("Describe the node you want to generate.", "", rawURLs, useSearch))
+		return
+	case urlFlash != "":
+		render(w, r, views.NodeGenerateModal(urlFlash, prompt, rawURLs, useSearch))
 		return
 	}
 	const maxPromptLen = 2000
@@ -220,37 +226,112 @@ func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
 		prompt = prompt[:maxPromptLen]
 	}
 
-	draft, err := s.aiClient.GenerateNode(r.Context(), prompt)
+	job, err := ai.Enqueue(r.Context(), s.queries, user.ID, prompt, urls, useSearch)
 	if err != nil {
-		s.logger.Error("ai: generate node", "err", err, "user_id", user.ID)
-		render(w, r, views.NodeGenerateModal("Couldn't generate a draft — try again or rephrase your prompt.", prompt))
+		s.logger.Error("ai: enqueue generation job", "err", err, "user_id", user.ID)
+		render(w, r, views.NodeGenerateModal("Couldn't start generation. Please try again.", prompt, rawURLs, useSearch))
 		return
 	}
-	s.logger.Info("ai: node draft generated", "user_id", user.ID, "type", draft.Type)
+	s.logger.Info("ai: generation job enqueued", "job_id", job.ID, "user_id", user.ID, "urls", len(urls), "search", useSearch)
+	render(w, r, views.NodeGeneratingModal(job.ID.String()))
+}
 
-	// Build the same form arguments handleNodeNew does, then pre-fill type,
-	// title, and body from the draft. Everything else stays at its default so
-	// the user makes the graph-shaping choices (parent, visibility, tags).
-	groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
+// handleNodeGenerateStatus (GET /nodes/generate/{id}) is polled by the
+// "Generating…" modal. While the job is pending/running it returns that modal
+// again (so polling continues); on failure it returns the prompt modal with
+// the error; on success it returns the normal New Post modal pre-filled with
+// the draft — which omits the poll trigger, stopping the poll. Jobs are scoped
+// to the requesting user.
+func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request) {
+	if s.aiClient == nil {
+		s.notFound(w, r)
+		return
+	}
+	user := currentUser(r)
+	id, err := uuid.Parse(chiURLParam(r, "id"))
 	if err != nil {
-		s.logger.Error("ai generate: groups", "err", err)
+		s.notFound(w, r)
+		return
+	}
+	job, err := s.queries.GetGenerationJob(r.Context(), db.GetGenerationJobParams{ID: id, UserID: user.ID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.notFound(w, r)
+			return
+		}
+		s.logger.Error("ai generate status: load job", "err", err)
 		s.renderError(w, r, http.StatusInternalServerError)
 		return
 	}
-	initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
-		TypeFilter: "",
-		Query:      "",
-		ViewerID:   viewerID(r),
-	})
-	if err != nil {
-		s.logger.Error("ai generate: search parents", "err", err)
-		initialParents = nil
+
+	switch job.Status {
+	case db.GenerationJobStatusCompleted:
+		groups, err := s.queries.ListGroupsForUser(r.Context(), user.ID)
+		if err != nil {
+			s.logger.Error("ai generate status: groups", "err", err)
+			s.renderError(w, r, http.StatusInternalServerError)
+			return
+		}
+		initialParents, err := s.queries.SearchPostParents(r.Context(), db.SearchPostParentsParams{
+			TypeFilter: "",
+			Query:      "",
+			ViewerID:   viewerID(r),
+		})
+		if err != nil {
+			s.logger.Error("ai generate status: search parents", "err", err)
+			initialParents = nil
+		}
+		defaultVisibility := string(user.DefaultNodeVisibility)
+		if defaultVisibility == "" {
+			defaultVisibility = string(db.VisibilityKindPublic)
+		}
+		render(w, r, views.NodeNewModal("", derefStr(job.ResultType), derefStr(job.ResultTitle), derefStr(job.ResultBody), "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidateRows(initialParents)))
+	case db.GenerationJobStatusFailed:
+		msg := "Couldn't generate a draft — try again or rephrase your prompt."
+		if job.LastError != nil && *job.LastError != "" {
+			msg = *job.LastError
+		}
+		render(w, r, views.NodeGenerateModal(msg, job.Prompt, generateURLsText(job.InputUrls), job.UseSearch))
+	default: // pending / running
+		render(w, r, views.NodeGeneratingModal(job.ID.String()))
 	}
-	defaultVisibility := string(user.DefaultNodeVisibility)
-	if defaultVisibility == "" {
-		defaultVisibility = string(db.VisibilityKindPublic)
+}
+
+// parseGenerateURLs splits the source-links textarea (one URL per line),
+// validating each with the same rule the post form uses. Returns the cleaned
+// list, or a flash string describing the first problem.
+func parseGenerateURLs(raw string) ([]string, string) {
+	const maxURLs = 5
+	var urls []string
+	for _, line := range strings.Split(raw, "\n") {
+		u := strings.TrimSpace(line)
+		if u == "" {
+			continue
+		}
+		if msg := validateSourceURL(u); msg != "" {
+			return nil, "A source link is invalid: " + msg
+		}
+		urls = append(urls, u)
 	}
-	render(w, r, views.NodeNewModal("", draft.Type, draft.Title, draft.Body, "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidateRows(initialParents)))
+	if len(urls) > maxURLs {
+		return nil, "Please provide at most 5 source links."
+	}
+	return urls, ""
+}
+
+// generateURLsText turns the stored input_urls JSON back into newline-separated
+// text so a failed job's prompt modal re-renders with the URLs the user typed.
+func generateURLsText(raw []byte) string {
+	var urls []string
+	_ = json.Unmarshal(raw, &urls)
+	return strings.Join(urls, "\n")
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {

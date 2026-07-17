@@ -102,7 +102,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 // draft, on failure with this modal again carrying a flash and the prompt.
 // Nothing is written to the graph here — the human reviews the pre-filled
 // post form and submits it through the normal create path.
-templ NodeGenerateModal(flash, prompt string) {
+templ NodeGenerateModal(flash, prompt, urls string, useSearch bool) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -131,6 +131,17 @@ templ NodeGenerateModal(flash, prompt string) {
 					<textarea name="prompt" rows="4" required autofocus placeholder="e.g. A topic about whether cities should cap rent, with room for both sides.">{ prompt }</textarea>
 					<small class="muted">One node at a time. You'll pick the parent and visibility yourself after reviewing.</small>
 				</label>
+				<label>
+					Source links (optional)
+					<textarea name="urls" rows="2" placeholder="Paste one URL per line to ground the draft in specific pages.">{ urls }</textarea>
+					<small class="muted">The model reads these pages and cites them in the draft.</small>
+				</label>
+				if WebSearchEnabled() {
+					<label class="row gap-8 center" style="cursor: pointer; margin-bottom: 6px;">
+						<input type="checkbox" name="use_search" value="1" checked?={ useSearch }/>
+						<span>Search the web for this topic</span>
+					</label>
+				}
 				<div class="form-row">
 					<button type="submit" class="btn accent">
 						<span class="material-symbols-outlined">auto_awesome</span>
@@ -143,6 +154,35 @@ templ NodeGenerateModal(flash, prompt string) {
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+}
+
+// NodeGeneratingModal is the "working…" state shown while the background
+// worker drafts the node. It polls GET /nodes/generate/{jobID} every 2s; each
+// poll response replaces this whole fragment (hx-swap outerHTML), so when the
+// job finishes the server returns the pre-filled post form (or an error modal)
+// and the polling naturally stops.
+templ NodeGeneratingModal(jobID string) {
+	<div
+		class="modal-backdrop"
+		hx-get={ "/nodes/generate/" + jobID }
+		hx-trigger="load delay:2s, every 2s"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-working-title">
+			<div class="row gap-12 wrap center" style="margin-bottom: 6px;">
+				<span class="eyebrow">AI draft</span>
+			</div>
+			<h2 id="ai-working-title" style="margin: 0 0 6px; font-size: 22px;">Generating…</h2>
+			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
+				Reading sources and drafting your node. This can take up to a minute — you can keep this open.
+			</p>
+			<div class="row gap-8 center">
+				<span class="material-symbols-outlined spin">progress_activity</span>
+				<span class="muted">Working…</span>
+			</div>
 		</div>
 	</div>
 }

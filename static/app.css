@@ -3741,6 +3741,15 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
     opacity: 1;
   }
 }
+/* Continuous rotation for the AI "Generating…" progress icon. */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .modal-close {
   position: absolute;
   top: 12px;

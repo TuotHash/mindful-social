@@ -41,6 +41,9 @@ type Server struct {
 	// unset — the "Generate with AI" entry point is hidden and the
 	// /nodes/generate routes 404.
 	aiClient *ai.Client
+	// genWorker drains the node_generation_jobs queue. nil when AI is
+	// disabled.
+	genWorker *ai.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
@@ -117,11 +120,15 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	// to the user as a flash).
 	if cfg.AIEndpointURL != "" {
 		s.aiClient = ai.NewClient(cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
-		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel)
+		aiLogger := logger.With("subsys", "ai")
+		gatherer := ai.NewGatherer(cfg.SearxngURL, aiLogger)
+		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, aiLogger)
+		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel, "web_search", cfg.SearxngURL != "")
 	} else {
 		logger.Info("ai: AI_ENDPOINT_URL unset, node drafting disabled")
 	}
 	views.SetAIEnabled(s.aiClient != nil)
+	views.SetWebSearchEnabled(s.aiClient != nil && cfg.SearxngURL != "")
 	if err := s.bootstrapAdmins(ctx); err != nil {
 		// Don't fail boot if admin reconcile fails — just log it. A
 		// transient DB error shouldn't keep the whole server down.
@@ -199,6 +206,9 @@ func (s *Server) Handler() http.Handler { return s.router }
 func (s *Server) Close() error {
 	if s.audioWorker != nil {
 		_ = s.audioWorker.Close()
+	}
+	if s.genWorker != nil {
+		_ = s.genWorker.Close()
 	}
 	s.db.Close()
 	return s.sqlDB.Close()
@@ -319,6 +329,7 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 		r.Get("/nodes/new", s.handleNodeNew)
 		r.Get("/nodes/generate", s.handleNodeGenerateForm)
 		r.Post("/nodes/generate", s.handleNodeGenerate)
+		r.Get("/nodes/generate/{id}", s.handleNodeGenerateStatus)
 		r.Post("/nodes/new/images", s.handleNewNodeImageUpload)
 		r.Post("/nodes/new/videos", s.handleNewNodeVideoUpload)
 		r.Get("/nodes/parent-picker", s.handleParentPicker)
