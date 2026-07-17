@@ -15,11 +15,6 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-// perJobTimeout bounds one generation end to end (web fetches + LLM). The
-// worker runs off the request path so it isn't subject to the 30s HTTP cap,
-// but a single hung job shouldn't stall the queue forever.
-const perJobTimeout = 3 * time.Minute
-
 // drafter and gatherer are the two collaborators the worker needs, defined as
 // interfaces so tests can substitute fakes. *Client and *Gatherer satisfy them.
 type drafter interface {
@@ -40,6 +35,12 @@ type Worker struct {
 	gatherer gatherer
 	logger   *slog.Logger
 
+	// jobTimeout bounds one generation end to end (web fetches + LLM). The
+	// worker runs off the request path so it isn't subject to the 30s HTTP
+	// cap, but a single hung job shouldn't stall the queue forever. Tunable
+	// because local grounded generation time varies wildly by hardware.
+	jobTimeout time.Duration
+
 	stop   context.CancelFunc
 	done   chan struct{}
 	closed sync.Once
@@ -48,17 +49,22 @@ type Worker struct {
 }
 
 // NewWorker returns a started worker. When drafter is nil (AI disabled) it is
-// an inert no-op whose Close returns immediately.
-func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, logger *slog.Logger) *Worker {
+// an inert no-op whose Close returns immediately. jobTimeout bounds a single
+// job; a non-positive value falls back to 5 minutes.
+func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeout time.Duration, logger *slog.Logger) *Worker {
+	if jobTimeout <= 0 {
+		jobTimeout = 5 * time.Minute
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Worker{
-		queries:   queries,
-		drafter:   drafter,
-		gatherer:  gatherer,
-		logger:    logger,
-		stop:      cancel,
-		done:      make(chan struct{}),
-		idleSleep: 2 * time.Second,
+		queries:    queries,
+		drafter:    drafter,
+		gatherer:   gatherer,
+		logger:     logger,
+		jobTimeout: jobTimeout,
+		stop:       cancel,
+		done:       make(chan struct{}),
+		idleSleep:  2 * time.Second,
 	}
 	if drafter == nil {
 		close(w.done)
@@ -111,7 +117,7 @@ func (w *Worker) tick(ctx context.Context) bool {
 
 func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 	logger := w.logger.With("job_id", job.ID, "user_id", job.UserID)
-	ctx, cancel := context.WithTimeout(ctx, perJobTimeout)
+	ctx, cancel := context.WithTimeout(ctx, w.jobTimeout)
 	defer cancel()
 
 	var urls []string

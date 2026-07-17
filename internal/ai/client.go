@@ -18,7 +18,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Client is a thin OpenAI-compatible chat client. Zero value is not usable;
@@ -38,11 +37,11 @@ func NewClient(baseURL, model, apiKey string) *Client {
 		baseURL: strings.TrimRight(baseURL, "/"),
 		model:   model,
 		apiKey:  apiKey,
-		http: &http.Client{
-			// Local generation on CPU/Metal can take many seconds for the
-			// first token; give it comfortable headroom like the TTS client.
-			Timeout: 2 * time.Minute,
-		},
+		// No fixed client Timeout: local grounded generation is slow and
+		// varies by hardware, so the deadline is governed entirely by the
+		// context the caller passes (the worker's per-job timeout). A fixed
+		// client timeout here would just race that and fire early.
+		http: &http.Client{},
 	}
 }
 

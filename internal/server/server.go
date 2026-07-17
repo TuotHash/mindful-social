@@ -122,7 +122,7 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		s.aiClient = ai.NewClient(cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
 		aiLogger := logger.With("subsys", "ai")
 		gatherer := ai.NewGatherer(cfg.SearxngURL, aiLogger)
-		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, aiLogger)
+		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, cfg.AIJobTimeout, aiLogger)
 		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel, "web_search", cfg.SearxngURL != "")
 	} else {
 		logger.Info("ai: AI_ENDPOINT_URL unset, node drafting disabled")

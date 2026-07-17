@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -93,6 +94,13 @@ type Config struct {
 	// (fetching user-supplied links) still works without it. Only consulted
 	// when AIEndpointURL is also set.
 	SearxngURL string
+
+	// AIJobTimeout bounds one background drafting job end to end (web fetches
+	// + model generation). Grounded generation on a local model can be slow —
+	// reading ~12k characters of source context before the first token — so
+	// this is generous and tunable via AI_JOB_TIMEOUT (e.g. "8m"). Raise it if
+	// jobs fail with "context deadline exceeded"; lower it to fail faster.
+	AIJobTimeout time.Duration
 }
 
 // Load reads configuration from environment variables.
@@ -123,6 +131,7 @@ func Load(logger *slog.Logger) (Config, error) {
 		AIModel:                    envOr("AI_MODEL", ""),
 		AIAPIKey:                   envOr("AI_API_KEY", ""),
 		SearxngURL:                 envOr("SEARXNG_URL", ""),
+		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 5*time.Minute),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -225,6 +234,21 @@ func envPositiveInt(logger *slog.Logger, key string, fallback int) int {
 		return fallback
 	}
 	return v
+}
+
+// envDuration parses a Go duration string (e.g. "8m", "90s"); anything
+// unrecognised or non-positive falls back to the default and logs a warning.
+func envDuration(logger *slog.Logger, key string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		logger.Warn("config: invalid duration, using default", "key", key, "value", raw, "default", fallback)
+		return fallback
+	}
+	return d
 }
 
 // envBool parses common true/false spellings; anything unrecognised falls
