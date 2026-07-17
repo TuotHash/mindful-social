@@ -97,6 +97,7 @@ in {
         GOOGLE_CLIENT_ID = "1234.apps.googleusercontent.com";
         AI_ENDPOINT_URL = "http://127.0.0.1:11434/v1";
         AI_MODEL = "llama3.1:8b";
+        SEARXNG_URL = "http://127.0.0.1:8888";
       };
       description = ''
         Additional environment variables merged into the systemd unit.
@@ -109,6 +110,11 @@ in {
         Ollama at http://127.0.0.1:11434/v1) and AI_MODEL to the model
         name. Leave AI_ENDPOINT_URL unset to keep the feature disabled.
         A hosted provider's AI_API_KEY belongs in environmentFile.
+
+        To let drafts be grounded in web search, set SEARXNG_URL to a
+        SearXNG instance with the JSON format enabled (e.g. NixOS
+        services.searx, or `docker run -p 8888:8080 searxng/searxng`).
+        Without it, users can still ground drafts by pasting source URLs.
       '';
     };
 
