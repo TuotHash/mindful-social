@@ -6,8 +6,11 @@ grounded by pasting source URLs; only the "Search the web" option needs it.
 ## Local dev (macOS/Linux)
 
 ```sh
-./searxng/run.sh                 # starts SearXNG on 127.0.0.1:8888 (Docker)
+./searxng/run.sh                 # starts SearXNG on 127.0.0.1:8888
 ```
+
+Uses Podman or Docker, whichever is installed (override with
+`CONTAINER_ENGINE=docker ./searxng/run.sh`).
 
 Then run the app with:
 
