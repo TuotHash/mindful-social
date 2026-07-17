@@ -33,7 +33,13 @@ type Querier interface {
 	// multiple worker goroutines/processes run safely. Returns no rows when the
 	// queue is empty — callers should treat pgx.ErrNoRows as "nothing to do".
 	ClaimNextAudioJob(ctx context.Context) (AudioJob, error)
+	// Atomically grabs the oldest pending job. SKIP LOCKED keeps multiple workers
+	// safe. Returns no rows when the queue is empty — treat pgx.ErrNoRows as
+	// "nothing to do".
+	ClaimNextGenerationJob(ctx context.Context) (NodeGenerationJob, error)
 	CompleteAudioJob(ctx context.Context, id uuid.UUID) error
+	// Stores the drafted node and the sources it was grounded in.
+	CompleteGenerationJob(ctx context.Context, arg CompleteGenerationJobParams) error
 	// Used to refuse demotions that would leave the instance with no admins.
 	// A site with zero admins can't be managed through the UI; recovery
 	// requires either ADMIN_USERS at boot or a DB-level fix.
@@ -111,10 +117,15 @@ type Querier interface {
 	// we don't reset attempts/status on retry. Returns the row either way so the
 	// caller can decide whether it just created work.
 	EnqueueAudioJob(ctx context.Context, arg EnqueueAudioJobParams) (AudioJob, error)
+	// Creates a pending AI node-drafting job. input_urls and use_search capture how
+	// the draft should be grounded; the worker fills in the result_* columns.
+	EnqueueGenerationJob(ctx context.Context, arg EnqueueGenerationJobParams) (NodeGenerationJob, error)
 	// Marks failed but leaves attempts/last_error intact for diagnostics. If we
 	// ever want retries with backoff we can flip status back to 'pending' from
 	// a separate scheduler instead of handling it here.
 	FailAudioJob(ctx context.Context, arg FailAudioJobParams) error
+	// Marks failed and keeps last_error for the UI to surface.
+	FailGenerationJob(ctx context.Context, arg FailGenerationJobParams) error
 	// Walk the parent chain to the topmost ancestor. Returns the id only when
 	// that ancestor is a topic; otherwise no row (callers reject the upload).
 	// The `parent_node_id IS NOT NULL` cycle guard mirrors node_visible_to() —
@@ -129,6 +140,8 @@ type Querier interface {
 	// the viewer follow this profile, and does the profile follow the viewer
 	// back (mutual = connection)?
 	GetFollowState(ctx context.Context, arg GetFollowStateParams) (GetFollowStateRow, error)
+	// Scoped to the owner so a user can only poll their own jobs.
+	GetGenerationJob(ctx context.Context, arg GetGenerationJobParams) (NodeGenerationJob, error)
 	GetGroup(ctx context.Context, id uuid.UUID) (Group, error)
 	GetGroupBySlug(ctx context.Context, slug string) (Group, error)
 	GetGroupMembership(ctx context.Context, arg GetGroupMembershipParams) (GroupMembership, error)

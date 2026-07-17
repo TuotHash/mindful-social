@@ -122,6 +122,61 @@ func (e EdgeKind) Valid() bool {
 	return false
 }
 
+type GenerationJobStatus string
+
+const (
+	GenerationJobStatusPending   GenerationJobStatus = "pending"
+	GenerationJobStatusRunning   GenerationJobStatus = "running"
+	GenerationJobStatusCompleted GenerationJobStatus = "completed"
+	GenerationJobStatusFailed    GenerationJobStatus = "failed"
+)
+
+func (e *GenerationJobStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GenerationJobStatus(s)
+	case string:
+		*e = GenerationJobStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GenerationJobStatus: %T", src)
+	}
+	return nil
+}
+
+type NullGenerationJobStatus struct {
+	GenerationJobStatus GenerationJobStatus `json:"generation_job_status"`
+	Valid               bool                `json:"valid"` // Valid is true if GenerationJobStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGenerationJobStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.GenerationJobStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GenerationJobStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGenerationJobStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GenerationJobStatus), nil
+}
+
+func (e GenerationJobStatus) Valid() bool {
+	switch e {
+	case GenerationJobStatusPending,
+		GenerationJobStatusRunning,
+		GenerationJobStatusCompleted,
+		GenerationJobStatusFailed:
+		return true
+	}
+	return false
+}
+
 type GroupMemberRole string
 
 const (
@@ -601,6 +656,24 @@ type Node struct {
 	VisibilityGroupID *uuid.UUID         `json:"visibility_group_id"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 	Language          *string            `json:"language"`
+}
+
+type NodeGenerationJob struct {
+	ID            uuid.UUID           `json:"id"`
+	UserID        uuid.UUID           `json:"user_id"`
+	Prompt        string              `json:"prompt"`
+	InputUrls     []byte              `json:"input_urls"`
+	UseSearch     bool                `json:"use_search"`
+	Status        GenerationJobStatus `json:"status"`
+	Attempts      int32               `json:"attempts"`
+	ResultType    *string             `json:"result_type"`
+	ResultTitle   *string             `json:"result_title"`
+	ResultBody    *string             `json:"result_body"`
+	ResultSources []byte              `json:"result_sources"`
+	LastError     *string             `json:"last_error"`
+	CreatedAt     pgtype.Timestamptz  `json:"created_at"`
+	StartedAt     pgtype.Timestamptz  `json:"started_at"`
+	CompletedAt   pgtype.Timestamptz  `json:"completed_at"`
 }
 
 type NodeImage struct {
