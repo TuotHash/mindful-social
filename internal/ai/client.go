@@ -75,18 +75,27 @@ Given the user's request, produce ONE node. Reply with ONLY a JSON object, no pr
 
 Pick the single type that best fits. Keep the title concise and self-contained. Do not invent sources or links.`
 
-// GenerateNode asks the model for a node draft. Transport and HTTP errors are
-// returned immediately (and verbatim, for diagnostics). A response that fails
-// to parse or validate is retried once, since local models occasionally emit
-// stray tokens around the JSON.
+// GenerateNode asks the model for a node draft from a prompt alone (no web
+// grounding).
 func (c *Client) GenerateNode(ctx context.Context, prompt string) (*NodeDraft, error) {
+	return c.GenerateNodeGrounded(ctx, prompt, nil)
+}
+
+// GenerateNodeGrounded drafts a node, optionally grounded in fetched web
+// sources. When sources are present the model is told to rely on them and not
+// invent facts. Transport and HTTP errors are returned immediately (and
+// verbatim, for diagnostics); a response that fails to parse or validate is
+// retried once, since local models occasionally emit stray tokens around the
+// JSON.
+func (c *Client) GenerateNodeGrounded(ctx context.Context, prompt string, sources []Source) (*NodeDraft, error) {
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return nil, errors.New("prompt is empty")
 	}
+	userContent := buildUserContent(prompt, sources)
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
-		content, err := c.complete(ctx, prompt)
+		content, err := c.complete(ctx, userContent)
 		if err != nil {
 			// Transport / HTTP failure — retrying won't help and the caller
 			// wants the real reason.
@@ -100,6 +109,21 @@ func (c *Client) GenerateNode(ctx context.Context, prompt string) (*NodeDraft, e
 		return draft, nil
 	}
 	return nil, fmt.Errorf("model did not return a valid node draft: %w", lastErr)
+}
+
+// buildUserContent assembles the user message: the prompt, plus the fetched
+// source text with a grounding instruction when any sources are present.
+func buildUserContent(prompt string, sources []Source) string {
+	if len(sources) == 0 {
+		return prompt
+	}
+	var b strings.Builder
+	b.WriteString(prompt)
+	b.WriteString("\n\nGround the node in the following web sources. Use only claims supported by them and do not invent facts; if they conflict or are thin, say so plainly in the body.\n")
+	for i, s := range sources {
+		fmt.Fprintf(&b, "\n[Source %d] %s (%s)\n%s\n", i+1, s.Title, s.URL, s.Text)
+	}
+	return b.String()
 }
 
 type chatMessage struct {
@@ -126,12 +150,12 @@ type chatResponse struct {
 }
 
 // complete POSTs one chat request and returns the assistant message content.
-func (c *Client) complete(ctx context.Context, prompt string) (string, error) {
+func (c *Client) complete(ctx context.Context, userContent string) (string, error) {
 	reqBody, err := json.Marshal(chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: userContent},
 		},
 		ResponseFormat: &responseFormat{Type: "json_object"},
 		Temperature:    0.4,

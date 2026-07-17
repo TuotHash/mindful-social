@@ -119,6 +119,35 @@ func TestGenerateNodeTruncatesLongTitle(t *testing.T) {
 	}
 }
 
+func TestBuildUserContent(t *testing.T) {
+	if got := buildUserContent("just a prompt", nil); got != "just a prompt" {
+		t.Errorf("no sources should pass the prompt through, got %q", got)
+	}
+	out := buildUserContent("draft a topic", []Source{
+		{URL: "https://x.example", Title: "X", Text: "vacancy rose 3% in 2024"},
+	})
+	for _, want := range []string{"draft a topic", "https://x.example", "vacancy rose 3% in 2024", "do not invent facts"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("grounded content missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGenerateNodeGroundedReturnsDraft(t *testing.T) {
+	srv, _ := completionsServer(t, `{"type":"finding","title":"Vacancy rose 3%","body":"Per the source."}`)
+	c := NewClient(srv.URL, "test-model", "")
+
+	draft, err := c.GenerateNodeGrounded(context.Background(), "vacancies", []Source{
+		{URL: "https://x.example", Title: "X", Text: "vacancy rose 3%"},
+	})
+	if err != nil {
+		t.Fatalf("GenerateNodeGrounded: %v", err)
+	}
+	if draft.Type != "finding" || draft.Title != "Vacancy rose 3%" {
+		t.Errorf("unexpected draft %+v", draft)
+	}
+}
+
 func TestGenerateNodeSurfacesHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "model not found", http.StatusNotFound)
