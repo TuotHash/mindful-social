@@ -3750,6 +3750,21 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
     transform: rotate(360deg);
   }
 }
+/* Live draft preview in the "Generating…" modal: a scrollable, de-emphasised
+   box that fills with the model's output as it streams in. */
+.progress-box {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d8dbe0);
+  border-radius: 8px;
+  background: var(--surface-muted, #f6f7f9);
+  color: var(--muted, #667);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .modal-close {
   position: absolute;
   top: 12px;

@@ -233,7 +233,7 @@ func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logger.Info("ai: generation job enqueued", "job_id", job.ID, "user_id", user.ID, "urls", len(urls), "search", useSearch)
-	render(w, r, views.NodeGeneratingModal(job.ID.String()))
+	render(w, r, views.NodeGeneratingModal(job.ID.String(), "", ""))
 }
 
 // handleNodeGenerateStatus (GET /nodes/generate/{id}) is polled by the
@@ -293,7 +293,7 @@ func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request
 		}
 		render(w, r, views.NodeGenerateModal(msg, job.Prompt, generateURLsText(job.InputUrls), job.UseSearch))
 	default: // pending / running
-		render(w, r, views.NodeGeneratingModal(job.ID.String()))
+		render(w, r, views.NodeGeneratingModal(job.ID.String(), job.Stage, humanizeProgress(job.Progress)))
 	}
 }
 
@@ -332,6 +332,95 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// humanizeProgress turns the worker's raw streamed draft (partial, JSON-ish:
+// {"type":…,"title":"…","body":"…) into readable prose for the live "Draft so
+// far" box — the title, then the body, as they arrive. It is display-only and
+// tolerant of truncation mid-stream; the real draft always comes from the
+// strictly-parsed result_* columns, never from this. Before any field has
+// streamed in it returns the raw text so the user still sees motion.
+func humanizeProgress(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	title := extractJSONField(raw, "title")
+	body := extractJSONField(raw, "body")
+	if title == "" && body == "" {
+		return raw
+	}
+	var b strings.Builder
+	b.WriteString(title)
+	if body != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(body)
+	}
+	return b.String()
+}
+
+// extractJSONField pulls the string value of key out of a partial (possibly
+// unterminated) JSON object, decoding the common backslash escapes. Returns
+// whatever has streamed in so far; empty when the field hasn't appeared yet.
+func extractJSONField(raw, key string) string {
+	marker := `"` + key + `"`
+	i := strings.Index(raw, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := raw[i+len(marker):]
+	j := 0
+	skipSpace := func() {
+		for j < len(rest) {
+			switch rest[j] {
+			case ' ', '\t', '\n', '\r':
+				j++
+			default:
+				return
+			}
+		}
+	}
+	skipSpace()
+	if j >= len(rest) || rest[j] != ':' {
+		return ""
+	}
+	j++
+	skipSpace()
+	if j >= len(rest) || rest[j] != '"' {
+		return ""
+	}
+	j++ // past the opening quote
+	var b strings.Builder
+	for j < len(rest) {
+		c := rest[j]
+		if c == '\\' {
+			if j+1 >= len(rest) {
+				break // truncated escape at the streaming edge
+			}
+			switch rest[j+1] {
+			case 'n':
+				b.WriteByte('\n')
+			case 't':
+				b.WriteByte('\t')
+			case 'r':
+				// carriage return: drop it
+			case '"', '\\', '/':
+				b.WriteByte(rest[j+1])
+			default:
+				b.WriteByte(rest[j+1])
+			}
+			j += 2
+			continue
+		}
+		if c == '"' {
+			break // closing quote — value complete
+		}
+		b.WriteByte(c)
+		j++
+	}
+	return b.String()
 }
 
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {

@@ -163,7 +163,11 @@ templ NodeGenerateModal(flash, prompt, urls string, useSearch bool) {
 // poll response replaces this whole fragment (hx-swap outerHTML), so when the
 // job finishes the server returns the pre-filled post form (or an error modal)
 // and the polling naturally stops.
-templ NodeGeneratingModal(jobID string) {
+// stage is a short status label ("Searching the web…", "Writing the draft…")
+// and progress is the draft text produced so far (already cleaned for display).
+// Both come from the job row the worker updates as it streams, so the modal
+// shows what the model is doing and the draft appearing live.
+templ NodeGeneratingModal(jobID, stage, progress string) {
 	<div
 		class="modal-backdrop"
 		hx-get={ "/nodes/generate/" + jobID }
@@ -177,12 +181,24 @@ templ NodeGeneratingModal(jobID string) {
 			</div>
 			<h2 id="ai-working-title" style="margin: 0 0 6px; font-size: 22px;">Generating…</h2>
 			<p class="muted" style="margin: 0 0 18px; font-size: 13px;">
-				Reading sources and drafting your node. This can take up to a minute — you can keep this open.
+				Working through your request. This can take a little while on a local model — you can keep this open.
 			</p>
-			<div class="row gap-8 center">
+			<div class="row gap-8 center" style="margin-bottom: 12px;">
 				<span class="material-symbols-outlined spin">progress_activity</span>
-				<span class="muted">Working…</span>
+				if stage != "" {
+					<span class="muted">{ stage }</span>
+				} else {
+					<span class="muted">Working…</span>
+				}
 			</div>
+			if progress != "" {
+				<div class="eyebrow" style="margin-bottom: 4px;">Draft so far</div>
+				<div id="ai-progress" class="progress-box">{ progress }</div>
+				// htmx runs this on each poll swap; keep the box pinned to the newest text.
+				<script>
+					(function(){var b=document.getElementById('ai-progress');if(b){b.scrollTop=b.scrollHeight;}})();
+				</script>
+			}
 		</div>
 	</div>
 }
