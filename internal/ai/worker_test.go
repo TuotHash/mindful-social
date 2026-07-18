@@ -105,6 +105,33 @@ func TestAppendSources(t *testing.T) {
 	}
 }
 
+func TestGroundedEvidenceFiltersToFetchedURLs(t *testing.T) {
+	sources := []Source{
+		{URL: "https://a.example", Title: "A"},
+		{URL: "https://b.example", Title: "B"},
+	}
+	items := []EvidenceDraft{
+		{Title: "keep A", SourceURL: "https://a.example", Relation: "supports"},
+		{Title: "hallucinated", SourceURL: "https://evil.example", Relation: "supports"},
+		{Title: "dup A", SourceURL: "https://a.example", Relation: "related"}, // deduped
+		{Title: "keep B", SourceURL: "https://b.example", Relation: "opposes"},
+	}
+	got := groundedEvidence(items, sources)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 (A + B, hallucinated dropped, dup A collapsed), got %d: %+v", len(got), got)
+	}
+	if got[0].SourceURL != "https://a.example" || got[1].SourceURL != "https://b.example" {
+		t.Errorf("unexpected order/urls: %+v", got)
+	}
+}
+
+func TestGroundedEvidenceEmptyWithoutSources(t *testing.T) {
+	got := groundedEvidence([]EvidenceDraft{{Title: "x", SourceURL: "https://a"}}, nil)
+	if got == nil || len(got) != 0 {
+		t.Errorf("expected non-nil empty slice, got %+v", got)
+	}
+}
+
 func TestMarshalSources(t *testing.T) {
 	b, err := marshalSources([]Source{{URL: "https://a", Title: "A", Text: "ignored body"}})
 	if err != nil {

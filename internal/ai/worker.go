@@ -170,23 +170,32 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		return
 	}
 
-	body := appendSources(draft.Body, sources)
+	// Citations no longer get stapled into the body — they become reusable
+	// evidence findings the user picks in the confirm modal.
+	body := draft.Body
 	sourcesJSON, err := marshalSources(sources)
 	if err != nil {
 		w.fail(ctx, logger, job, err)
 		return
 	}
+	evidence := groundedEvidence(draft.Evidence, sources)
+	evidenceJSON, err := json.Marshal(evidence)
+	if err != nil {
+		w.fail(ctx, logger, job, err)
+		return
+	}
 	if err := w.queries.CompleteGenerationJob(ctx, db.CompleteGenerationJobParams{
-		ID:            job.ID,
-		ResultType:    &draft.Type,
-		ResultTitle:   &draft.Title,
-		ResultBody:    &body,
-		ResultSources: sourcesJSON,
+		ID:             job.ID,
+		ResultType:     &draft.Type,
+		ResultTitle:    &draft.Title,
+		ResultBody:     &body,
+		ResultSources:  sourcesJSON,
+		ResultEvidence: evidenceJSON,
 	}); err != nil {
 		logger.Error("ai worker: complete", "err", err)
 		return
 	}
-	logger.Info("ai draft generated", "type", draft.Type, "sources", len(sources))
+	logger.Info("ai draft generated", "type", draft.Type, "sources", len(sources), "evidence", len(evidence))
 	// Terminal event: the SSE client swaps the modal to the finished form.
 	w.hub.Publish(job.ID, ProgressEvent{Done: true, Status: string(db.GenerationJobStatusCompleted)})
 }
@@ -319,6 +328,38 @@ func (w *Worker) fail(ctx context.Context, logger *slog.Logger, job db.NodeGener
 type sourceRef struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
+}
+
+// evidenceRef is the persisted shape of a proposed evidence finding
+// (result_evidence JSONB), matching what the confirm handler unmarshals.
+type evidenceRef struct {
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	SourceURL string `json:"source_url"`
+	Relation  string `json:"relation"`
+}
+
+// groundedEvidence keeps only evidence whose source_url was one of the pages
+// actually fetched — a hallucinated link can never become a citation node — and
+// dedupes by URL so one source yields at most one evidence finding.
+func groundedEvidence(items []EvidenceDraft, sources []Source) []evidenceRef {
+	out := make([]evidenceRef, 0, len(items))
+	if len(items) == 0 || len(sources) == 0 {
+		return out
+	}
+	allowed := make(map[string]bool, len(sources))
+	for _, s := range sources {
+		allowed[s.URL] = true
+	}
+	seen := map[string]bool{}
+	for _, e := range items {
+		if !allowed[e.SourceURL] || seen[e.SourceURL] {
+			continue
+		}
+		seen[e.SourceURL] = true
+		out = append(out, evidenceRef{Title: e.Title, Body: e.Body, SourceURL: e.SourceURL, Relation: e.Relation})
+	}
+	return out
 }
 
 func marshalSources(sources []Source) ([]byte, error) {

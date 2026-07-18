@@ -207,6 +207,38 @@ func TestGenerateNodeGroundedStreamForwardsDeltas(t *testing.T) {
 	}
 }
 
+func TestParseDraftReadsEvidence(t *testing.T) {
+	content := `{"type":"view","title":"Can a narcissist change?","body":"It depends.","evidence":[` +
+		`{"title":"7 Steps","body":"Motivated patients can work on behaviors.","source_url":"https://psychologytoday.com/x","relation":"supports"},` +
+		`{"title":"Thriveworks","body":"Discusses therapy challenges.","source_url":"https://thriveworks.com/y","relation":"weird"},` +
+		`{"title":"","body":"no title","source_url":"https://drop.me"},` +
+		`{"title":"No URL","body":"dropped","source_url":""}]}`
+	draft, err := parseDraft(content)
+	if err != nil {
+		t.Fatalf("parseDraft: %v", err)
+	}
+	if len(draft.Evidence) != 2 {
+		t.Fatalf("expected 2 valid evidence items, got %d: %+v", len(draft.Evidence), draft.Evidence)
+	}
+	if draft.Evidence[0].Relation != "supports" {
+		t.Errorf("item 0 relation = %q, want supports", draft.Evidence[0].Relation)
+	}
+	// Unknown relation falls back to "related".
+	if draft.Evidence[1].Relation != "related" {
+		t.Errorf("item 1 relation = %q, want related (fallback)", draft.Evidence[1].Relation)
+	}
+}
+
+func TestParseDraftNoEvidence(t *testing.T) {
+	draft, err := parseDraft(`{"type":"topic","title":"A topic","body":""}`)
+	if err != nil {
+		t.Fatalf("parseDraft: %v", err)
+	}
+	if len(draft.Evidence) != 0 {
+		t.Errorf("expected no evidence, got %+v", draft.Evidence)
+	}
+}
+
 func TestGenerateNodeSurfacesHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "model not found", http.StatusNotFound)

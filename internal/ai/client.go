@@ -53,7 +53,23 @@ type NodeDraft struct {
 	Type  string // "view" | "topic" | "finding"
 	Title string
 	Body  string
+	// Evidence are proposed finding nodes derived from the grounding sources.
+	// Each becomes a reusable finding linked to the main node if the user keeps
+	// it in the confirm modal. Empty for ungrounded drafts.
+	Evidence []EvidenceDraft
 }
+
+// EvidenceDraft is one proposed piece of evidence: a finding backed by a source
+// the draft was grounded in.
+type EvidenceDraft struct {
+	Title     string
+	Body      string
+	SourceURL string
+	Relation  string // "supports" | "opposes" | "related"
+}
+
+// allowedRelations are the edge kinds evidence may take toward the main node.
+var allowedRelations = map[string]bool{"supports": true, "opposes": true, "related": true}
 
 // allowedTypes are the node types the model may pick, matching db.NodeType
 // values. Kept as a local set so this package stays free of a db dependency.
@@ -71,9 +87,11 @@ There are exactly three node types:
 - "finding": evidence — a concrete observation, fact, or citation that attaches to another node.
 
 Given the user's request, produce ONE node. Reply with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:
-{"type": "view" | "topic" | "finding", "title": "<short title, max 200 characters>", "body": "<optional markdown elaboration, may be empty>"}
+{"type": "view" | "topic" | "finding", "title": "<short title, max 200 characters>", "body": "<optional markdown elaboration, may be empty>", "evidence": [{"title": "<short title>", "body": "<1-2 sentences on what this source contributes>", "source_url": "<one of the provided source URLs>", "relation": "supports" | "opposes" | "related"}]}
 
-Pick the single type that best fits. Keep the title concise and self-contained. Do not invent sources or links.`
+Pick the single type that best fits. Keep the title concise and self-contained. Do not invent sources or links.
+
+The "evidence" array is optional supporting material that will become separate, reusable evidence nodes. Only include an evidence item when web sources are provided to you, and each item's "source_url" MUST be exactly one of those provided source URLs — never invent a URL. Set "relation" to how that source relates to the node: "supports" if it backs the node, "opposes" if it argues against it, otherwise "related". If no sources are provided, use an empty array [].`
 
 // GenerateNode asks the model for a node draft from a prompt alone (no web
 // grounding).
@@ -267,9 +285,15 @@ func (c *Client) completeStream(ctx context.Context, userContent string, onToken
 func parseDraft(content string) (*NodeDraft, error) {
 	raw := stripJSONFence(strings.TrimSpace(content))
 	var out struct {
-		Type  string `json:"type"`
-		Title string `json:"title"`
-		Body  string `json:"body"`
+		Type     string `json:"type"`
+		Title    string `json:"title"`
+		Body     string `json:"body"`
+		Evidence []struct {
+			Title     string `json:"title"`
+			Body      string `json:"body"`
+			SourceURL string `json:"source_url"`
+			Relation  string `json:"relation"`
+		} `json:"evidence"`
 	}
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return nil, fmt.Errorf("content is not JSON: %w", err)
@@ -287,10 +311,40 @@ func parseDraft(content string) (*NodeDraft, error) {
 		// slightly-long title doesn't cost the user a whole round-trip.
 		title = strings.TrimSpace(string(r[:maxTitleLen]))
 	}
+
+	// Evidence is best-effort: skip malformed items rather than failing the
+	// whole draft. The worker further restricts URLs to the sources actually
+	// fetched, so a hallucinated link can't slip through as a citation.
+	var evidence []EvidenceDraft
+	for _, e := range out.Evidence {
+		etitle := strings.TrimSpace(e.Title)
+		eurl := strings.TrimSpace(e.SourceURL)
+		if etitle == "" || eurl == "" {
+			continue
+		}
+		if s := strings.ToLower(eurl); !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") {
+			continue
+		}
+		if r := []rune(etitle); len(r) > maxTitleLen {
+			etitle = strings.TrimSpace(string(r[:maxTitleLen]))
+		}
+		relation := strings.ToLower(strings.TrimSpace(e.Relation))
+		if !allowedRelations[relation] {
+			relation = "related"
+		}
+		evidence = append(evidence, EvidenceDraft{
+			Title:     etitle,
+			Body:      strings.TrimSpace(e.Body),
+			SourceURL: eurl,
+			Relation:  relation,
+		})
+	}
+
 	return &NodeDraft{
-		Type:  typ,
-		Title: title,
-		Body:  strings.TrimSpace(out.Body),
+		Type:     typ,
+		Title:    title,
+		Body:     strings.TrimSpace(out.Body),
+		Evidence: evidence,
 	}, nil
 }
 
