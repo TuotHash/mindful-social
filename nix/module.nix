@@ -110,8 +110,12 @@ in {
         Ollama at http://127.0.0.1:11434/v1) and AI_MODEL to the model
         name. Leave AI_ENDPOINT_URL unset to keep the feature disabled.
         A hosted provider's AI_API_KEY belongs in environmentFile.
-        AI_JOB_TIMEOUT (default 5m) bounds one drafting job; raise it on
-        slow hardware if jobs fail with "context deadline exceeded".
+
+        Generation streams, so timeouts have two knobs:
+        AI_STREAM_IDLE_TIMEOUT (default 90s) is the primary guard — it
+        fails a job only when the model produces no output for that long,
+        so a slow-but-progressing model is never killed. AI_JOB_TIMEOUT
+        (default 30m) is just the absolute backstop on total job time.
 
         To let drafts be grounded in web search, set SEARXNG_URL to a
         SearXNG instance with the JSON format enabled (e.g. NixOS
