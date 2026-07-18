@@ -3,9 +3,11 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -294,6 +296,110 @@ func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request
 		render(w, r, views.NodeGenerateModal(msg, job.Prompt, generateURLsText(job.InputUrls), job.UseSearch))
 	default: // pending / running
 		render(w, r, views.NodeGeneratingModal(job.ID.String(), job.Stage, humanizeProgress(job.Progress)))
+	}
+}
+
+// handleNodeGenerateStream (GET /nodes/generate/{id}/stream) is a Server-Sent
+// Events endpoint the "Generating…" modal subscribes to. It pushes the worker's
+// live stage + streamed draft to the browser over one persistent connection, so
+// the modal updates the text in place (no flashing full-fragment reloads) and
+// shows the model's output as it's produced. On a terminal event the client
+// fetches the finished form from handleNodeGenerateStatus. Jobs are scoped to
+// the requesting user.
+func (s *Server) handleNodeGenerateStream(w http.ResponseWriter, r *http.Request) {
+	if s.aiClient == nil || s.progressHub == nil {
+		s.notFound(w, r)
+		return
+	}
+	user := currentUser(r)
+	id, err := uuid.Parse(chiURLParam(r, "id"))
+	if err != nil {
+		s.notFound(w, r)
+		return
+	}
+	job, err := s.queries.GetGenerationJob(r.Context(), db.GetGenerationJobParams{ID: id, UserID: user.ID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.notFound(w, r)
+			return
+		}
+		s.logger.Error("ai generate stream: load job", "err", err)
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
+
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	h.Set("X-Accel-Buffering", "no") // don't let a reverse proxy buffer the stream
+	w.WriteHeader(http.StatusOK)
+
+	writeEvent := func(event string, payload any) bool {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return false
+		}
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, b); err != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+
+	// Already finished before the stream connected — tell the client to fetch
+	// the result immediately.
+	if job.Status == db.GenerationJobStatusCompleted || job.Status == db.GenerationJobStatusFailed {
+		writeEvent("done", map[string]string{"status": string(job.Status)})
+		return
+	}
+
+	ch, cancel := s.progressHub.Subscribe(id)
+	defer cancel()
+
+	// Subscribe-then-recheck closes the race where the job finishes between the
+	// first load above and Subscribe: a terminal that fired in that window would
+	// have cleared the hub snapshot, so confirm against the DB now.
+	if fresh, err := s.queries.GetGenerationJob(r.Context(), db.GetGenerationJobParams{ID: id, UserID: user.ID}); err == nil {
+		if fresh.Status == db.GenerationJobStatusCompleted || fresh.Status == db.GenerationJobStatusFailed {
+			writeEvent("done", map[string]string{"status": string(fresh.Status)})
+			return
+		}
+		job = fresh
+	}
+	// Seed with the current snapshot so a mid-generation connect isn't blank.
+	writeEvent("progress", map[string]string{"stage": job.Stage, "progress": humanizeProgress(job.Progress)})
+
+	ctx := r.Context()
+	ping := time.NewTicker(15 * time.Second)
+	defer ping.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			if ev.Done {
+				writeEvent("done", map[string]string{"status": ev.Status})
+				return
+			}
+			if !writeEvent("progress", map[string]string{"stage": ev.Stage, "progress": humanizeProgress(ev.Progress)}) {
+				return
+			}
+		case <-ping.C:
+			// Keep the connection warm and detect a dead client promptly.
+			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
 	}
 }
 

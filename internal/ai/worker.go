@@ -35,6 +35,7 @@ type Worker struct {
 	queries  *db.Queries
 	drafter  drafter
 	gatherer gatherer
+	hub      *ProgressHub // live updates to the SSE handler; may be nil
 	logger   *slog.Logger
 
 	// jobTimeout is the ABSOLUTE ceiling on one generation end to end (web
@@ -58,7 +59,8 @@ type Worker struct {
 // an inert no-op whose Close returns immediately. jobTimeout is the absolute
 // ceiling on a single job; idleTimeout is the no-output-for-this-long stall
 // guard on streaming generation. Non-positive values fall back to 30m and 90s.
-func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeout, idleTimeout time.Duration, logger *slog.Logger) *Worker {
+// hub receives live progress for the SSE handler and may be nil.
+func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, hub *ProgressHub, jobTimeout, idleTimeout time.Duration, logger *slog.Logger) *Worker {
 	if jobTimeout <= 0 {
 		jobTimeout = 30 * time.Minute
 	}
@@ -70,6 +72,7 @@ func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeo
 		queries:     queries,
 		drafter:     drafter,
 		gatherer:    gatherer,
+		hub:         hub,
 		logger:      logger,
 		jobTimeout:  jobTimeout,
 		idleTimeout: idleTimeout,
@@ -146,6 +149,7 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		gatherStage = "Searching the web…"
 	}
 	w.setProgress(ctx, job.ID, gatherStage, "")
+	w.hub.Publish(job.ID, ProgressEvent{Stage: gatherStage})
 
 	sources, err := w.gatherer.Gather(ctx, job.Prompt, urls, job.UseSearch)
 	if err != nil {
@@ -158,6 +162,7 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		writeStage = fmt.Sprintf("Read %s — writing the draft…", plural(len(sources), "source"))
 	}
 	w.setProgress(ctx, job.ID, writeStage, "")
+	w.hub.Publish(job.ID, ProgressEvent{Stage: writeStage})
 
 	draft, err := w.generate(ctx, job, sources, writeStage)
 	if err != nil {
@@ -182,6 +187,8 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		return
 	}
 	logger.Info("ai draft generated", "type", draft.Type, "sources", len(sources))
+	// Terminal event: the SSE client swaps the modal to the finished form.
+	w.hub.Publish(job.ID, ProgressEvent{Done: true, Status: string(db.GenerationJobStatusCompleted)})
 }
 
 // generate runs the streaming LLM call under an idle watchdog. It streams the
@@ -199,17 +206,23 @@ func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources
 	stop := w.watchIdle(llmCtx, &last, &stalled, cancelLLM)
 	defer stop()
 
-	// accum and lastWrite are touched only from onToken, which the stream
+	// accum, lastDB, and lastHub are touched only from onToken, which the stream
 	// reader invokes synchronously on this goroutine — no locking needed.
 	var accum strings.Builder
-	var lastWrite time.Time
+	var lastDB, lastHub time.Time
 	onToken := func(delta string) {
 		last.Store(time.Now().UnixNano())
 		accum.WriteString(delta)
-		// Throttle DB writes to ~1/s (plus the first token) so a fast stream
-		// doesn't hammer Postgres; the poll only reads every 2s anyway.
-		if time.Since(lastWrite) >= time.Second {
-			lastWrite = time.Now()
+		now := time.Now()
+		// Push to the SSE hub often (in-memory, cheap) so the browser sees the
+		// draft flow ~10x/s; persist to Postgres at most once/second as a
+		// durable fallback for a late or reconnecting subscriber.
+		if now.Sub(lastHub) >= 100*time.Millisecond {
+			lastHub = now
+			w.hub.Publish(job.ID, ProgressEvent{Stage: stage, Progress: accum.String()})
+		}
+		if now.Sub(lastDB) >= time.Second {
+			lastDB = now
 			w.setProgress(ctx, job.ID, stage, accum.String())
 		}
 	}
@@ -290,6 +303,7 @@ func (w *Worker) fail(ctx context.Context, logger *slog.Logger, job db.NodeGener
 	if err := w.queries.FailGenerationJob(ctx, db.FailGenerationJobParams{ID: job.ID, LastError: &msg}); err != nil {
 		logger.Error("ai worker: mark failed", "err", err)
 	}
+	w.hub.Publish(job.ID, ProgressEvent{Done: true, Status: string(db.GenerationJobStatusFailed)})
 }
 
 // sourceRef is the persisted shape of a used source (result_sources JSONB).

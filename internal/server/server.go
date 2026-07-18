@@ -44,6 +44,9 @@ type Server struct {
 	// genWorker drains the node_generation_jobs queue. nil when AI is
 	// disabled.
 	genWorker *ai.Worker
+	// progressHub carries live generation updates from the worker to the SSE
+	// handler that streams them to the browser. nil when AI is disabled.
+	progressHub *ai.ProgressHub
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
@@ -122,7 +125,8 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		s.aiClient = ai.NewClient(cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
 		aiLogger := logger.With("subsys", "ai")
 		gatherer := ai.NewGatherer(cfg.SearxngURL, aiLogger)
-		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, cfg.AIJobTimeout, cfg.AIStreamIdleTimeout, aiLogger)
+		s.progressHub = ai.NewProgressHub()
+		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, s.progressHub, cfg.AIJobTimeout, cfg.AIStreamIdleTimeout, aiLogger)
 		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel, "web_search", cfg.SearxngURL != "")
 	} else {
 		logger.Info("ai: AI_ENDPOINT_URL unset, node drafting disabled")
@@ -330,6 +334,7 @@ func (s *Server) userFacingRoutes(r chi.Router) {
 		r.Get("/nodes/generate", s.handleNodeGenerateForm)
 		r.Post("/nodes/generate", s.handleNodeGenerate)
 		r.Get("/nodes/generate/{id}", s.handleNodeGenerateStatus)
+		r.Get("/nodes/generate/{id}/stream", s.handleNodeGenerateStream)
 		r.Post("/nodes/new/images", s.handleNewNodeImageUpload)
 		r.Post("/nodes/new/videos", s.handleNewNodeVideoUpload)
 		r.Get("/nodes/parent-picker", s.handleParentPicker)

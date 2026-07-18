@@ -164,16 +164,18 @@ templ NodeGenerateModal(flash, prompt, urls string, useSearch bool) {
 // job finishes the server returns the pre-filled post form (or an error modal)
 // and the polling naturally stops.
 // stage is a short status label ("Searching the web…", "Writing the draft…")
-// and progress is the draft text produced so far (already cleaned for display).
-// Both come from the job row the worker updates as it streams, so the modal
-// shows what the model is doing and the draft appearing live.
+// and progress is the draft text produced so far (already cleaned for display) —
+// used for the first paint and as a no-flash fallback. Once mounted, the modal
+// opens a Server-Sent Events connection to /nodes/generate/{id}/stream and
+// updates the stage and draft text in place as the model produces them, so
+// there's no polling and no full-fragment flashing. On a terminal event it
+// fetches the finished form (or error) into #modal.
 templ NodeGeneratingModal(jobID, stage, progress string) {
 	<div
+		id="gen-modal"
 		class="modal-backdrop"
-		hx-get={ "/nodes/generate/" + jobID }
-		hx-trigger="load delay:2s, every 2s"
-		hx-target="this"
-		hx-swap="outerHTML"
+		data-stream={ "/nodes/generate/" + jobID + "/stream" }
+		data-final={ "/nodes/generate/" + jobID }
 	>
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-working-title">
 			<div class="row gap-12 wrap center" style="margin-bottom: 6px;">
@@ -186,20 +188,57 @@ templ NodeGeneratingModal(jobID, stage, progress string) {
 			<div class="row gap-8 center" style="margin-bottom: 12px;">
 				<span class="material-symbols-outlined spin">progress_activity</span>
 				if stage != "" {
-					<span class="muted">{ stage }</span>
+					<span id="gen-stage" class="muted">{ stage }</span>
 				} else {
-					<span class="muted">Working…</span>
+					<span id="gen-stage" class="muted">Working…</span>
 				}
 			</div>
 			if progress != "" {
-				<div class="eyebrow" style="margin-bottom: 4px;">Draft so far</div>
-				<div id="ai-progress" class="progress-box">{ progress }</div>
-				// htmx runs this on each poll swap; keep the box pinned to the newest text.
-				<script>
-					(function(){var b=document.getElementById('ai-progress');if(b){b.scrollTop=b.scrollHeight;}})();
-				</script>
+				<div id="gen-progress-wrap">
+					<div class="eyebrow" style="margin-bottom: 4px;">Draft so far</div>
+					<div id="gen-progress" class="progress-box">{ progress }</div>
+				</div>
+			} else {
+				<div id="gen-progress-wrap" style="display: none;">
+					<div class="eyebrow" style="margin-bottom: 4px;">Draft so far</div>
+					<div id="gen-progress" class="progress-box"></div>
+				</div>
 			}
 		</div>
+		<script>
+			(function(){
+				var modal = document.getElementById('gen-modal');
+				if(!modal || modal.dataset.sseInit){ return; }
+				modal.dataset.sseInit = '1';
+				var stageEl = document.getElementById('gen-stage');
+				var wrap = document.getElementById('gen-progress-wrap');
+				var box = document.getElementById('gen-progress');
+				var finished = false;
+				var es = new EventSource(modal.dataset.stream);
+				function recover(){
+					if(finished){ return; }
+					finished = true;
+					try { es.close(); } catch(e) {}
+					if(window.htmx){ htmx.ajax('GET', modal.dataset.final, {target:'#modal', swap:'innerHTML'}); }
+				}
+				es.addEventListener('progress', function(e){
+					var d; try { d = JSON.parse(e.data); } catch(err) { return; }
+					if(d.stage){ stageEl.textContent = d.stage; }
+					if(d.progress){
+						wrap.style.display = '';
+						box.textContent = d.progress;
+						box.scrollTop = box.scrollHeight;
+					}
+				});
+				es.addEventListener('done', function(){ recover(); });
+				es.onerror = function(){
+					// EventSource auto-reconnects on transient blips (readyState
+					// CONNECTING); only give up and fall back to the status
+					// endpoint when it has truly closed.
+					if(es.readyState === EventSource.CLOSED){ recover(); }
+				};
+			})();
+		</script>
 	</div>
 }
 
