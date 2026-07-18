@@ -34,6 +34,15 @@ SET status         = 'completed',
     last_error     = NULL
 WHERE id = $1;
 
+-- name: UpdateGenerationJobProgress :exec
+-- Worker heartbeat while a job runs: a short human stage label plus the draft
+-- text streamed from the model so far. Best-effort — a failed write must never
+-- fail the job, so the worker logs and continues.
+UPDATE node_generation_jobs
+SET stage    = $2,
+    progress = $3
+WHERE id = $1;
+
 -- name: FailGenerationJob :exec
 -- Marks failed and keeps last_error for the UI to surface.
 UPDATE node_generation_jobs

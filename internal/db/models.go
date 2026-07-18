@@ -674,6 +674,8 @@ type NodeGenerationJob struct {
 	CreatedAt     pgtype.Timestamptz  `json:"created_at"`
 	StartedAt     pgtype.Timestamptz  `json:"started_at"`
 	CompletedAt   pgtype.Timestamptz  `json:"completed_at"`
+	Stage         string              `json:"stage"`
+	Progress      string              `json:"progress"`
 }
 
 type NodeImage struct {

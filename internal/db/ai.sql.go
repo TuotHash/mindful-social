@@ -23,7 +23,7 @@ WHERE id = (
   LIMIT 1
   FOR UPDATE SKIP LOCKED
 )
-RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at
+RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress
 `
 
 // Atomically grabs the oldest pending job. SKIP LOCKED keeps multiple workers
@@ -48,6 +48,8 @@ func (q *Queries) ClaimNextGenerationJob(ctx context.Context) (NodeGenerationJob
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
+		&i.Stage,
+		&i.Progress,
 	)
 	return i, err
 }
@@ -87,7 +89,7 @@ func (q *Queries) CompleteGenerationJob(ctx context.Context, arg CompleteGenerat
 const enqueueGenerationJob = `-- name: EnqueueGenerationJob :one
 INSERT INTO node_generation_jobs (user_id, prompt, input_urls, use_search)
 VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at
+RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress
 `
 
 type EnqueueGenerationJobParams struct {
@@ -123,6 +125,8 @@ func (q *Queries) EnqueueGenerationJob(ctx context.Context, arg EnqueueGeneratio
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
+		&i.Stage,
+		&i.Progress,
 	)
 	return i, err
 }
@@ -146,7 +150,7 @@ func (q *Queries) FailGenerationJob(ctx context.Context, arg FailGenerationJobPa
 }
 
 const getGenerationJob = `-- name: GetGenerationJob :one
-SELECT id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at FROM node_generation_jobs
+SELECT id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress FROM node_generation_jobs
 WHERE id = $1 AND user_id = $2
 `
 
@@ -175,6 +179,29 @@ func (q *Queries) GetGenerationJob(ctx context.Context, arg GetGenerationJobPara
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.CompletedAt,
+		&i.Stage,
+		&i.Progress,
 	)
 	return i, err
+}
+
+const updateGenerationJobProgress = `-- name: UpdateGenerationJobProgress :exec
+UPDATE node_generation_jobs
+SET stage    = $2,
+    progress = $3
+WHERE id = $1
+`
+
+type UpdateGenerationJobProgressParams struct {
+	ID       uuid.UUID `json:"id"`
+	Stage    string    `json:"stage"`
+	Progress string    `json:"progress"`
+}
+
+// Worker heartbeat while a job runs: a short human stage label plus the draft
+// text streamed from the model so far. Best-effort — a failed write must never
+// fail the job, so the worker logs and continues.
+func (q *Queries) UpdateGenerationJobProgress(ctx context.Context, arg UpdateGenerationJobProgressParams) error {
+	_, err := q.db.Exec(ctx, updateGenerationJobProgress, arg.ID, arg.Stage, arg.Progress)
+	return err
 }

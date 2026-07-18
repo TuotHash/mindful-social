@@ -417,6 +417,10 @@ type Querier interface {
 	// soft-deleted. updated_at bumps; the UI treats updated_at > created_at
 	// as "edited".
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Node, error)
+	// Worker heartbeat while a job runs: a short human stage label plus the draft
+	// text streamed from the model so far. Best-effort — a failed write must never
+	// fail the job, so the worker logs and continues.
+	UpdateGenerationJobProgress(ctx context.Context, arg UpdateGenerationJobProgressParams) error
 	UpdateGroupMemberVisibility(ctx context.Context, arg UpdateGroupMemberVisibilityParams) error
 	// Owner-only — the handler enforces that. Stored as the same enum the
 	// create form populates: 'public' | 'connections' | 'private'.
