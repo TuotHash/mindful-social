@@ -22,8 +22,9 @@ func TestWatchIdleCancelsOnStall(t *testing.T) {
 
 	var last atomic.Int64
 	last.Store(time.Now().UnixNano()) // set once, never poked again → goes idle
-	var stalled atomic.Bool
-	stop := w.watchIdle(ctx, &last, &stalled, cancel)
+	var started, stalled atomic.Bool
+	started.Store(true) // first token already seen, so the idle guard is active
+	stop := w.watchIdle(ctx, &last, &started, &stalled, cancel)
 	defer stop()
 
 	select {
@@ -36,6 +37,26 @@ func TestWatchIdleCancelsOnStall(t *testing.T) {
 	}
 }
 
+func TestWatchIdleIgnoresPreFirstTokenWarmup(t *testing.T) {
+	w := testWorker(100 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var last atomic.Int64
+	last.Store(time.Now().UnixNano())
+	var started, stalled atomic.Bool
+	// started stays false: the model hasn't emitted a token yet. Even well past
+	// the idle window, the watchdog must not cancel — warmup is bounded only by
+	// the hard cap.
+	stop := w.watchIdle(ctx, &last, &started, &stalled, cancel)
+	defer stop()
+
+	time.Sleep(400 * time.Millisecond)
+	if stalled.Load() || ctx.Err() != nil {
+		t.Fatal("watchdog cancelled during pre-first-token warmup")
+	}
+}
+
 func TestWatchIdleLetsActiveStreamRun(t *testing.T) {
 	w := testWorker(200 * time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -43,8 +64,9 @@ func TestWatchIdleLetsActiveStreamRun(t *testing.T) {
 
 	var last atomic.Int64
 	last.Store(time.Now().UnixNano())
-	var stalled atomic.Bool
-	stop := w.watchIdle(ctx, &last, &stalled, cancel)
+	var started, stalled atomic.Bool
+	started.Store(true)
+	stop := w.watchIdle(ctx, &last, &started, &stalled, cancel)
 
 	// Poke steadily for well over one idle window; the watchdog must not fire.
 	deadline := time.Now().Add(700 * time.Millisecond)

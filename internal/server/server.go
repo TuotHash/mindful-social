@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/scs/v2"
@@ -218,6 +219,22 @@ func (s *Server) Close() error {
 	return s.sqlDB.Close()
 }
 
+// timeoutExceptStreaming applies chi's request Timeout to normal requests but
+// lets Server-Sent Events through untouched (identified by their Accept header).
+// SSE handlers manage their own lifetime and end when the client disconnects.
+func timeoutExceptStreaming(d time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		timed := middleware.Timeout(d)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			timed.ServeHTTP(w, r)
+		})
+	}
+}
+
 func (s *Server) routes() {
 	r := chi.NewRouter()
 	// Outer middleware that runs on every route, including the
@@ -225,7 +242,11 @@ func (s *Server) routes() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(s.recoverer)
-	r.Use(middleware.Timeout(30 * time.Second))
+	// 30s request cap, but never on Server-Sent Events: a streaming response
+	// (e.g. live AI generation) is long-lived by design, and the deadline this
+	// sets on the request context would otherwise cut the stream at 30s (and
+	// then write a superfluous 504 over the already-sent 200).
+	r.Use(timeoutExceptStreaming(30 * time.Second))
 	// Defense-in-depth headers. Sits at the outer layer so even early
 	// error responses (CSRF rejects, backchannel JSON errors) carry them.
 	r.Use(securityHeaders)

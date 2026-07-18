@@ -195,15 +195,18 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 // draft into the job row (throttled) so the polling UI shows it live, resets the
 // idle clock on every token, and cancels the call if the model goes quiet for
 // longer than idleTimeout — turning a stall into a fast, clear failure while
-// letting a slow-but-progressing model run to completion.
+// letting a slow-but-progressing model run to completion. The idle guard only
+// engages after the first token: time-to-first-token (prompt evaluation) on a
+// local model with grounded context is legitimately minutes, so before any
+// output arrives only the outer hard-cap timeout applies.
 func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources []Source, stage string) (*NodeDraft, error) {
 	llmCtx, cancelLLM := context.WithCancel(ctx)
 	defer cancelLLM()
 
 	var last atomic.Int64
 	last.Store(time.Now().UnixNano())
-	var stalled atomic.Bool
-	stop := w.watchIdle(llmCtx, &last, &stalled, cancelLLM)
+	var started, stalled atomic.Bool
+	stop := w.watchIdle(llmCtx, &last, &started, &stalled, cancelLLM)
 	defer stop()
 
 	// accum, lastDB, and lastHub are touched only from onToken, which the stream
@@ -211,6 +214,7 @@ func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources
 	var accum strings.Builder
 	var lastDB, lastHub time.Time
 	onToken := func(delta string) {
+		started.Store(true)
 		last.Store(time.Now().UnixNano())
 		accum.WriteString(delta)
 		now := time.Now()
@@ -242,7 +246,7 @@ func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources
 // last hasn't advanced within idleTimeout, recording the stall in stalled. It
 // returns a stop func (idempotent) that ends the goroutine. Extracted so the
 // stall logic is unit-testable without a model or a database.
-func (w *Worker) watchIdle(ctx context.Context, last *atomic.Int64, stalled *atomic.Bool, cancel context.CancelFunc) func() {
+func (w *Worker) watchIdle(ctx context.Context, last *atomic.Int64, started, stalled *atomic.Bool, cancel context.CancelFunc) func() {
 	// Check several times per idle window so a stall is caught promptly, but
 	// never busier than every 250ms.
 	interval := w.idleTimeout / 4
@@ -262,6 +266,11 @@ func (w *Worker) watchIdle(ctx context.Context, last *atomic.Int64, stalled *ato
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				// Don't enforce idle until the model has emitted its first
+				// token; the initial warmup is bounded only by the hard cap.
+				if !started.Load() {
+					continue
+				}
 				idleFor := time.Since(time.Unix(0, last.Load()))
 				if idleFor >= w.idleTimeout {
 					stalled.Store(true)
