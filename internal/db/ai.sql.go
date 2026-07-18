@@ -23,7 +23,7 @@ WHERE id = (
   LIMIT 1
   FOR UPDATE SKIP LOCKED
 )
-RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress
+RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress, result_evidence
 `
 
 // Atomically grabs the oldest pending job. SKIP LOCKED keeps multiple workers
@@ -50,31 +50,35 @@ func (q *Queries) ClaimNextGenerationJob(ctx context.Context) (NodeGenerationJob
 		&i.CompletedAt,
 		&i.Stage,
 		&i.Progress,
+		&i.ResultEvidence,
 	)
 	return i, err
 }
 
 const completeGenerationJob = `-- name: CompleteGenerationJob :exec
 UPDATE node_generation_jobs
-SET status         = 'completed',
-    completed_at   = now(),
-    result_type    = $2,
-    result_title   = $3,
-    result_body    = $4,
-    result_sources = $5,
-    last_error     = NULL
+SET status          = 'completed',
+    completed_at    = now(),
+    result_type     = $2,
+    result_title    = $3,
+    result_body     = $4,
+    result_sources  = $5,
+    result_evidence = $6,
+    last_error      = NULL
 WHERE id = $1
 `
 
 type CompleteGenerationJobParams struct {
-	ID            uuid.UUID `json:"id"`
-	ResultType    *string   `json:"result_type"`
-	ResultTitle   *string   `json:"result_title"`
-	ResultBody    *string   `json:"result_body"`
-	ResultSources []byte    `json:"result_sources"`
+	ID             uuid.UUID `json:"id"`
+	ResultType     *string   `json:"result_type"`
+	ResultTitle    *string   `json:"result_title"`
+	ResultBody     *string   `json:"result_body"`
+	ResultSources  []byte    `json:"result_sources"`
+	ResultEvidence []byte    `json:"result_evidence"`
 }
 
-// Stores the drafted node and the sources it was grounded in.
+// Stores the drafted node, the sources it was grounded in, and the proposed
+// evidence findings the user can turn into linked nodes at confirm time.
 func (q *Queries) CompleteGenerationJob(ctx context.Context, arg CompleteGenerationJobParams) error {
 	_, err := q.db.Exec(ctx, completeGenerationJob,
 		arg.ID,
@@ -82,6 +86,7 @@ func (q *Queries) CompleteGenerationJob(ctx context.Context, arg CompleteGenerat
 		arg.ResultTitle,
 		arg.ResultBody,
 		arg.ResultSources,
+		arg.ResultEvidence,
 	)
 	return err
 }
@@ -89,7 +94,7 @@ func (q *Queries) CompleteGenerationJob(ctx context.Context, arg CompleteGenerat
 const enqueueGenerationJob = `-- name: EnqueueGenerationJob :one
 INSERT INTO node_generation_jobs (user_id, prompt, input_urls, use_search)
 VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress
+RETURNING id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress, result_evidence
 `
 
 type EnqueueGenerationJobParams struct {
@@ -127,6 +132,7 @@ func (q *Queries) EnqueueGenerationJob(ctx context.Context, arg EnqueueGeneratio
 		&i.CompletedAt,
 		&i.Stage,
 		&i.Progress,
+		&i.ResultEvidence,
 	)
 	return i, err
 }
@@ -150,7 +156,7 @@ func (q *Queries) FailGenerationJob(ctx context.Context, arg FailGenerationJobPa
 }
 
 const getGenerationJob = `-- name: GetGenerationJob :one
-SELECT id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress FROM node_generation_jobs
+SELECT id, user_id, prompt, input_urls, use_search, status, attempts, result_type, result_title, result_body, result_sources, last_error, created_at, started_at, completed_at, stage, progress, result_evidence FROM node_generation_jobs
 WHERE id = $1 AND user_id = $2
 `
 
@@ -181,6 +187,7 @@ func (q *Queries) GetGenerationJob(ctx context.Context, arg GetGenerationJobPara
 		&i.CompletedAt,
 		&i.Stage,
 		&i.Progress,
+		&i.ResultEvidence,
 	)
 	return i, err
 }

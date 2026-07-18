@@ -38,7 +38,8 @@ type Querier interface {
 	// "nothing to do".
 	ClaimNextGenerationJob(ctx context.Context) (NodeGenerationJob, error)
 	CompleteAudioJob(ctx context.Context, id uuid.UUID) error
-	// Stores the drafted node and the sources it was grounded in.
+	// Stores the drafted node, the sources it was grounded in, and the proposed
+	// evidence findings the user can turn into linked nodes at confirm time.
 	CompleteGenerationJob(ctx context.Context, arg CompleteGenerationJobParams) error
 	// Used to refuse demotions that would leave the instance with no admins.
 	// A site with zero admins can't be managed through the UI; recovery

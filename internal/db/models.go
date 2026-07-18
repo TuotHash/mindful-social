@@ -659,23 +659,24 @@ type Node struct {
 }
 
 type NodeGenerationJob struct {
-	ID            uuid.UUID           `json:"id"`
-	UserID        uuid.UUID           `json:"user_id"`
-	Prompt        string              `json:"prompt"`
-	InputUrls     []byte              `json:"input_urls"`
-	UseSearch     bool                `json:"use_search"`
-	Status        GenerationJobStatus `json:"status"`
-	Attempts      int32               `json:"attempts"`
-	ResultType    *string             `json:"result_type"`
-	ResultTitle   *string             `json:"result_title"`
-	ResultBody    *string             `json:"result_body"`
-	ResultSources []byte              `json:"result_sources"`
-	LastError     *string             `json:"last_error"`
-	CreatedAt     pgtype.Timestamptz  `json:"created_at"`
-	StartedAt     pgtype.Timestamptz  `json:"started_at"`
-	CompletedAt   pgtype.Timestamptz  `json:"completed_at"`
-	Stage         string              `json:"stage"`
-	Progress      string              `json:"progress"`
+	ID             uuid.UUID           `json:"id"`
+	UserID         uuid.UUID           `json:"user_id"`
+	Prompt         string              `json:"prompt"`
+	InputUrls      []byte              `json:"input_urls"`
+	UseSearch      bool                `json:"use_search"`
+	Status         GenerationJobStatus `json:"status"`
+	Attempts       int32               `json:"attempts"`
+	ResultType     *string             `json:"result_type"`
+	ResultTitle    *string             `json:"result_title"`
+	ResultBody     *string             `json:"result_body"`
+	ResultSources  []byte              `json:"result_sources"`
+	LastError      *string             `json:"last_error"`
+	CreatedAt      pgtype.Timestamptz  `json:"created_at"`
+	StartedAt      pgtype.Timestamptz  `json:"started_at"`
+	CompletedAt    pgtype.Timestamptz  `json:"completed_at"`
+	Stage          string              `json:"stage"`
+	Progress       string              `json:"progress"`
+	ResultEvidence []byte              `json:"result_evidence"`
 }
 
 type NodeImage struct {

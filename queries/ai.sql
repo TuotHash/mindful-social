@@ -23,15 +23,17 @@ WHERE id = (
 RETURNING *;
 
 -- name: CompleteGenerationJob :exec
--- Stores the drafted node and the sources it was grounded in.
+-- Stores the drafted node, the sources it was grounded in, and the proposed
+-- evidence findings the user can turn into linked nodes at confirm time.
 UPDATE node_generation_jobs
-SET status         = 'completed',
-    completed_at   = now(),
-    result_type    = $2,
-    result_title   = $3,
-    result_body    = $4,
-    result_sources = $5,
-    last_error     = NULL
+SET status          = 'completed',
+    completed_at    = now(),
+    result_type     = $2,
+    result_title    = $3,
+    result_body     = $4,
+    result_sources  = $5,
+    result_evidence = $6,
+    last_error      = NULL
 WHERE id = $1;
 
 -- name: UpdateGenerationJobProgress :exec
