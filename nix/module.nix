@@ -27,6 +27,15 @@ let
   '';
 
   ttsSidecarURL = "http://${ttsCfg.listenAddr}:${toString ttsCfg.port}";
+
+  searxCfg = cfg.searx;
+  searxURL = "http://${searxCfg.listenAddr}:${toString searxCfg.port}";
+
+  # Where the auto-generated SearXNG secret key is persisted. Lives under
+  # /var/lib (not the Nix store) so the key never leaks into the world-
+  # readable store, and stays stable across reboots and deploys.
+  searxSecretDir = "/var/lib/mindful-social-searx";
+  searxSecretFile = "${searxSecretDir}/secret.env";
 in {
   options.services.mindful-social = {
     enable = lib.mkEnableOption "the Mindful Social server";
@@ -117,10 +126,12 @@ in {
         so a slow-but-progressing model is never killed. AI_JOB_TIMEOUT
         (default 30m) is just the absolute backstop on total job time.
 
-        To let drafts be grounded in web search, set SEARXNG_URL to a
-        SearXNG instance with the JSON format enabled (e.g. NixOS
-        services.searx, or `docker run -p 8888:8080 searxng/searxng`).
-        Without it, users can still ground drafts by pasting source URLs.
+        To let drafts be grounded in web search, either flip
+        services.mindful-social.searx.enable to provision a local
+        SearXNG automatically (SEARXNG_URL is then set for you), or set
+        SEARXNG_URL here to point at an external SearXNG instance with
+        the JSON format enabled. Without either, users can still ground
+        drafts by pasting source URLs.
       '';
     };
 
@@ -257,6 +268,34 @@ in {
         '';
       };
     };
+
+    searx = {
+      enable = lib.mkEnableOption ''
+        a local SearXNG metasearch instance for grounding AI drafts in
+        web search. Provisions the upstream services.searx with the JSON
+        API enabled and an auto-generated secret key, bound to loopback,
+        and points the main service at it via SEARXNG_URL. Without this
+        (and without a manually-set SEARXNG_URL) users can still ground
+        drafts by pasting source URLs'';
+
+      listenAddr = lib.mkOption {
+        type = lib.types.str;
+        default = "127.0.0.1";
+        description = ''
+          Loopback address the SearXNG instance binds to. Keep this on
+          localhost — only the main service should reach it.
+        '';
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 8888;
+        description = ''
+          TCP port for the local SearXNG instance. The main service
+          composes SEARXNG_URL from listenAddr + this value.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -338,6 +377,9 @@ in {
       }
       // lib.optionalAttrs ttsCfg.enable {
         TTS_SIDECAR_URL = ttsSidecarURL;
+      }
+      // lib.optionalAttrs searxCfg.enable {
+        SEARXNG_URL = searxURL;
       }
       // cfg.environment;
 
@@ -522,6 +564,55 @@ in {
         AmbientCapabilities = [];
         UMask = "0077";
       };
+    };
+
+    # Local SearXNG for grounding AI drafts in web search. The upstream
+    # services.searx renders settings.yml from `settings` and, when an
+    # environmentFile is present, runs it through envsubst ($VAR syntax)
+    # in its searx-init unit — so the secret key is injected at runtime
+    # from a file that never touches the Nix store.
+    services.searx = lib.mkIf searxCfg.enable {
+      enable = true;
+      environmentFile = searxSecretFile;
+      settings = {
+        server = {
+          bind_address = searxCfg.listenAddr;
+          port = searxCfg.port;
+          # Substituted by searx-init's envsubst from searxSecretFile.
+          secret_key = "$SEARXNG_SECRET_KEY";
+        };
+        # The app queries the JSON API; stock SearXNG only enables html,
+        # so JSON must be turned on explicitly or every search 403s.
+        search.formats = [ "html" "json" ];
+      };
+    };
+
+    # Generate (once) and persist the SearXNG secret key outside the
+    # store. Ordered before searx-init so the EnvironmentFile it reads
+    # always exists. Runs as root; the file is root-only (systemd reads
+    # EnvironmentFile before dropping to the searx user, so searx itself
+    # never needs to read it).
+    systemd.services.mindful-social-searx-secret = lib.mkIf searxCfg.enable {
+      description = "Generate the SearXNG secret key for Mindful Social";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "searx-init.service" ];
+      requiredBy = [ "searx-init.service" ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        UMask = "0077";
+      };
+
+      script = ''
+        install -d -m 0700 ${searxSecretDir}
+        if [ ! -s ${searxSecretFile} ]; then
+          printf 'SEARXNG_SECRET_KEY=%s\n' \
+            "$(${lib.getExe' pkgs.openssl "openssl"} rand -hex 32)" \
+            > ${searxSecretFile}
+          chmod 0600 ${searxSecretFile}
+        fi
+      '';
     };
   };
 }
