@@ -9,9 +9,11 @@ import (
 	"testing"
 )
 
-// completionsServer stands in for an OpenAI-compatible endpoint. It returns
-// the assistant contents from bodies one at a time, so a test can script a
-// first (bad) response followed by a good one to exercise the retry path.
+// completionsServer stands in for an OpenAI-compatible streaming endpoint. It
+// streams the assistant contents from bodies one at a time (as SSE deltas
+// followed by [DONE]), so a test can script a first (bad) response followed by a
+// good one to exercise the retry path. Each content is split into a few chunks
+// to mimic real token-by-token streaming.
 func completionsServer(t *testing.T, contents ...string) (*httptest.Server, *int) {
 	t.Helper()
 	calls := 0
@@ -24,15 +26,46 @@ func completionsServer(t *testing.T, contents ...string) (*httptest.Server, *int
 			i = len(contents) - 1
 		}
 		calls++
-		resp := chatResponse{}
-		resp.Choices = append(resp.Choices, struct {
-			Message chatMessage `json:"message"`
-		}{Message: chatMessage{Role: "assistant", Content: contents[i]}})
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		w.Header().Set("Content-Type", "text/event-stream")
+		for _, delta := range splitIntoChunks(contents[i], 3) {
+			frame, _ := json.Marshal(streamChunk{Choices: []struct {
+				Delta struct {
+					Content string `json:"content"`
+				} `json:"delta"`
+			}{{Delta: struct {
+				Content string `json:"content"`
+			}{Content: delta}}}})
+			_, _ = w.Write([]byte("data: " + string(frame) + "\n\n"))
+		}
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	}))
 	t.Cleanup(srv.Close)
 	return srv, &calls
+}
+
+// splitIntoChunks divides s into at most n roughly-equal pieces (fewer when s
+// is short), so the fake endpoint emits several deltas per completion.
+func splitIntoChunks(s string, n int) []string {
+	if s == "" {
+		return []string{""}
+	}
+	r := []rune(s)
+	if n < 1 {
+		n = 1
+	}
+	if n > len(r) {
+		n = len(r)
+	}
+	size := (len(r) + n - 1) / n
+	var out []string
+	for i := 0; i < len(r); i += size {
+		end := i + size
+		if end > len(r) {
+			end = len(r)
+		}
+		out = append(out, string(r[i:end]))
+	}
+	return out
 }
 
 func TestGenerateNodeHappyPath(t *testing.T) {
@@ -145,6 +178,32 @@ func TestGenerateNodeGroundedReturnsDraft(t *testing.T) {
 	}
 	if draft.Type != "finding" || draft.Title != "Vacancy rose 3%" {
 		t.Errorf("unexpected draft %+v", draft)
+	}
+}
+
+func TestGenerateNodeGroundedStreamForwardsDeltas(t *testing.T) {
+	content := `{"type":"topic","title":"Should cities cap rent?","body":"A debate."}`
+	srv, _ := completionsServer(t, content)
+	c := NewClient(srv.URL, "test-model", "")
+
+	var got strings.Builder
+	deltas := 0
+	draft, err := c.GenerateNodeGroundedStream(context.Background(), "rent", nil, func(d string) {
+		got.WriteString(d)
+		deltas++
+	})
+	if err != nil {
+		t.Fatalf("GenerateNodeGroundedStream: %v", err)
+	}
+	if draft.Type != "topic" || draft.Title != "Should cities cap rent?" {
+		t.Errorf("unexpected draft %+v", draft)
+	}
+	if deltas < 2 {
+		t.Errorf("expected multiple deltas, got %d", deltas)
+	}
+	// The concatenated deltas must reconstruct exactly what was parsed.
+	if got.String() != content {
+		t.Errorf("reassembled stream = %q, want %q", got.String(), content)
 	}
 }
 

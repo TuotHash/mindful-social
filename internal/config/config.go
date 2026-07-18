@@ -95,12 +95,21 @@ type Config struct {
 	// when AIEndpointURL is also set.
 	SearxngURL string
 
-	// AIJobTimeout bounds one background drafting job end to end (web fetches
-	// + model generation). Grounded generation on a local model can be slow —
-	// reading ~12k characters of source context before the first token — so
-	// this is generous and tunable via AI_JOB_TIMEOUT (e.g. "8m"). Raise it if
-	// jobs fail with "context deadline exceeded"; lower it to fail faster.
+	// AIJobTimeout is the ABSOLUTE ceiling on one background drafting job end
+	// to end (web fetches + model generation) — a backstop against a runaway
+	// job, not the primary guard. Since generation streams, the real
+	// stall-detection is AIStreamIdleTimeout below; a slow-but-progressing
+	// model is never killed by this cap unless it genuinely runs this long.
+	// Generous by design; tune via AI_JOB_TIMEOUT (e.g. "45m").
 	AIJobTimeout time.Duration
+
+	// AIStreamIdleTimeout is how long the model may produce NO output before
+	// the streaming generation is treated as stalled and cancelled. The clock
+	// resets on every token, so a model that keeps emitting text — however
+	// slowly — keeps running; only a truly hung stream is killed. This is the
+	// primary generation guard (AIJobTimeout is just the outer backstop).
+	// Tunable via AI_STREAM_IDLE_TIMEOUT (e.g. "2m").
+	AIStreamIdleTimeout time.Duration
 }
 
 // Load reads configuration from environment variables.
@@ -131,7 +140,8 @@ func Load(logger *slog.Logger) (Config, error) {
 		AIModel:                    envOr("AI_MODEL", ""),
 		AIAPIKey:                   envOr("AI_API_KEY", ""),
 		SearxngURL:                 envOr("SEARXNG_URL", ""),
-		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 10*time.Minute),
+		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 30*time.Minute),
+		AIStreamIdleTimeout:        envDuration(logger, "AI_STREAM_IDLE_TIMEOUT", 90*time.Second),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

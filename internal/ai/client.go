@@ -10,6 +10,7 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -87,6 +88,17 @@ func (c *Client) GenerateNode(ctx context.Context, prompt string) (*NodeDraft, e
 // retried once, since local models occasionally emit stray tokens around the
 // JSON.
 func (c *Client) GenerateNodeGrounded(ctx context.Context, prompt string, sources []Source) (*NodeDraft, error) {
+	return c.GenerateNodeGroundedStream(ctx, prompt, sources, nil)
+}
+
+// GenerateNodeGroundedStream is GenerateNodeGrounded with live progress: onToken
+// is invoked with each content delta as it streams from the model (it may be
+// called many times, and may be nil to ignore). The worker uses it to reset its
+// idle watchdog and to write the draft-in-progress to the job row so the UI can
+// show generation happening live. The returned draft is still produced by
+// strictly parsing the full accumulated output, exactly as the non-streaming
+// path — the streamed deltas are for display and liveness only.
+func (c *Client) GenerateNodeGroundedStream(ctx context.Context, prompt string, sources []Source, onToken func(delta string)) (*NodeDraft, error) {
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return nil, errors.New("prompt is empty")
@@ -94,10 +106,10 @@ func (c *Client) GenerateNodeGrounded(ctx context.Context, prompt string, source
 	userContent := buildUserContent(prompt, sources)
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
-		content, err := c.complete(ctx, userContent)
+		content, err := c.completeStream(ctx, userContent, onToken)
 		if err != nil {
-			// Transport / HTTP failure — retrying won't help and the caller
-			// wants the real reason.
+			// Transport / HTTP / cancellation failure — retrying won't help and
+			// the caller wants the real reason.
 			return nil, err
 		}
 		draft, err := parseDraft(content)
@@ -142,14 +154,10 @@ type chatRequest struct {
 	Stream         bool            `json:"stream"`
 }
 
-type chatResponse struct {
-	Choices []struct {
-		Message chatMessage `json:"message"`
-	} `json:"choices"`
-}
 
-// complete POSTs one chat request and returns the assistant message content.
-func (c *Client) complete(ctx context.Context, userContent string) (string, error) {
+// newChatRequest builds the POST for one completion. stream selects SSE vs. a
+// single JSON body; both share the same messages and options.
+func (c *Client) newChatRequest(ctx context.Context, userContent string, stream bool) (*http.Request, error) {
 	reqBody, err := json.Marshal(chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
@@ -158,20 +166,43 @@ func (c *Client) complete(ctx context.Context, userContent string) (string, erro
 		},
 		ResponseFormat: &responseFormat{Type: "json_object"},
 		Temperature:    0.4,
-		Stream:         false,
+		Stream:         stream,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.baseURL+"/chat/completions", bytes.NewReader(reqBody))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
+	return req, nil
+}
+
+// streamChunk is one SSE frame from the chat-completions stream: the delta
+// carries incremental content.
+type streamChunk struct {
+	Choices []struct {
+		Delta struct {
+			Content string `json:"content"`
+		} `json:"delta"`
+	} `json:"choices"`
+}
+
+// completeStream POSTs a streaming chat request, forwards each content delta to
+// onToken (when non-nil), and returns the full accumulated assistant message.
+// Reading the body is what advances the deadline: a stalled stream leaves the
+// caller's context to fire, and cancellation surfaces here as a read error.
+func (c *Client) completeStream(ctx context.Context, userContent string, onToken func(delta string)) (string, error) {
+	req, err := c.newChatRequest(ctx, userContent, true)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "text/event-stream")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -184,14 +215,50 @@ func (c *Client) complete(ctx context.Context, userContent string) (string, erro
 		return "", fmt.Errorf("ai endpoint %s: %s", resp.Status, bytes.TrimSpace(msg))
 	}
 
-	var parsed chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return "", fmt.Errorf("decode ai response: %w", err)
+	var full strings.Builder
+	sc := bufio.NewScanner(resp.Body)
+	// SSE frames are line-delimited; a single delta is small, but raise the
+	// buffer ceiling so an unusually large frame can't abort the scan.
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+		var chunk streamChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			// Tolerate a stray keep-alive / comment frame rather than failing
+			// the whole generation on one unparsable line.
+			continue
+		}
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		delta := chunk.Choices[0].Delta.Content
+		if delta == "" {
+			continue
+		}
+		full.WriteString(delta)
+		if onToken != nil {
+			onToken(delta)
+		}
 	}
-	if len(parsed.Choices) == 0 {
-		return "", errors.New("ai endpoint returned no choices")
+	if err := sc.Err(); err != nil {
+		// Distinguish a cancelled/expired context (idle watchdog or hard cap)
+		// from a raw I/O error so the worker can report it meaningfully.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", ctxErr
+		}
+		return "", fmt.Errorf("read ai stream: %w", err)
 	}
-	return parsed.Choices[0].Message.Content, nil
+	if full.Len() == 0 {
+		return "", errors.New("ai endpoint returned no content")
+	}
+	return full.String(), nil
 }
 
 // parseDraft turns the model's message content into a validated NodeDraft.
