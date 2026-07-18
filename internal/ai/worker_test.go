@@ -1,10 +1,65 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
+
+func testWorker(idle time.Duration) *Worker {
+	return &Worker{idleTimeout: idle, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+}
+
+func TestWatchIdleCancelsOnStall(t *testing.T) {
+	w := testWorker(100 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var last atomic.Int64
+	last.Store(time.Now().UnixNano()) // set once, never poked again → goes idle
+	var stalled atomic.Bool
+	stop := w.watchIdle(ctx, &last, &stalled, cancel)
+	defer stop()
+
+	select {
+	case <-ctx.Done():
+		if !stalled.Load() {
+			t.Fatal("ctx cancelled but stalled flag not set")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("watchdog did not cancel a stalled stream")
+	}
+}
+
+func TestWatchIdleLetsActiveStreamRun(t *testing.T) {
+	w := testWorker(200 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var last atomic.Int64
+	last.Store(time.Now().UnixNano())
+	var stalled atomic.Bool
+	stop := w.watchIdle(ctx, &last, &stalled, cancel)
+
+	// Poke steadily for well over one idle window; the watchdog must not fire.
+	deadline := time.Now().Add(700 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		last.Store(time.Now().UnixNano())
+		time.Sleep(40 * time.Millisecond)
+		if stalled.Load() {
+			t.Fatal("watchdog cancelled an actively-streaming generation")
+		}
+	}
+	stop()
+	if ctx.Err() != nil {
+		t.Fatalf("ctx should be live after an active stream, got %v", ctx.Err())
+	}
+}
 
 func TestAppendSources(t *testing.T) {
 	if got := appendSources("body text", nil); got != "body text" {

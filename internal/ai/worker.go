@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/TuotHash/mindful-social/internal/db"
@@ -18,7 +20,7 @@ import (
 // drafter and gatherer are the two collaborators the worker needs, defined as
 // interfaces so tests can substitute fakes. *Client and *Gatherer satisfy them.
 type drafter interface {
-	GenerateNodeGrounded(ctx context.Context, prompt string, sources []Source) (*NodeDraft, error)
+	GenerateNodeGroundedStream(ctx context.Context, prompt string, sources []Source, onToken func(delta string)) (*NodeDraft, error)
 }
 
 type gatherer interface {
@@ -35,11 +37,15 @@ type Worker struct {
 	gatherer gatherer
 	logger   *slog.Logger
 
-	// jobTimeout bounds one generation end to end (web fetches + LLM). The
-	// worker runs off the request path so it isn't subject to the 30s HTTP
-	// cap, but a single hung job shouldn't stall the queue forever. Tunable
-	// because local grounded generation time varies wildly by hardware.
+	// jobTimeout is the ABSOLUTE ceiling on one generation end to end (web
+	// fetches + LLM) — the outer backstop against a runaway job. The primary
+	// generation guard is idleTimeout below.
 	jobTimeout time.Duration
+
+	// idleTimeout is how long the streaming model may produce no output before
+	// the generation is treated as stalled and cancelled. The clock resets on
+	// every token, so a slow-but-progressing model is never killed here.
+	idleTimeout time.Duration
 
 	stop   context.CancelFunc
 	done   chan struct{}
@@ -49,22 +55,27 @@ type Worker struct {
 }
 
 // NewWorker returns a started worker. When drafter is nil (AI disabled) it is
-// an inert no-op whose Close returns immediately. jobTimeout bounds a single
-// job; a non-positive value falls back to 5 minutes.
-func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeout time.Duration, logger *slog.Logger) *Worker {
+// an inert no-op whose Close returns immediately. jobTimeout is the absolute
+// ceiling on a single job; idleTimeout is the no-output-for-this-long stall
+// guard on streaming generation. Non-positive values fall back to 30m and 90s.
+func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, jobTimeout, idleTimeout time.Duration, logger *slog.Logger) *Worker {
 	if jobTimeout <= 0 {
-		jobTimeout = 10 * time.Minute
+		jobTimeout = 30 * time.Minute
+	}
+	if idleTimeout <= 0 {
+		idleTimeout = 90 * time.Second
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Worker{
-		queries:    queries,
-		drafter:    drafter,
-		gatherer:   gatherer,
-		logger:     logger,
-		jobTimeout: jobTimeout,
-		stop:       cancel,
-		done:       make(chan struct{}),
-		idleSleep:  2 * time.Second,
+		queries:     queries,
+		drafter:     drafter,
+		gatherer:    gatherer,
+		logger:      logger,
+		jobTimeout:  jobTimeout,
+		idleTimeout: idleTimeout,
+		stop:        cancel,
+		done:        make(chan struct{}),
+		idleSleep:   2 * time.Second,
 	}
 	if drafter == nil {
 		close(w.done)
@@ -117,6 +128,8 @@ func (w *Worker) tick(ctx context.Context) bool {
 
 func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 	logger := w.logger.With("job_id", job.ID, "user_id", job.UserID)
+	// Absolute ceiling on the whole job; the idle watchdog below is the real
+	// stall guard on the streaming phase.
 	ctx, cancel := context.WithTimeout(ctx, w.jobTimeout)
 	defer cancel()
 
@@ -128,13 +141,25 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		}
 	}
 
+	gatherStage := "Reading your sources…"
+	if job.UseSearch {
+		gatherStage = "Searching the web…"
+	}
+	w.setProgress(ctx, job.ID, gatherStage, "")
+
 	sources, err := w.gatherer.Gather(ctx, job.Prompt, urls, job.UseSearch)
 	if err != nil {
 		w.fail(ctx, logger, job, err)
 		return
 	}
 
-	draft, err := w.drafter.GenerateNodeGrounded(ctx, job.Prompt, sources)
+	writeStage := "Writing the draft…"
+	if len(sources) > 0 {
+		writeStage = fmt.Sprintf("Read %s — writing the draft…", plural(len(sources), "source"))
+	}
+	w.setProgress(ctx, job.ID, writeStage, "")
+
+	draft, err := w.generate(ctx, job, sources, writeStage)
 	if err != nil {
 		w.fail(ctx, logger, job, err)
 		return
@@ -157,6 +182,103 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 		return
 	}
 	logger.Info("ai draft generated", "type", draft.Type, "sources", len(sources))
+}
+
+// generate runs the streaming LLM call under an idle watchdog. It streams the
+// draft into the job row (throttled) so the polling UI shows it live, resets the
+// idle clock on every token, and cancels the call if the model goes quiet for
+// longer than idleTimeout — turning a stall into a fast, clear failure while
+// letting a slow-but-progressing model run to completion.
+func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources []Source, stage string) (*NodeDraft, error) {
+	llmCtx, cancelLLM := context.WithCancel(ctx)
+	defer cancelLLM()
+
+	var last atomic.Int64
+	last.Store(time.Now().UnixNano())
+	var stalled atomic.Bool
+	stop := w.watchIdle(llmCtx, &last, &stalled, cancelLLM)
+	defer stop()
+
+	// accum and lastWrite are touched only from onToken, which the stream
+	// reader invokes synchronously on this goroutine — no locking needed.
+	var accum strings.Builder
+	var lastWrite time.Time
+	onToken := func(delta string) {
+		last.Store(time.Now().UnixNano())
+		accum.WriteString(delta)
+		// Throttle DB writes to ~1/s (plus the first token) so a fast stream
+		// doesn't hammer Postgres; the poll only reads every 2s anyway.
+		if time.Since(lastWrite) >= time.Second {
+			lastWrite = time.Now()
+			w.setProgress(ctx, job.ID, stage, accum.String())
+		}
+	}
+
+	draft, err := w.drafter.GenerateNodeGroundedStream(llmCtx, job.Prompt, sources, onToken)
+	stop()
+	if err != nil {
+		if stalled.Load() {
+			return nil, fmt.Errorf("the model stopped producing output for over %s", w.idleTimeout)
+		}
+		return nil, err
+	}
+	return draft, nil
+}
+
+// watchIdle starts a goroutine that cancels via cancel() when the timestamp in
+// last hasn't advanced within idleTimeout, recording the stall in stalled. It
+// returns a stop func (idempotent) that ends the goroutine. Extracted so the
+// stall logic is unit-testable without a model or a database.
+func (w *Worker) watchIdle(ctx context.Context, last *atomic.Int64, stalled *atomic.Bool, cancel context.CancelFunc) func() {
+	// Check several times per idle window so a stall is caught promptly, but
+	// never busier than every 250ms.
+	interval := w.idleTimeout / 4
+	if interval < 250*time.Millisecond {
+		interval = 250 * time.Millisecond
+	}
+	done := make(chan struct{})
+	var once sync.Once
+	stop := func() { once.Do(func() { close(done) }) }
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				idleFor := time.Since(time.Unix(0, last.Load()))
+				if idleFor >= w.idleTimeout {
+					stalled.Store(true)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return stop
+}
+
+// setProgress writes the job's live stage/progress. Best-effort: a failed write
+// is logged and swallowed so it can never fail the generation itself.
+func (w *Worker) setProgress(ctx context.Context, id uuid.UUID, stage, progress string) {
+	if err := w.queries.UpdateGenerationJobProgress(ctx, db.UpdateGenerationJobProgressParams{
+		ID:       id,
+		Stage:    stage,
+		Progress: progress,
+	}); err != nil {
+		w.logger.Warn("ai worker: progress update", "err", err, "job_id", id)
+	}
+}
+
+// plural formats a count with its noun, adding an "s" for anything but one.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
 }
 
 func (w *Worker) fail(ctx context.Context, logger *slog.Logger, job db.NodeGenerationJob, cause error) {
