@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -142,7 +144,7 @@ func (s *Server) handleNodeNew(w http.ResponseWriter, r *http.Request) {
 		defaultVisibility = string(db.VisibilityKindPublic)
 	}
 	if isHTMX(r) {
-		render(w, r, views.NodeNewModal("", "finding", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
+		render(w, r, views.NodeNewModal("", "finding", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates, nil))
 		return
 	}
 	render(w, r, views.NodeNew(viewerFor(user), "", "finding", "", "", "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidates))
@@ -287,7 +289,7 @@ func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request
 		if defaultVisibility == "" {
 			defaultVisibility = string(db.VisibilityKindPublic)
 		}
-		render(w, r, views.NodeNewModal("", derefStr(job.ResultType), derefStr(job.ResultTitle), derefStr(job.ResultBody), "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidateRows(initialParents)))
+		render(w, r, views.NodeNewModal("", derefStr(job.ResultType), derefStr(job.ResultTitle), derefStr(job.ResultBody), "", "", defaultVisibility, groups, "", "", "root", "related", parentCandidateRows(initialParents), evidenceFromJSON(job.ResultEvidence)))
 	case db.GenerationJobStatusFailed:
 		msg := "Couldn't generate a draft — try again or rephrase your prompt."
 		if job.LastError != nil && *job.LastError != "" {
@@ -438,6 +440,140 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// sourceDomain returns a compact display host (no "www.") for an evidence link,
+// falling back to the raw string if it doesn't parse.
+func sourceDomain(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	return strings.TrimPrefix(u.Host, "www.")
+}
+
+// evidenceFromJSON turns a job's stored result_evidence into checklist items for
+// the confirm modal (all ticked by default). Returns nil on empty/invalid input.
+func evidenceFromJSON(raw []byte) []views.EvidenceItem {
+	if len(raw) == 0 {
+		return nil
+	}
+	var refs []struct {
+		Title     string `json:"title"`
+		Body      string `json:"body"`
+		SourceURL string `json:"source_url"`
+		Relation  string `json:"relation"`
+	}
+	if err := json.Unmarshal(raw, &refs); err != nil {
+		return nil
+	}
+	items := make([]views.EvidenceItem, 0, len(refs))
+	for i, r := range refs {
+		items = append(items, views.EvidenceItem{
+			Index:        i,
+			Title:        r.Title,
+			Body:         r.Body,
+			SourceURL:    r.SourceURL,
+			SourceDomain: sourceDomain(r.SourceURL),
+			Relation:     r.Relation,
+			Included:     true,
+		})
+	}
+	return items
+}
+
+// parseEvidenceForm reconstructs the evidence checklist from a submitted post
+// form. Every rendered item submits its hidden evidence_source_{i}, so those
+// keys enumerate the full set; evidence_include lists the ticked indices. Used
+// both to preserve the list across a validation re-render and to drive
+// createEvidenceFindings.
+func parseEvidenceForm(r *http.Request) []views.EvidenceItem {
+	_ = r.ParseForm()
+	included := map[string]bool{}
+	for _, v := range r.PostForm["evidence_include"] {
+		included[v] = true
+	}
+	var idxs []int
+	for key := range r.PostForm {
+		if s, ok := strings.CutPrefix(key, "evidence_source_"); ok {
+			if n, err := strconv.Atoi(s); err == nil {
+				idxs = append(idxs, n)
+			}
+		}
+	}
+	sort.Ints(idxs)
+	items := make([]views.EvidenceItem, 0, len(idxs))
+	for _, i := range idxs {
+		si := strconv.Itoa(i)
+		src := r.PostForm.Get("evidence_source_" + si)
+		if src == "" {
+			continue
+		}
+		items = append(items, views.EvidenceItem{
+			Index:        i,
+			Title:        strings.TrimSpace(r.PostForm.Get("evidence_title_" + si)),
+			Body:         r.PostForm.Get("evidence_body_" + si),
+			SourceURL:    src,
+			SourceDomain: sourceDomain(src),
+			Relation:     r.PostForm.Get("evidence_relation_" + si),
+			Included:     included[si],
+		})
+	}
+	return items
+}
+
+// createEvidenceFindings creates a reusable finding node for each ticked
+// evidence item and links it to the parent (main) node with the item's relation
+// edge. Best-effort per item: the main node already exists, so a bad item is
+// logged and skipped rather than failing the request.
+func (s *Server) createEvidenceFindings(r *http.Request, user *db.User, parent db.Node) {
+	for _, e := range parseEvidenceForm(r) {
+		if !e.Included {
+			continue
+		}
+		title := strings.TrimSpace(e.Title)
+		if title == "" || len(title) > 200 {
+			continue
+		}
+		if msg := validateSourceURL(e.SourceURL); msg != "" {
+			continue
+		}
+		kind := db.EdgeKind(e.Relation)
+		if !isUserPickableEdgeKind(kind) {
+			kind = db.EdgeKindRelated
+		}
+		src := e.SourceURL
+		parentID := parent.ID
+		finding, err := s.createNodeWithUniqueSlug(r.Context(), slugify(title), func(slug string) db.CreateNodeParams {
+			return db.CreateNodeParams{
+				Type:              db.NodeTypeFinding,
+				Title:             title,
+				Body:              e.Body,
+				SourceUrl:         &src,
+				CreatedBy:         user.ID,
+				Slug:              slug,
+				Visibility:        parent.Visibility,
+				VisibilityGroupID: parent.VisibilityGroupID,
+				GroupID:           parent.GroupID,
+				ParentNodeID:      &parentID,
+			}
+		})
+		if err != nil {
+			s.logger.Error("create evidence finding", "err", err, "parent_node_id", parent.ID)
+			continue
+		}
+		if _, err := s.queries.CreateEdge(r.Context(), db.CreateEdgeParams{
+			FromNode:  parent.ID,
+			ToNode:    finding.ID,
+			Kind:      kind,
+			CreatedBy: user.ID,
+		}); err != nil {
+			s.logger.Error("create evidence edge", "err", err, "finding_id", finding.ID)
+		}
+		s.snapshotNodeRevision(r.Context(), finding.ID, &user.ID, finding.Title, finding.Body, "Created.", nil)
+		s.enqueueAudioForNode(r.Context(), finding)
+		s.logger.Info("evidence finding created", "node_id", finding.ID, "parent_node_id", parent.ID, "kind", kind, "user_id", user.ID)
+	}
 }
 
 // humanizeProgress turns the worker's raw streamed draft (partial, JSON-ish:
@@ -591,8 +727,11 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 
 	rerender := func(flash string) {
 		tc := parentCandidatesForRerender()
+		// Preserve any AI-proposed evidence (ticks + edits) across a validation
+		// re-render so the user doesn't lose it. Empty for a normal new post.
+		evidence := parseEvidenceForm(r)
 		if isHTMX(r) {
-			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
+			render(w, r, views.NodeNewModal(flash, rawType, title, body, rawPin, rawTags, rawVisibility, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc, evidence))
 			return
 		}
 		render(w, r, views.NodeNew(viewerFor(user), flash, rawType, title, body, rawPin, rawTags, rawVisibility, groups, rawFindParent, rawParentNodeID, rawTopicParentMode, rawFindingEdgeKind, tc))
@@ -751,6 +890,9 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.snapshotNodeRevision(r.Context(), node.ID, &user.ID, node.Title, node.Body, "Created.", tagNames)
 	s.enqueueAudioForNode(r.Context(), node)
+	// Turn any ticked AI-proposed evidence into reusable finding nodes linked to
+	// this one. No-op for a normal post (no evidence fields in the form).
+	s.createEvidenceFindings(r, user, node)
 	// Modal submit: ask htmx to do a full navigation to the new post so the
 	// modal closes and the page actually changes. Non-htmx submits get the
 	// usual 303 redirect.

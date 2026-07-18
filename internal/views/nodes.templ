@@ -51,7 +51,7 @@ templ NodeNew(viewer *Viewer, flash string, formType, formTitle, formBody, formP
 // when GET /nodes/new arrives with HX-Request: true. Form submit posts
 // via htmx; on validation error the server re-renders this fragment, on
 // success the handler returns HX-Redirect so htmx does a full navigation.
-templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate) {
+templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTags, formVisibility string, groups []db.ListGroupsForUserRow, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind string, parentCandidates []TopicCandidate, evidence []EvidenceItem) {
 	<div class="modal-backdrop" onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="post-modal-title">
 			<button type="button" class="modal-close" aria-label="Close" onclick="document.getElementById('modal').innerHTML=''">
@@ -87,6 +87,7 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 				hx-swap="innerHTML"
 			>
 				@postFormFields(formType, formTitle, formBody, formPin, formTags, formVisibility, groups, findParent, formParentNodeID, formTopicParentMode, formFindingEdgeKind, parentCandidates)
+				@evidenceChecklist(evidence)
 				<div class="form-row">
 					<button type="submit" class="btn accent"><span class="material-symbols-outlined">send</span>Post</button>
 					<button type="button" class="btn ghost" onclick="document.getElementById('modal').innerHTML=''"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -94,6 +95,34 @@ templ NodeNewModal(flash string, formType, formTitle, formBody, formPin, formTag
 			</form>
 		</div>
 	</div>
+}
+
+// evidenceChecklist renders the AI-proposed evidence as ticked-by-default items
+// inside the post form. Each ticked item becomes a reusable finding node linked
+// to the main node on submit (see createEvidenceFindings). Renders nothing when
+// there's no evidence, so the normal "new post" form is unaffected.
+templ evidenceChecklist(evidence []EvidenceItem) {
+	if len(evidence) > 0 {
+		<fieldset class="evidence-list">
+			<legend>Evidence to create as linked findings</legend>
+			<small class="muted" style="font-size: 12px;">Each ticked item becomes its own reusable evidence node, linked to this post. Untick any you don't want.</small>
+			for _, e := range evidence {
+				<div class="evidence-item">
+					<label class="row gap-8 center" style="cursor: pointer;">
+						<input type="checkbox" name="evidence_include" value={ evidenceIndex(e.Index) } checked?={ e.Included }/>
+						<input type="text" name={ "evidence_title_" + evidenceIndex(e.Index) } value={ e.Title } class="evidence-title" aria-label="Evidence title"/>
+					</label>
+					<div class="row gap-8 center wrap" style="margin: 4px 0 0 28px;">
+						<span class={ "chip", evidenceRelationClass(e.Relation) }>{ e.Relation }</span>
+						<a href={ templ.URL(e.SourceURL) } target="_blank" rel="noopener noreferrer" class="muted" style="font-size: 12px;">{ e.SourceDomain }</a>
+					</div>
+					<input type="hidden" name={ "evidence_source_" + evidenceIndex(e.Index) } value={ e.SourceURL }/>
+					<input type="hidden" name={ "evidence_body_" + evidenceIndex(e.Index) } value={ e.Body }/>
+					<input type="hidden" name={ "evidence_relation_" + evidenceIndex(e.Index) } value={ e.Relation }/>
+				</div>
+			}
+		</fieldset>
+	}
 }
 
 // NodeGenerateModal renders the AI prompt box. GET /nodes/generate returns it
@@ -1263,6 +1292,35 @@ type TopicCandidate struct {
 	ID    uuid.UUID
 	Type  db.NodeType
 	Title string
+}
+
+// EvidenceItem is one AI-proposed evidence finding shown in the confirm modal's
+// checklist. Index identifies its form fields (evidence_title_{Index}, …);
+// Included pre-checks the box. Created as a reusable finding linked to the main
+// node when the box is ticked.
+type EvidenceItem struct {
+	Index        int
+	Title        string
+	Body         string
+	SourceURL    string
+	SourceDomain string
+	Relation     string // "supports" | "opposes" | "related"
+	Included     bool
+}
+
+// evidenceIndex renders an item's index for its form-field names.
+func evidenceIndex(i int) string { return fmt.Sprintf("%d", i) }
+
+// evidenceRelationClass maps a relation to a chip modifier class for colouring.
+func evidenceRelationClass(relation string) string {
+	switch relation {
+	case "supports":
+		return "chip-supports"
+	case "opposes":
+		return "chip-opposes"
+	default:
+		return "chip-related"
+	}
 }
 
 // TopicCandidatePicker renders the parent-node search results in the post

@@ -3765,6 +3765,41 @@ form:has(input[name="to_mode"][value="new"]:checked) .edge-target-existing {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* AI-proposed evidence checklist in the confirm modal. */
+.evidence-list {
+  border: 1px solid var(--border, #d8dbe0);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 4px 0 2px;
+}
+.evidence-list > legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.evidence-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--border, #e3e5e9);
+}
+.evidence-item:first-of-type {
+  border-top: 0;
+}
+.evidence-title {
+  flex: 1;
+  min-width: 0;
+}
+.chip.chip-supports {
+  color: var(--supports);
+  border-color: color-mix(in oklch, var(--supports) 40%, transparent);
+}
+.chip.chip-opposes {
+  color: var(--opposes);
+  border-color: color-mix(in oklch, var(--opposes) 40%, transparent);
+}
+.chip.chip-related {
+  color: var(--relates);
+  border-color: color-mix(in oklch, var(--relates) 45%, transparent);
+}
 .modal-close {
   position: absolute;
   top: 12px;
