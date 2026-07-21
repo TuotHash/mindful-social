@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -102,11 +101,12 @@ type Config struct {
 
 	// AIProviders is the ordered list of OpenAI-compatible backends the
 	// drafting worker uses, tried first-to-last with automatic failover. It
-	// is derived in Load from either AI_PROVIDERS (a JSON array) or, when
-	// that is unset, the legacy AI_ENDPOINT_URL/AI_MODEL/AI_API_KEY trio
-	// (a single "default" provider). Empty means AI drafting is disabled.
-	// This is the single source the server consumes; the scalar AI* fields
-	// above only feed the fallback path.
+	// is derived in Load from AI_PROVIDERS (a comma-separated list of keys,
+	// each backed by AI_<KEY>_ENDPOINT / AI_<KEY>_MODEL / AI_<KEY>_API_KEY,
+	// mirroring the OIDC_PROVIDERS scheme) or, when that is unset, the legacy
+	// AI_ENDPOINT_URL/AI_MODEL/AI_API_KEY trio (a single "default" provider).
+	// Empty means AI drafting is disabled. This is the single source the
+	// server consumes; the scalar AI* fields above only feed the fallback path.
 	AIProviders []AIProvider
 
 	// SearxngURL is the base URL of a SearXNG metasearch instance used to
@@ -174,45 +174,28 @@ func Load(logger *slog.Logger) (Config, error) {
 	return cfg, nil
 }
 
-// aiProviders builds the ordered failover list. AI_PROVIDERS (a JSON array)
-// wins when present; each entry needs an endpoint and model (invalid ones are
-// warned and skipped) and may name an env var holding its API key via
-// "api_key_env", resolved here so the JSON itself never carries a secret. When
-// AI_PROVIDERS is unset or yields nothing usable, the legacy single-endpoint
-// vars become one "default" provider. An empty result disables AI drafting.
+// aiProviders builds the ordered failover list, structured like the OIDC
+// providers (see auth.LoadProviders): AI_PROVIDERS is a comma-separated list of
+// keys, and each key <K> draws its settings from AI_<K>_ENDPOINT, AI_<K>_MODEL,
+// and the optional AI_<K>_API_KEY (a secret, kept in an environment file). List
+// order is failover order. A provider missing its endpoint or model is warned
+// and skipped. When AI_PROVIDERS is unset, the legacy single-endpoint vars
+// (AI_ENDPOINT_URL/AI_MODEL/AI_API_KEY) become one "default" provider. An empty
+// result disables AI drafting.
 func aiProviders(logger *slog.Logger, legacyEndpoint, legacyModel, legacyKey string) []AIProvider {
-	raw := strings.TrimSpace(os.Getenv("AI_PROVIDERS"))
-	if raw != "" {
-		var entries []struct {
-			Name      string `json:"name"`
-			Endpoint  string `json:"endpoint"`
-			Model     string `json:"model"`
-			APIKeyEnv string `json:"api_key_env"`
-		}
-		if err := json.Unmarshal([]byte(raw), &entries); err != nil {
-			logger.Warn("config: AI_PROVIDERS is not valid JSON, AI drafting disabled", "err", err)
-			return nil
-		}
-		out := make([]AIProvider, 0, len(entries))
-		for i, e := range entries {
-			endpoint := strings.TrimSpace(e.Endpoint)
-			model := strings.TrimSpace(e.Model)
+	keys := envList("AI_PROVIDERS")
+	if len(keys) > 0 {
+		out := make([]AIProvider, 0, len(keys))
+		for _, key := range keys {
+			envKey := strings.ToUpper(key)
+			get := func(name string) string { return os.Getenv("AI_" + envKey + "_" + name) }
+			endpoint := strings.TrimSpace(get("ENDPOINT"))
+			model := strings.TrimSpace(get("MODEL"))
 			if endpoint == "" || model == "" {
-				logger.Warn("config: AI_PROVIDERS entry missing endpoint or model, skipping", "index", i, "name", e.Name)
+				logger.Warn("config: skipping incomplete AI provider (needs AI_<KEY>_ENDPOINT and AI_<KEY>_MODEL)", "key", key)
 				continue
 			}
-			name := strings.TrimSpace(e.Name)
-			if name == "" {
-				name = "provider-" + strconv.Itoa(i)
-			}
-			key := ""
-			if envName := strings.TrimSpace(e.APIKeyEnv); envName != "" {
-				key = os.Getenv(envName)
-				if key == "" {
-					logger.Warn("config: AI_PROVIDERS api_key_env is unset", "provider", name, "api_key_env", envName)
-				}
-			}
-			out = append(out, AIProvider{Name: name, Endpoint: endpoint, Model: model, APIKey: key})
+			out = append(out, AIProvider{Name: key, Endpoint: endpoint, Model: model, APIKey: get("API_KEY")})
 		}
 		if len(out) > 0 {
 			return out
