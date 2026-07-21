@@ -3,12 +3,17 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/TuotHash/mindful-social/internal/db"
 )
 
 func testWorker(idle time.Duration) *Worker {
@@ -129,6 +134,74 @@ func TestGroundedEvidenceEmptyWithoutSources(t *testing.T) {
 	got := groundedEvidence([]EvidenceDraft{{Title: "x", SourceURL: "https://a"}}, nil)
 	if got == nil || len(got) != 0 {
 		t.Errorf("expected non-nil empty slice, got %+v", got)
+	}
+}
+
+// fakeDrafter is a stand-in Drafter for failover tests. It records how many
+// times it was called and returns a fixed draft/error.
+type fakeDrafter struct {
+	draft *NodeDraft
+	err   error
+	calls int32
+}
+
+func (f *fakeDrafter) GenerateNodeGroundedStream(ctx context.Context, prompt string, sources []Source, onToken func(delta string)) (*NodeDraft, error) {
+	atomic.AddInt32(&f.calls, 1)
+	return f.draft, f.err
+}
+
+func failoverWorker(providers ...Provider) *Worker {
+	w := testWorker(time.Minute)
+	w.drafters = providers
+	return w
+}
+
+func TestGenerateFailsOverToNextProvider(t *testing.T) {
+	first := &fakeDrafter{err: errors.New("connection refused")}
+	second := &fakeDrafter{draft: &NodeDraft{Type: "view", Title: "ok"}}
+	w := failoverWorker(Provider{Name: "first", Drafter: first}, Provider{Name: "second", Drafter: second})
+
+	draft, err := w.generate(context.Background(), w.logger, db.NodeGenerationJob{ID: uuid.New(), Prompt: "hi"}, nil, "stage")
+	if err != nil {
+		t.Fatalf("expected fallback to succeed, got %v", err)
+	}
+	if draft == nil || draft.Title != "ok" {
+		t.Fatalf("expected second provider's draft, got %+v", draft)
+	}
+	if atomic.LoadInt32(&first.calls) != 1 || atomic.LoadInt32(&second.calls) != 1 {
+		t.Errorf("both providers should be tried once: first=%d second=%d", first.calls, second.calls)
+	}
+}
+
+func TestGenerateReturnsLastErrorWhenAllFail(t *testing.T) {
+	first := &fakeDrafter{err: errors.New("first down")}
+	lastErr := errors.New("second down")
+	second := &fakeDrafter{err: lastErr}
+	w := failoverWorker(Provider{Name: "first", Drafter: first}, Provider{Name: "second", Drafter: second})
+
+	_, err := w.generate(context.Background(), w.logger, db.NodeGenerationJob{ID: uuid.New(), Prompt: "hi"}, nil, "stage")
+	if !errors.Is(err, lastErr) {
+		t.Fatalf("expected the last provider's error, got %v", err)
+	}
+	if atomic.LoadInt32(&second.calls) != 1 {
+		t.Errorf("second provider should have been tried, calls=%d", second.calls)
+	}
+}
+
+func TestGenerateStopsFailoverWhenContextCancelled(t *testing.T) {
+	first := &fakeDrafter{err: errors.New("boom")}
+	second := &fakeDrafter{draft: &NodeDraft{Title: "should not run"}}
+	w := failoverWorker(Provider{Name: "first", Drafter: first}, Provider{Name: "second", Drafter: second})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // job timed out / server shutting down before the second attempt
+
+	_, err := w.generate(ctx, w.logger, db.NodeGenerationJob{ID: uuid.New(), Prompt: "hi"}, nil, "stage")
+	if err == nil {
+		t.Fatal("expected an error when the context is cancelled")
+	}
+	if atomic.LoadInt32(&second.calls) != 0 {
+		t.Errorf("cancelled context must not fall back to the next provider, calls=%d", second.calls)
 	}
 }
 

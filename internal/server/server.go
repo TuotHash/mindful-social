@@ -38,10 +38,10 @@ type Server struct {
 	csrf        func(http.Handler) http.Handler
 	router      chi.Router
 	audioWorker *audio.Worker
-	// aiClient drafts nodes from a prompt. nil when AI_ENDPOINT_URL is
-	// unset — the "Generate with AI" entry point is hidden and the
-	// /nodes/generate routes 404.
-	aiClient *ai.Client
+	// aiEnabled reports whether node drafting is configured (at least one AI
+	// provider). false when no provider is set — the "Generate with AI" entry
+	// point is hidden and the /nodes/generate routes 404.
+	aiEnabled bool
 	// genWorker drains the node_generation_jobs queue. nil when AI is
 	// disabled.
 	genWorker *ai.Worker
@@ -122,18 +122,24 @@ func New(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	// unset the feature stays invisible; the client is otherwise stateless
 	// so there's nothing to health-check at boot (per-request errors surface
 	// to the user as a flash).
-	if cfg.AIEndpointURL != "" {
-		s.aiClient = ai.NewClient(cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
+	if len(cfg.AIProviders) > 0 {
+		s.aiEnabled = true
+		providers := make([]ai.Provider, len(cfg.AIProviders))
+		names := make([]string, len(cfg.AIProviders))
+		for i, p := range cfg.AIProviders {
+			providers[i] = ai.Provider{Name: p.Name, Drafter: ai.NewClient(p.Endpoint, p.Model, p.APIKey)}
+			names[i] = p.Name
+		}
 		aiLogger := logger.With("subsys", "ai")
 		gatherer := ai.NewGatherer(cfg.SearxngURL, aiLogger)
 		s.progressHub = ai.NewProgressHub()
-		s.genWorker = ai.NewWorker(s.queries, s.aiClient, gatherer, s.progressHub, cfg.AIJobTimeout, cfg.AIStreamIdleTimeout, aiLogger)
-		logger.Info("ai: node drafting enabled", "endpoint", cfg.AIEndpointURL, "model", cfg.AIModel, "web_search", cfg.SearxngURL != "")
+		s.genWorker = ai.NewWorker(s.queries, providers, gatherer, s.progressHub, cfg.AIJobTimeout, cfg.AIStreamIdleTimeout, aiLogger)
+		logger.Info("ai: node drafting enabled", "providers", names, "web_search", cfg.SearxngURL != "")
 	} else {
-		logger.Info("ai: AI_ENDPOINT_URL unset, node drafting disabled")
+		logger.Info("ai: no provider configured, node drafting disabled")
 	}
-	views.SetAIEnabled(s.aiClient != nil)
-	views.SetWebSearchEnabled(s.aiClient != nil && cfg.SearxngURL != "")
+	views.SetAIEnabled(s.aiEnabled)
+	views.SetWebSearchEnabled(s.aiEnabled && cfg.SearxngURL != "")
 	if err := s.bootstrapAdmins(ctx); err != nil {
 		// Don't fail boot if admin reconcile fails — just log it. A
 		// transient DB error shouldn't keep the whole server down.

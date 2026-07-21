@@ -17,10 +17,17 @@ import (
 	"github.com/TuotHash/mindful-social/internal/db"
 )
 
-// drafter and gatherer are the two collaborators the worker needs, defined as
+// Drafter and gatherer are the two collaborators the worker needs, defined as
 // interfaces so tests can substitute fakes. *Client and *Gatherer satisfy them.
-type drafter interface {
+type Drafter interface {
 	GenerateNodeGroundedStream(ctx context.Context, prompt string, sources []Source, onToken func(delta string)) (*NodeDraft, error)
+}
+
+// Provider is one named backend in the worker's ordered failover list. The
+// worker tries providers first-to-last, falling back to the next on error.
+type Provider struct {
+	Name    string // short label for logs (e.g. "local", "gemini")
+	Drafter Drafter
 }
 
 type gatherer interface {
@@ -33,7 +40,7 @@ type gatherer interface {
 // matter of launching more.
 type Worker struct {
 	queries  *db.Queries
-	drafter  drafter
+	drafters []Provider // ordered failover list; empty means AI disabled
 	gatherer gatherer
 	hub      *ProgressHub // live updates to the SSE handler; may be nil
 	logger   *slog.Logger
@@ -55,12 +62,13 @@ type Worker struct {
 	idleSleep time.Duration
 }
 
-// NewWorker returns a started worker. When drafter is nil (AI disabled) it is
-// an inert no-op whose Close returns immediately. jobTimeout is the absolute
-// ceiling on a single job; idleTimeout is the no-output-for-this-long stall
-// guard on streaming generation. Non-positive values fall back to 30m and 90s.
-// hub receives live progress for the SSE handler and may be nil.
-func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, hub *ProgressHub, jobTimeout, idleTimeout time.Duration, logger *slog.Logger) *Worker {
+// NewWorker returns a started worker. When drafters is empty (AI disabled) it is
+// an inert no-op whose Close returns immediately. Providers are tried in order
+// with automatic failover. jobTimeout is the absolute ceiling on a single job;
+// idleTimeout is the no-output-for-this-long stall guard on streaming
+// generation. Non-positive values fall back to 30m and 90s. hub receives live
+// progress for the SSE handler and may be nil.
+func NewWorker(queries *db.Queries, drafters []Provider, gatherer gatherer, hub *ProgressHub, jobTimeout, idleTimeout time.Duration, logger *slog.Logger) *Worker {
 	if jobTimeout <= 0 {
 		jobTimeout = 30 * time.Minute
 	}
@@ -70,7 +78,7 @@ func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, hub *Pro
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &Worker{
 		queries:     queries,
-		drafter:     drafter,
+		drafters:    drafters,
 		gatherer:    gatherer,
 		hub:         hub,
 		logger:      logger,
@@ -80,7 +88,7 @@ func NewWorker(queries *db.Queries, drafter drafter, gatherer gatherer, hub *Pro
 		done:        make(chan struct{}),
 		idleSleep:   2 * time.Second,
 	}
-	if drafter == nil {
+	if len(drafters) == 0 {
 		close(w.done)
 		return w
 	}
@@ -164,7 +172,7 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 	w.setProgress(ctx, job.ID, writeStage, "")
 	w.hub.Publish(job.ID, ProgressEvent{Stage: writeStage})
 
-	draft, err := w.generate(ctx, job, sources, writeStage)
+	draft, err := w.generate(ctx, logger, job, sources, writeStage)
 	if err != nil {
 		w.fail(ctx, logger, job, err)
 		return
@@ -200,15 +208,45 @@ func (w *Worker) process(ctx context.Context, job db.NodeGenerationJob) {
 	w.hub.Publish(job.ID, ProgressEvent{Done: true, Status: string(db.GenerationJobStatusCompleted)})
 }
 
-// generate runs the streaming LLM call under an idle watchdog. It streams the
-// draft into the job row (throttled) so the polling UI shows it live, resets the
-// idle clock on every token, and cancels the call if the model goes quiet for
-// longer than idleTimeout — turning a stall into a fast, clear failure while
-// letting a slow-but-progressing model run to completion. The idle guard only
-// engages after the first token: time-to-first-token (prompt evaluation) on a
-// local model with grounded context is legitimately minutes, so before any
-// output arrives only the outer hard-cap timeout applies.
-func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources []Source, stage string) (*NodeDraft, error) {
+// generate drafts the node, trying each configured provider in order and
+// falling back to the next on error (a down endpoint, an HTTP failure, or a
+// stall). A partial stream from a failed provider never leaks into the next
+// attempt: each provider gets a fresh accumulator and idle watchdog via
+// attempt. Failover stops early if the outer ctx is cancelled — a job-timeout
+// or shutdown is not a provider fault and must not trigger a retry. When every
+// provider fails, the last error is returned (surfaced to the user unchanged).
+func (w *Worker) generate(ctx context.Context, logger *slog.Logger, job db.NodeGenerationJob, sources []Source, stage string) (*NodeDraft, error) {
+	var lastErr error
+	for i, p := range w.drafters {
+		draft, err := w.attempt(ctx, p, job, sources, stage)
+		if err == nil {
+			return draft, nil
+		}
+		lastErr = err
+		// The outer ctx being cancelled means the whole job timed out or the
+		// server is shutting down — not this provider's fault, so don't burn
+		// the remaining providers on a doomed retry.
+		if ctx.Err() != nil {
+			return nil, err
+		}
+		if i < len(w.drafters)-1 {
+			logger.Warn("ai worker: provider failed, falling back",
+				"provider", p.Name, "next", w.drafters[i+1].Name, "err", err)
+		}
+	}
+	return nil, lastErr
+}
+
+// attempt runs one streaming LLM call against a single provider under an idle
+// watchdog. It streams the draft into the job row (throttled) so the polling UI
+// shows it live, resets the idle clock on every token, and cancels the call if
+// the model goes quiet for longer than idleTimeout — turning a stall into a
+// fast, clear failure while letting a slow-but-progressing model run to
+// completion. The idle guard only engages after the first token:
+// time-to-first-token (prompt evaluation) on a local model with grounded
+// context is legitimately minutes, so before any output arrives only the outer
+// hard-cap timeout applies.
+func (w *Worker) attempt(ctx context.Context, p Provider, job db.NodeGenerationJob, sources []Source, stage string) (*NodeDraft, error) {
 	llmCtx, cancelLLM := context.WithCancel(ctx)
 	defer cancelLLM()
 
@@ -219,7 +257,9 @@ func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources
 	defer stop()
 
 	// accum, lastDB, and lastHub are touched only from onToken, which the stream
-	// reader invokes synchronously on this goroutine — no locking needed.
+	// reader invokes synchronously on this goroutine — no locking needed. They
+	// are local to this attempt, so a failed provider's partial output is
+	// discarded before the next provider starts streaming.
 	var accum strings.Builder
 	var lastDB, lastHub time.Time
 	onToken := func(delta string) {
@@ -240,7 +280,7 @@ func (w *Worker) generate(ctx context.Context, job db.NodeGenerationJob, sources
 		}
 	}
 
-	draft, err := w.drafter.GenerateNodeGroundedStream(llmCtx, job.Prompt, sources, onToken)
+	draft, err := p.Drafter.GenerateNodeGroundedStream(llmCtx, job.Prompt, sources, onToken)
 	stop()
 	if err != nil {
 		if stalled.Load() {

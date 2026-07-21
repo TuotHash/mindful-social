@@ -185,7 +185,7 @@ func parentCandidateRows(rows []db.SearchPostParentsRow) []views.TopicCandidate 
 // hidden "Generate with AI" button. The feature is htmx-only; a non-htmx hit
 // falls back to the styled New Post page, which still carries the button.
 func (s *Server) handleNodeGenerateForm(w http.ResponseWriter, r *http.Request) {
-	if s.aiClient == nil {
+	if !s.aiEnabled {
 		s.notFound(w, r)
 		return
 	}
@@ -201,7 +201,7 @@ func (s *Server) handleNodeGenerateForm(w http.ResponseWriter, r *http.Request) 
 // background worker finishes. Web fetch + long-context generation exceeds the
 // request timeout, so the work happens off the request path.
 func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
-	if s.aiClient == nil {
+	if !s.aiEnabled {
 		s.notFound(w, r)
 		return
 	}
@@ -247,7 +247,7 @@ func (s *Server) handleNodeGenerate(w http.ResponseWriter, r *http.Request) {
 // the draft — which omits the poll trigger, stopping the poll. Jobs are scoped
 // to the requesting user.
 func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request) {
-	if s.aiClient == nil {
+	if !s.aiEnabled {
 		s.notFound(w, r)
 		return
 	}
@@ -309,7 +309,7 @@ func (s *Server) handleNodeGenerateStatus(w http.ResponseWriter, r *http.Request
 // fetches the finished form from handleNodeGenerateStatus. Jobs are scoped to
 // the requesting user.
 func (s *Server) handleNodeGenerateStream(w http.ResponseWriter, r *http.Request) {
-	if s.aiClient == nil || s.progressHub == nil {
+	if !s.aiEnabled || s.progressHub == nil {
 		s.notFound(w, r)
 		return
 	}

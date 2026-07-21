@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -9,6 +10,17 @@ import (
 	"strings"
 	"time"
 )
+
+// AIProvider is one OpenAI-compatible backend the drafting worker may use.
+// Providers form an ordered failover list (see AIProviders): the worker tries
+// the first and falls back to the next on error. APIKey is the resolved secret
+// (already read from its referencing env var), never logged.
+type AIProvider struct {
+	Name     string // short label for logs (e.g. "local", "gemini")
+	Endpoint string // API root, e.g. "http://127.0.0.1:11434/v1"
+	Model    string // model name passed to the endpoint
+	APIKey   string // bearer token; empty for local runtimes like Ollama
+}
 
 type Config struct {
 	ListenAddr  string
@@ -88,6 +100,15 @@ type Config struct {
 	// out of the repo; supply via an environment file in production.
 	AIAPIKey string
 
+	// AIProviders is the ordered list of OpenAI-compatible backends the
+	// drafting worker uses, tried first-to-last with automatic failover. It
+	// is derived in Load from either AI_PROVIDERS (a JSON array) or, when
+	// that is unset, the legacy AI_ENDPOINT_URL/AI_MODEL/AI_API_KEY trio
+	// (a single "default" provider). Empty means AI drafting is disabled.
+	// This is the single source the server consumes; the scalar AI* fields
+	// above only feed the fallback path.
+	AIProviders []AIProvider
+
 	// SearxngURL is the base URL of a SearXNG metasearch instance used to
 	// ground AI drafts in web search results (e.g. "http://127.0.0.1:8888").
 	// Empty disables the "Search the web" option — URL-grounded drafting
@@ -143,6 +164,7 @@ func Load(logger *slog.Logger) (Config, error) {
 		AIJobTimeout:               envDuration(logger, "AI_JOB_TIMEOUT", 30*time.Minute),
 		AIStreamIdleTimeout:        envDuration(logger, "AI_STREAM_IDLE_TIMEOUT", 90*time.Second),
 	}
+	cfg.AIProviders = aiProviders(logger, cfg.AIEndpointURL, cfg.AIModel, cfg.AIAPIKey)
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
@@ -150,6 +172,60 @@ func Load(logger *slog.Logger) (Config, error) {
 		logger.Warn("config: PUBLIC_BASE_URL unset, using default", "default", cfg.PublicBaseURL)
 	}
 	return cfg, nil
+}
+
+// aiProviders builds the ordered failover list. AI_PROVIDERS (a JSON array)
+// wins when present; each entry needs an endpoint and model (invalid ones are
+// warned and skipped) and may name an env var holding its API key via
+// "api_key_env", resolved here so the JSON itself never carries a secret. When
+// AI_PROVIDERS is unset or yields nothing usable, the legacy single-endpoint
+// vars become one "default" provider. An empty result disables AI drafting.
+func aiProviders(logger *slog.Logger, legacyEndpoint, legacyModel, legacyKey string) []AIProvider {
+	raw := strings.TrimSpace(os.Getenv("AI_PROVIDERS"))
+	if raw != "" {
+		var entries []struct {
+			Name      string `json:"name"`
+			Endpoint  string `json:"endpoint"`
+			Model     string `json:"model"`
+			APIKeyEnv string `json:"api_key_env"`
+		}
+		if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+			logger.Warn("config: AI_PROVIDERS is not valid JSON, AI drafting disabled", "err", err)
+			return nil
+		}
+		out := make([]AIProvider, 0, len(entries))
+		for i, e := range entries {
+			endpoint := strings.TrimSpace(e.Endpoint)
+			model := strings.TrimSpace(e.Model)
+			if endpoint == "" || model == "" {
+				logger.Warn("config: AI_PROVIDERS entry missing endpoint or model, skipping", "index", i, "name", e.Name)
+				continue
+			}
+			name := strings.TrimSpace(e.Name)
+			if name == "" {
+				name = "provider-" + strconv.Itoa(i)
+			}
+			key := ""
+			if envName := strings.TrimSpace(e.APIKeyEnv); envName != "" {
+				key = os.Getenv(envName)
+				if key == "" {
+					logger.Warn("config: AI_PROVIDERS api_key_env is unset", "provider", name, "api_key_env", envName)
+				}
+			}
+			out = append(out, AIProvider{Name: name, Endpoint: endpoint, Model: model, APIKey: key})
+		}
+		if len(out) > 0 {
+			return out
+		}
+		// AI_PROVIDERS was set but produced nothing usable — treat AI as
+		// disabled rather than silently falling back to the legacy vars,
+		// which would mask the misconfiguration.
+		return nil
+	}
+	if strings.TrimSpace(legacyEndpoint) == "" {
+		return nil
+	}
+	return []AIProvider{{Name: "default", Endpoint: legacyEndpoint, Model: legacyModel, APIKey: legacyKey}}
 }
 
 // LogLevelFromEnv returns the configured startup log level. Invalid values
