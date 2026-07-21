@@ -36,6 +36,16 @@ let
   # readable store, and stays stable across reboots and deploys.
   searxSecretDir = "/var/lib/mindful-social-searx";
   searxSecretFile = "${searxSecretDir}/secret.env";
+
+  aiCfg = cfg.ai;
+  # AI_PROVIDERS as JSON for the service environment. Carries only the
+  # non-secret provider metadata — each provider's API key is referenced by
+  # env-var name (api_key_env), and that variable is supplied through
+  # environmentFile, so no key ever lands in the world-readable Nix store.
+  aiProvidersJSON = builtins.toJSON (map (p:
+    { inherit (p) name endpoint model; }
+    // lib.optionalAttrs (p.apiKeyEnv != "") { api_key_env = p.apiKeyEnv; }
+  ) aiCfg.providers);
 in {
   options.services.mindful-social = {
     enable = lib.mkEnableOption "the Mindful Social server";
@@ -114,11 +124,14 @@ in {
         Put actual secrets in environmentFile instead so they stay out
         of the Nix store.
 
-        AI node drafting (optional) is configured here too: set
-        AI_ENDPOINT_URL to an OpenAI-compatible endpoint (e.g. a local
-        Ollama at http://127.0.0.1:11434/v1) and AI_MODEL to the model
-        name. Leave AI_ENDPOINT_URL unset to keep the feature disabled.
-        A hosted provider's AI_API_KEY belongs in environmentFile.
+        AI node drafting (optional) is best configured via
+        services.mindful-social.ai.providers, which supports several
+        backends with automatic failover. For a single backend you can
+        instead set AI_ENDPOINT_URL to an OpenAI-compatible endpoint (e.g.
+        a local Ollama at http://127.0.0.1:11434/v1) and AI_MODEL to the
+        model name here; leave both unset to keep the feature disabled. A
+        hosted provider's API key belongs in environmentFile (as AI_API_KEY
+        for the single-endpoint form, or the apiKeyEnv name for a provider).
 
         Generation streams, so timeouts have two knobs:
         AI_STREAM_IDLE_TIMEOUT (default 90s) is the primary guard — it
@@ -269,6 +282,66 @@ in {
       };
     };
 
+    ai = {
+      providers = lib.mkOption {
+        type = lib.types.listOf (lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              example = "gemini";
+              description = "Short label for this backend, shown in logs.";
+            };
+            endpoint = lib.mkOption {
+              type = lib.types.str;
+              example = "https://generativelanguage.googleapis.com/v1beta/openai";
+              description = ''
+                API root of an OpenAI-compatible chat-completions endpoint
+                (Ollama, vLLM, llama.cpp, OpenRouter, Gemini's OpenAI layer,
+                etc.). A trailing slash is tolerated.
+              '';
+            };
+            model = lib.mkOption {
+              type = lib.types.str;
+              example = "gemini-3-flash-preview";
+              description = "Model name passed to the endpoint.";
+            };
+            apiKeyEnv = lib.mkOption {
+              type = lib.types.str;
+              default = "";
+              example = "GEMINI_API_KEY";
+              description = ''
+                Name of the environment variable holding this provider's API
+                key. The key itself is NOT written here — set it in
+                environmentFile so it stays out of the Nix store. Leave empty
+                for local runtimes (e.g. Ollama) that need no key.
+              '';
+            };
+          };
+        });
+        default = [];
+        example = [
+          { name = "local"; endpoint = "http://127.0.0.1:11434/v1"; model = "llama3.1:8b"; }
+          { name = "gemini"; endpoint = "https://generativelanguage.googleapis.com/v1beta/openai";
+            model = "gemini-3-flash-preview"; apiKeyEnv = "GEMINI_API_KEY"; }
+        ];
+        description = ''
+          Ordered list of AI backends for node drafting, tried first-to-last
+          with automatic failover: if the first errors (down, HTTP failure,
+          or a stall) the worker falls back to the next. Pairing a private
+          local Ollama with a hosted fallback like Gemini means a single
+          backend outage no longer fails every draft.
+
+          Serialized into the AI_PROVIDERS environment variable. When this
+          list is empty the feature falls back to the legacy AI_ENDPOINT_URL
+          / AI_MODEL / AI_API_KEY vars set in `environment` (a single
+          provider); leave both unset to keep AI drafting disabled.
+
+          Each provider's API key is referenced by env-var name (apiKeyEnv)
+          and supplied through environmentFile, so no secret enters the store.
+        '';
+      };
+    };
+
     searx = {
       enable = lib.mkEnableOption ''
         a local SearXNG metasearch instance for grounding AI drafts in
@@ -380,6 +453,9 @@ in {
       }
       // lib.optionalAttrs searxCfg.enable {
         SEARXNG_URL = searxURL;
+      }
+      // lib.optionalAttrs (aiCfg.providers != []) {
+        AI_PROVIDERS = aiProvidersJSON;
       }
       // cfg.environment;
 
